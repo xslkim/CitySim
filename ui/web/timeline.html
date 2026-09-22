@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>WorldSim 观察端 · 事件时间轴</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg0:#0E1116;--bg1:#161B22;--bg2:#1F2630;--bd:#2D333D;--t0:#E6E9EF;--t1:#9AA4B2;--ac:#5AC3ED;--pos:#2EFA8D;--neg:#F75752;--warn:#FEAE3E;--nt:#8A93A0;--dir:#BF86E8}
+html,body{height:100%}
+body{background:var(--bg0);color:var(--t0);font:13px/1.55 -apple-system,"Segoe UI","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;overflow:hidden}
+a{color:inherit;text-decoration:none}
+.topnav{height:48px;display:flex;align-items:center;gap:20px;padding:0 16px;background:var(--bg1);border-bottom:1px solid var(--bd)}
+.logo{font-size:14px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
+.logo b{color:var(--ac)}
+.logo small{font-weight:400;color:var(--t1);font-size:11px;margin-left:6px}
+.nav{display:flex;gap:4px}
+.nav a{padding:6px 12px;border-radius:8px;font-size:13px;color:var(--t1);white-space:nowrap}
+.nav a:hover{background:var(--bg2);color:var(--t0)}
+.nav a.on{background:var(--bg2);color:var(--ac);font-weight:600}
+.nav .dbg{font-style:normal;font-size:10px;color:var(--dir);border:1px solid var(--dir);border-radius:4px;padding:0 3px;margin-left:4px;vertical-align:1px}
+.sim{margin-left:auto;display:flex;gap:14px;font-size:12px;color:var(--t1);font-variant-numeric:tabular-nums;white-space:nowrap}
+.sim b{color:var(--t0);font-weight:600}
+.sim .lag{color:var(--pos)}
+.layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:8px;padding:8px;height:calc(100vh - 48px)}
+.col{display:flex;flex-direction:column;gap:8px;min-height:0;min-width:0}
+.card{background:var(--bg1);border:1px solid var(--bd);border-radius:8px;padding:12px}
+.scroll{overflow-y:auto;min-height:0}
+.scroll::-webkit-scrollbar{width:8px}
+.scroll::-webkit-scrollbar-thumb{background:var(--bd);border-radius:4px}
+.ct{font-size:14px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.ct small{font-size:11px;color:var(--t1);font-weight:400}
+.sub{font-size:11px;color:var(--t1)}
+/* control bar */
+.ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cbtn{width:32px;height:32px;border-radius:8px;background:var(--bg2);border:1px solid var(--bd);color:var(--t0);font-size:12px;cursor:pointer}
+.cbtn.main{background:var(--ac);color:#0E1116;border-color:var(--ac)}
+.spd{display:flex;gap:2px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:2px}
+.spd button{background:none;border:none;color:var(--t1);font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;font-variant-numeric:tabular-nums}
+.spd button.on{background:var(--bg1);color:var(--ac);font-weight:600}
+.tickinfo{font-size:12px;color:var(--t1);font-variant-numeric:tabular-nums}
+.tickinfo b{color:var(--t0)}
+.live{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px}
+.livedot{width:8px;height:8px;border-radius:50%;background:var(--pos);animation:bl 1.6s ease-in-out infinite}
+@keyframes bl{0%,100%{opacity:1}50%{opacity:.3}}
+.btn{display:inline-block;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:5px 12px;font-size:12px;color:var(--t0)}
+/* scrub */
+.scrub{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:11px;color:var(--t1);font-variant-numeric:tabular-nums}
+.strack{position:relative;flex:1;height:18px}
+.strack .rail{position:absolute;left:0;right:0;top:7px;height:4px;border-radius:2px;background:var(--bg2)}
+.strack .fill{position:absolute;left:0;top:7px;height:4px;border-radius:2px;background:var(--ac);width:28.5%}
+.strack .knob{position:absolute;top:2px;width:14px;height:14px;border-radius:50%;background:var(--t0);border:3px solid var(--ac);left:28.5%;transform:translateX(-50%)}
+/* histogram */
+.hist{display:flex;align-items:flex-end;gap:2px;height:64px;margin-top:4px}
+.hist .b{flex:1;background:var(--bg2);border-radius:2px 2px 0 0;position:relative;min-height:2px}
+.hist .b>i{position:absolute;left:0;right:0;top:0;background:var(--neg);border-radius:2px 2px 0 0}
+.histlbl{display:flex;justify-content:space-between;font-size:9px;color:var(--t1);margin-top:2px;font-variant-numeric:tabular-nums}
+/* chips */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--bd);background:var(--bg2);color:var(--t1);border-radius:8px;padding:3px 9px;font-size:11px}
+.chip.on{color:var(--ac);border-color:var(--ac)}
+.chip.ond{color:var(--dir);border-color:var(--dir)}
+.chip.onw{color:var(--warn);border-color:var(--warn)}
+.fsec{font-size:11px;color:var(--t1);margin:10px 0 6px;letter-spacing:1px}
+.kw{width:100%;background:var(--bg2);border:1px solid var(--ac);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--t0);outline:none}
+/* event rows */
+.evr{display:flex;gap:10px;align-items:flex-start;background:var(--bg1);border:1px solid var(--bd);border-radius:8px;padding:8px 12px 8px 14px;position:relative;overflow:hidden}
+.evr::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--t1)}
+.evr.t-world::before{background:var(--ac)}
+.evr.t-dir::before{background:var(--dir)}
+.evr.t-sys::before{background:var(--bd)}
+.evr.evA{border-color:#3d4654;background:linear-gradient(180deg,#1a212b,#161B22)}
+.evr.evA::before{width:6px;background:var(--warn)}
+.evr.evA::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(254,174,62,.10) 50%,transparent 70%);background-size:250% 100%;animation:sweep 3s linear infinite;pointer-events:none}
+@keyframes sweep{from{background-position:200% 0}to{background-position:-100% 0}}
+.evr .tm{width:64px;flex:none;font-size:11px;color:var(--t1);font-variant-numeric:tabular-nums;line-height:1.4}
+.evr .tm .sq{color:var(--ac);font-size:10px}
+.evr .ic{width:22px;flex:none;text-align:center;font-size:14px}
+.evr .bd{flex:1;min-width:0}
+.evr .tx{font-size:13px}
+.evr .mt{font-size:11px;color:var(--t1);margin-top:2px}
+.gr{flex:none;font-size:10px;font-weight:700;border-radius:4px;padding:1px 6px;border:1px solid var(--warn);color:var(--warn)}
+.gr.b{border-color:var(--bd);color:var(--t1)}
+.daysep{display:flex;align-items:center;gap:10px;color:var(--t1);font-size:11px;padding:2px 6px}
+.daysep::before,.daysep::after{content:"";flex:1;height:1px;background:var(--bd)}
+.fin{border:1px dashed var(--warn);border-radius:6px;padding:2px 8px;font-size:10px;color:var(--warn)}
+.legend2{display:flex;flex-direction:column;gap:6px;font-size:12px}
+.legend2 .li{display:flex;align-items:center;gap:8px}
+.lb{width:6px;height:18px;border-radius:2px;flex:none}
+</style>
+</head>
+<body>
+<header class="topnav">
+  <div class="logo">◆ <b>WorldSim</b> 观察端<small>阶段 0 · 占位视觉</small></div>
+  <nav class="nav">
+    <a href="index.html">地图</a>
+    <a href="timeline.html" class="on">时间轴</a>
+    <a href="ripple.html">涟漪</a>
+    <a href="relations.html">关系</a>
+    <a href="health.html">健康度<i class="dbg">调试</i></a>
+  </nav>
+  <div class="sim">
+    <span>sim <b>Day12 19:42</b></span>
+    <span>压缩比 <b>3.2×</b></span>
+    <span class="lag">数据延迟 2s</span>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- 左栏：过滤 -->
+  <div class="col scroll">
+    <div class="card">
+      <div class="ct">过滤<small>条件下推 REST 查询</small></div>
+      <div class="fsec">类型（06 注册表）</div>
+      <div class="chips">
+        <span class="chip on">话 对话</span><span class="chip on">卦 八卦</span><span class="chip on">⚡ 争执</span>
+        <span class="chip on">❤ 告白</span><span class="chip">✉ 私信</span><span class="chip">✉ 邀约</span>
+        <span class="chip">借 借/还</span><span class="chip">礼 礼物</span><span class="chip">走 移动</span>
+        <span class="chip">思 反思</span><span class="chip on">⚐ 公告/传闻</span><span class="chip on">¥ 工资</span>
+        <span class="chip on">↗ 股价</span><span class="chip">夜 加班</span><span class="chip">目 目击投影</span>
+      </div>
+      <div class="fsec">trigger</div>
+      <div class="chips">
+        <span class="chip on">autonomous</span><span class="chip on">world</span><span class="chip ond">director</span><span class="chip">system</span>
+      </div>
+      <div class="fsec">角色</div>
+      <div class="chips"><span class="chip on">林晚 ×</span><span class="chip">周叙 ×</span><span class="chip">+ 添加</span></div>
+      <div class="fsec">地点</div>
+      <div class="chips"><span class="chip">全部 ▾</span><span class="chip">公寓</span><span class="chip">公司</span><span class="chip">校外</span></div>
+      <div class="fsec">关键词（zhparser 中文分词）</div>
+      <input class="kw" value="裁员">
+      <div class="fsec">事件等级</div>
+      <div class="chips"><span class="chip onw">仅看 A 级 ✓</span><span class="chip">B 级 ✓</span><span class="chip">C 级</span></div>
+    </div>
+    <div class="card">
+      <div class="ct">色条图例<small>02 §7.3 · 干预率 KPI 就靠色条密度</small></div>
+      <div class="legend2">
+        <div class="li"><span class="lb" style="background:var(--t1)"></span>autonomous（Agent 自主）</div>
+        <div class="li"><span class="lb" style="background:var(--ac)"></span>world（世界规则触发）</div>
+        <div class="li"><span class="lb" style="background:var(--dir)"></span>director（编剧干预 · 审计）</div>
+        <div class="li"><span class="lb" style="background:var(--bd)"></span>system（默认折叠）</div>
+        <div class="li"><span class="lb" style="background:var(--warn);width:8px"></span>A 级：6px 加粗 + 高亮扫过</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 中栏 -->
+  <div class="col">
+    <div class="card">
+      <div class="ctl">
+        <button class="cbtn">◀◀</button>
+        <button class="cbtn main">▮</button>
+        <button class="cbtn">▶▶</button>
+        <div class="spd">
+          <button>0.5×</button><button class="on">1×</button><button>2×</button><button>4×</button><button>8×</button>
+        </div>
+        <span class="tickinfo">tick <b>12338</b> · sim <b>Day12 19:42:03</b></span>
+        <span class="live"><span class="livedot"></span>LIVE <a class="btn" href="#">跳至 live</a></span>
+      </div>
+      <div class="scrub">
+        <span>18:00</span>
+        <div class="strack"><div class="rail"></div><div class="fill"></div><div class="knob"></div></div>
+        <span>24:00</span>
+      </div>
+      <div class="sub" style="margin-top:6px">播放倍率（气泡逐句节奏）与内核压缩比 3.2× 是两个独立旋钮 · 拖到过去自动切历史模式</div>
+      <div class="hist" id="hist"></div>
+      <div class="histlbl"><span>0时</span><span>6时</span><span>12时</span><span>18时</span><span>23时</span></div>
+      <div class="sub" style="margin-top:2px">密度直方图：每模拟小时事件数 · <span style="color:var(--neg)">红</span> = 其中 A 级事件数 · 点击柱子跳转</div>
+    </div>
+
+    <div class="card scroll" style="flex:1;display:flex;flex-direction:column;gap:8px">
+      <div class="evr t-auto evA">
+        <div class="tm">19:42:03<br><span class="sq">e1211</span></div>
+        <div class="ic" style="color:var(--ac)">话</div>
+        <div class="bd"><div class="tx">林晚⇄陈屿 厨房对话 6~8 轮 · 第 3 句：“你还是放不下她？” ●●○○○</div>
+        <div class="mt">dialogue.chat · 公寓·2F厨房 · trigger: autonomous · 播放 1× · 目击：无</div></div>
+        <span class="gr">A</span>
+      </div>
+      <div class="evr t-auto evA">
+        <div class="tm">19:40:55<br><span class="sq">e1204</span></div>
+        <div class="ic" style="color:var(--neg)">❤</div>
+        <div class="bd"><div class="tx">周叙 → 苏蔓 <b>告白成功</b>（双向 affinity +15 · tension -10 · 写入“恋人”标签）—— “我喜欢你很久了。”“……我也是。”</div>
+        <div class="mt">dialogue.confess · 公寓·天台 · trigger: autonomous · arc_crush_01 收官 · <a href="index.html" style="color:var(--ac)">地图名场面 →</a></div></div>
+        <span class="gr">A</span>
+      </div>
+      <div class="evr t-world">
+        <div class="tm">19:38:11<br><span class="sq">e1201</span></div>
+        <div class="ic" style="color:var(--ac)">⚐</div>
+        <div class="bd"><div class="tx">裁员传闻发酵：昨日星澜科技单日跌 3.4%（&gt;3% 阈值）· 全公司 gossip 意图权重 ×2，持续 2 模拟日</div>
+        <div class="mt">world.layoff_rumor · 全公司 · trigger: world（规则触发，不占干预率）</div></div>
+      </div>
+      <div class="evr t-sys">
+        <div class="tm">19:35:47<br><span class="sq">e1199</span></div>
+        <div class="ic" style="color:var(--t1)">目</div>
+        <div class="bd"><div class="tx">叶蓁目击了 19:40 的天台告白（目击投影 · 保真度 1.0，不进失真链）</div>
+        <div class="mt">memory_projection · 公寓·天台 · 同节点目击上限 ≤6 人</div></div>
+      </div>
+      <div class="evr t-auto">
+        <div class="tm">19:31:20<br><span class="sq">e1196</span></div>
+        <div class="ic" style="color:var(--neg)">⚡</div>
+        <div class="bd"><div class="tx">韩彻⇄赵启 争执：“季度汇报到底谁署名？”（被系统判定抢功：aff -8 / ten +8）</div>
+        <div class="mt">dialogue.argue · 公司·茶水间 · trigger: autonomous · Δtension ≥8 → 火花演出</div></div>
+        <span class="gr b">B</span>
+      </div>
+      <div class="evr t-auto">
+        <div class="tm">19:26:10<br><span class="sq">e1194</span></div>
+        <div class="ic" style="color:var(--ac)">✉</div>
+        <div class="bd"><div class="tx">何雨桐 → 孙倩（校外）：「星澜要裁员，赔偿很少」—— 失真 19%</div>
+        <div class="mt">social.send_message · 触达校外节点 · trigger: autonomous · caused_by: e1188</div></div>
+      </div>
+      <div class="evr t-dir">
+        <div class="tm">19:12:08<br><span class="sq">e1190</span></div>
+        <div class="ic" style="color:var(--dir)">编</div>
+        <div class="bd"><div class="tx">编剧：把周叙与苏蔓排进同一部电梯（L1 场景排期 · 计入干预率 8.3%）</div>
+        <div class="mt">director.intervene · trigger: director · arc_crush_01 助推 · 干预审计始终可见</div></div>
+      </div>
+      <div class="evr t-auto">
+        <div class="tm">19:05:33<br><span class="sq">e1198</span></div>
+        <div class="ic" style="color:var(--warn)">借</div>
+        <div class="bd"><div class="tx">林晚 → 赵启 借款 <b>¥1,500</b>（14 模拟日内归还 · 生成债务边 · 财富需求驱动区 ×3）</div>
+        <div class="mt">social.borrow_money · 公寓·大堂 · trigger: autonomous · amount_cents=150000</div></div>
+      </div>
+      <div class="evr t-auto">
+        <div class="tm">19:02:40<br><span class="sq">e1188</span></div>
+        <div class="ic" style="color:var(--dir)">卦</div>
+        <div class="bd"><div class="tx">郑凯 → 叶蓁 咬耳朵：「技术部要裁人，赔偿封顶 ¥2,000」—— 第 2 手 · 失真 24%（¥500→¥2,000）</div>
+        <div class="mt">dialogue.gossip · 公寓·快递柜 · trigger: autonomous · cites: [m_3312] · <a href="ripple.html" style="color:var(--ac)">涟漪追踪 →</a></div></div>
+      </div>
+      <div class="evr t-auto">
+        <div class="tm">18:47:02<br><span class="sq">e1183</span></div>
+        <div class="ic" style="color:var(--t1)">✗</div>
+        <div class="bd"><div class="tx">苏蔓拒绝了韩彻的晚餐邀约（礼貌拒绝 · aff -1.5 / ten +1）</div>
+        <div class="mt">social.refuse · 公司·运营部 · trigger: autonomous · 冷却 24h</div></div>
+      </div>
+      <div class="evr t-world">
+        <div class="tm">18:30:00<br><span class="sq">e1179</span></div>
+        <div class="ic" style="color:var(--ac)">夜</div>
+        <div class="bd"><div class="tx">技术部加班夜：V2.3 版本封板（郑凯 / 高翔 / 罗铮 / 刘畅 / 张帆 · 18:30~21:00）</div>
+        <div class="mt">world.overtime · 公司·技术部 · trigger: world · 黄金档职场排期（L1）</div></div>
+      </div>
+      <div class="evr t-auto evA">
+        <div class="tm">18:12:55<br><span class="sq">e1170</span></div>
+        <div class="ic" style="color:var(--warn)">⚠</div>
+        <div class="bd"><div class="tx">程一诺在健身房苦等 40 分钟 —— 林晚<b>爽约被撞破</b>（aff -8 / ten +5 · 情绪 -10）· 打脸类爽点</div>
+        <div class="mt">social.appointment.stood_up · 公寓·B1健身房 · trigger: autonomous · 冷却 48h</div></div>
+        <span class="gr">A</span>
+      </div>
+      <div class="evr t-auto evA">
+        <div class="tm">18:02:17<br><span class="sq">e1187</span></div>
+        <div class="ic" style="color:var(--ac)">话</div>
+        <div class="bd"><div class="tx">周叙端着咖啡随口说：「听说技术部要优化，赔偿基数才 ¥500。」—— 涟漪源 · 4 手后传到当事人</div>
+        <div class="mt">dialogue.chat · 公司·茶水间 · trigger: autonomous · <a href="ripple.html" style="color:var(--ac)">涟漪追踪 →</a></div></div>
+        <span class="gr">A</span>
+      </div>
+      <div class="evr t-world">
+        <div class="tm">16:00:00<br><span class="sq">e1152</span></div>
+        <div class="ic" style="color:var(--ac)">☑</div>
+        <div class="bd"><div class="tx">绩效面谈：郑凯 B 级（涨薪冻结）· 韩彻 A 级（+4%）· 罗铮 C 级（进入观察名单）</div>
+        <div class="mt">world.perf_review · 公司 · trigger: world · C 级情绪 -15</div></div>
+      </div>
+      <div class="evr t-world">
+        <div class="tm">10:00:00<br><span class="sq">e1098</span></div>
+        <div class="ic" style="color:var(--warn)">¥</div>
+        <div class="bd"><div class="tx">发工资：24 名租客到账（P1 ¥8.5k~12.5k · P2 ¥15k~19k）· 财富 +25 · 还钱/消费高发窗口开启</div>
+        <div class="mt">economy.payroll · 全体 · trigger: world · 每月 1 日 10:00</div></div>
+      </div>
+      <div class="evr t-world">
+        <div class="tm">09:30:00<br><span class="sq">e1091</span></div>
+        <div class="ic" style="color:var(--pos)">↗</div>
+        <div class="bd"><div class="tx">星澜科技 ¥18.00 → ¥17.39 · <b style="color:var(--pos)">-3.4%</b> ｜ 临江银行 <b style="color:var(--neg)">+0.8%</b> ｜ 云岭新能源 <b style="color:var(--neg)">+1.2%</b></div>
+        <div class="mt">economy.stock.tick · trigger: world <span class="fin">金融例外区：红涨绿跌（A 股惯例）· 图例 <b style="color:var(--neg)">涨</b>/<b style="color:var(--pos)">跌</b></span></div></div>
+      </div>
+      <div class="daysep">☾ 第 11 天结束 · time.day_summary · 00:00</div>
+      <div class="evr t-sys">
+        <div class="tm">23:41:19<br><span class="sq">e1077</span></div>
+        <div class="ic" style="color:var(--t1)">思</div>
+        <div class="bd"><div class="tx">林晚反思：「周叙今天又在天台站了很久。我知道他在等什么，也知道那个人不是我。也行吧。」</div>
+        <div class="mt">agent.reflection · display-only · trigger: system（调试态展开）</div></div>
+      </div>
+      <div class="evr t-sys">
+        <div class="tm">23:05:44<br><span class="sq">e1070</span></div>
+        <div class="ic" style="color:var(--t1)">⚙</div>
+        <div class="bd"><div class="tx">system.llm.failover：次要层模型切换（Qwen3-8B → Qwen3-4B · 成本熔断降速预案待命）</div>
+        <div class="mt">trigger: system · 灰色系统条 · 时间轴默认折叠</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const data=[2,1,0,0,0,1,4,9,14,22,26,24,31,20,22,25,28,24,38,45,40,33,18,8];
+const a={17:1,18:2,19:2};
+const max=45;
+const h=document.getElementById('hist');
+data.forEach((v,i)=>{
+  const b=document.createElement('div');b.className='b';
+  b.style.height=Math.max(2,v/max*64)+'px';
+  if(a[i]){const r=document.createElement('i');r.style.height=(a[i]/max*64)+'px';b.appendChild(r);}
+  b.title=i+'时 · '+v+' 事件'+(a[i]?'（A级 '+a[i]+'）':'');
+  h.appendChild(b);
+});
+</script>
+</body>
+</html>

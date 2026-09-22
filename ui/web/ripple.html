@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>WorldSim 观察端 · 涟漪追踪</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg0:#0E1116;--bg1:#161B22;--bg2:#1F2630;--bd:#2D333D;--t0:#E6E9EF;--t1:#9AA4B2;--ac:#5AC3ED;--pos:#2EFA8D;--neg:#F75752;--warn:#FEAE3E;--nt:#8A93A0;--dir:#BF86E8}
+html,body{height:100%}
+body{background:var(--bg0);color:var(--t0);font:13px/1.55 -apple-system,"Segoe UI","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;overflow:hidden}
+a{color:inherit;text-decoration:none}
+.topnav{height:48px;display:flex;align-items:center;gap:20px;padding:0 16px;background:var(--bg1);border-bottom:1px solid var(--bd)}
+.logo{font-size:14px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
+.logo b{color:var(--ac)}
+.logo small{font-weight:400;color:var(--t1);font-size:11px;margin-left:6px}
+.nav{display:flex;gap:4px}
+.nav a{padding:6px 12px;border-radius:8px;font-size:13px;color:var(--t1);white-space:nowrap}
+.nav a:hover{background:var(--bg2);color:var(--t0)}
+.nav a.on{background:var(--bg2);color:var(--ac);font-weight:600}
+.nav .dbg{font-style:normal;font-size:10px;color:var(--dir);border:1px solid var(--dir);border-radius:4px;padding:0 3px;margin-left:4px;vertical-align:1px}
+.sim{margin-left:auto;display:flex;gap:14px;font-size:12px;color:var(--t1);font-variant-numeric:tabular-nums;white-space:nowrap}
+.sim b{color:var(--t0);font-weight:600}
+.sim .lag{color:var(--pos)}
+.layout{display:grid;grid-template-columns:320px minmax(0,1fr);gap:8px;padding:8px;height:calc(100vh - 48px)}
+.col{display:flex;flex-direction:column;gap:8px;min-height:0;min-width:0}
+.card{background:var(--bg1);border:1px solid var(--bd);border-radius:8px;padding:12px}
+.scroll{overflow-y:auto;min-height:0}
+.scroll::-webkit-scrollbar{width:8px}
+.scroll::-webkit-scrollbar-thumb{background:var(--bd);border-radius:4px}
+.ct{font-size:14px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.ct small{font-size:11px;color:var(--t1);font-weight:400}
+.sub{font-size:11px;color:var(--t1)}
+.ev{border-radius:8px;background:var(--bg2);padding:10px 10px 10px 14px;position:relative;font-size:12px}
+.ev::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:8px 0 0 8px;background:var(--t1)}
+.ev.world::before{background:var(--ac)}
+.ev.gradeA{border:1px solid #3d4654}
+.etag{display:inline-block;font-size:10px;border-radius:4px;padding:0 5px;margin-right:4px;border:1px solid var(--bd);color:var(--t1)}
+.etag.a{color:var(--warn);border-color:var(--warn)}
+.kv{display:flex;gap:6px;font-size:12px;margin-top:6px}
+.kv .k{color:var(--t1);width:64px;flex:none}
+.btn{display:inline-block;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:5px 12px;font-size:12px;color:var(--t0)}
+.btn:hover{border-color:var(--ac);color:var(--ac)}
+.leg{display:flex;align-items:center;gap:8px;font-size:12px;padding:3px 0}
+.leg .sw{width:26px;flex:none}
+.av{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#0E1116;flex:none}
+.dagcard{position:relative;flex:1;display:flex;flex-direction:column;min-height:0}
+.dagwrap{flex:1;min-height:0}
+.dagwrap svg{width:100%;height:100%}
+.stats{margin-left:auto;font-size:11px;color:var(--t1);font-variant-numeric:tabular-nums}
+.stats b{color:var(--t0)}
+.hlab{fill:var(--t1);font-size:11px;text-anchor:middle}
+.nlab{fill:var(--t0);font-size:11px;text-anchor:middle}
+.slab{fill:var(--t1);font-size:10px;text-anchor:middle}
+.dlab{font-size:11px;text-anchor:middle}
+.qlab{fill:var(--t1);font-size:10px;text-anchor:middle}
+.pulse{animation:pu .8s ease-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes pu{from{transform:scale(1);opacity:.9}to{transform:scale(2.2);opacity:0}}
+.hot{position:absolute;right:12px;bottom:12px;width:300px;background:rgba(22,27,34,.96);border:1px solid var(--bd);border-radius:8px;padding:10px 12px}
+.hotrow{display:flex;gap:8px;align-items:center;padding:3px 0;border-bottom:1px dashed var(--bd);font-size:12px}
+.hotrow:last-child{border-bottom:none}
+.hotrow .rk{color:var(--warn);font-weight:700;width:14px;flex:none}
+.hotrow .st{margin-left:auto;font-size:10px;color:var(--t1);white-space:nowrap}
+.mini{position:absolute;left:12px;bottom:12px;display:flex;gap:8px}
+.mcard{background:rgba(22,27,34,.96);border:1px solid var(--bd);border-radius:8px;padding:8px 10px;font-size:11px;width:196px}
+.mcard .tt{color:var(--t1);margin-bottom:4px}
+.mcard .vv{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<header class="topnav">
+  <div class="logo">◆ <b>WorldSim</b> 观察端<small>阶段 0 · 占位视觉</small></div>
+  <nav class="nav">
+    <a href="index.html">地图</a>
+    <a href="timeline.html">时间轴</a>
+    <a href="ripple.html" class="on">涟漪</a>
+    <a href="relations.html">关系</a>
+    <a href="health.html">健康度<i class="dbg">调试</i></a>
+  </nav>
+  <div class="sim">
+    <span>sim <b>Day12 19:42</b></span>
+    <span>压缩比 <b>3.2×</b></span>
+    <span class="lag">数据延迟 2s</span>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- 左栏：源事件摘要 + 图例 -->
+  <div class="col scroll">
+    <div class="card">
+      <div class="ct">源事件<small>memory_projection 直接投影 3 人</small></div>
+      <div class="ev gradeA world">
+        <div style="margin-bottom:4px"><span class="etag a">A 级</span><span class="etag">dialogue.chat</span><span class="etag">trigger: autonomous</span></div>
+        <b>e1187</b> · Day12 18:02 · 公司·茶水间
+        <div style="margin-top:6px">周叙端着咖啡随口说：<span style="color:var(--ac)">“听说技术部要优化，赔偿基数才 ¥500。”</span></div>
+        <div class="sub" style="margin-top:6px">在场：韩彻、赵启（目击投影）· 白鹿（目击投影）<br>arc_id: arc_rumor_01（谣言风暴）· caused_by: e1149（股价暴跌公告）</div>
+      </div>
+      <a class="btn" style="margin-top:8px" href="timeline.html">导出选题卡（切片用）→</a>
+    </div>
+
+    <div class="card">
+      <div class="ct">传播链<small>读 ripple_edge · hop ≤ 4</small></div>
+      <div class="kv"><span class="k">第 1 手</span><span>韩彻 → 郑凯（Day12 18:20，加班工位）</span></div>
+      <div class="kv"><span class="k">第 1 手</span><span>白鹿 → 何雨桐（Day12 18:47，电梯厅）</span></div>
+      <div class="kv"><span class="k">第 2 手</span><span>郑凯 → 叶蓁（Day12 19:05，大堂快递柜）</span></div>
+      <div class="kv"><span class="k">第 2 手</span><span>何雨桐 → 孙倩（Day12 19:26，校外私信）</span></div>
+      <div class="kv"><span class="k">第 3 手</span><span>叶蓁 → 苏蔓（Day12 19:31，504 房间）</span></div>
+      <div class="kv"><span class="k">第 4 手</span><span>苏蔓 → 陈屿（Day12 20:15 · <b style="color:var(--neg)">当事人</b>）</span></div>
+    </div>
+
+    <div class="card">
+      <div class="ct">图例<small>02 §7.4 视觉语言</small></div>
+      <div class="leg"><span class="sw"><svg width="26" height="14"><circle cx="7" cy="7" r="6" fill="var(--ac)"/></svg></span>源事件（24px 脉冲圆）</div>
+      <div class="leg"><span class="sw"><svg width="26" height="14"><circle cx="7" cy="7" r="4" fill="#EB6999" opacity=".7"/></svg></span>记忆投影（签名色 12px，半透明 70%）</div>
+      <div class="leg"><span class="sw"><svg width="26" height="14"><rect x="8" y="2" width="10" height="10" transform="rotate(45 13 7)" fill="var(--bg2)" stroke="#E6E9EF" stroke-width="2"/></svg></span>引发的后续事件（点击跳时间轴）</div>
+      <div class="leg"><span class="sw"><svg width="26" height="14"><line x1="0" y1="7" x2="26" y2="7" stroke="var(--nt)" stroke-width="2"/></svg></span>第 1 手：实线</div>
+      <div class="leg"><span class="sw"><svg width="26" height="14"><line x1="0" y1="7" x2="26" y2="7" stroke="var(--nt)" stroke-width="2" stroke-dasharray="4 3"/></svg></span>第 2 手起：虚线，逐手递减透明度</div>
+      <div class="leg"><span class="sw"><svg width="26" height="14"><line x1="0" y1="7" x2="8" y2="7" stroke="var(--nt)" stroke-width="3"/><line x1="10" y1="7" x2="18" y2="7" stroke="var(--warn)" stroke-width="3"/><line x1="20" y1="7" x2="26" y2="7" stroke="var(--neg)" stroke-width="3"/></svg></span>失真：≤15% 灰 · 15~40% 黄 · &gt;40% 红</div>
+    </div>
+  </div>
+
+  <!-- 中栏：DAG -->
+  <div class="col">
+    <div class="card dagcard">
+      <div class="ct">e1187 扩散图<small>“裁员小道消息” 4 手传到当事人</small>
+        <span class="stats">覆盖 <b>9/40</b> 人 · <b>4</b> 手传播 · 最大失真 <b style="color:var(--neg)">63%</b> · <b>3</b> 条后续事件</span>
+      </div>
+      <div class="dagwrap">
+        <svg viewBox="0 0 980 540" preserveAspectRatio="xMidYMin meet">
+          <defs>
+            <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/>
+            </marker>
+          </defs>
+          <!-- 列标题 -->
+          <text x="90" y="24" class="hlab">源事件</text>
+          <text x="212" y="24" class="hlab">直接投影 3 人</text>
+          <text x="382" y="24" class="hlab">第 1 手</text>
+          <text x="562" y="24" class="hlab">第 2 手</text>
+          <text x="742" y="24" class="hlab">第 3 手</text>
+          <text x="890" y="24" class="hlab">第 4 手 · 当事人</text>
+
+          <!-- 源 → 投影（细线） -->
+          <line x1="102" y1="272" x2="196" y2="206" stroke="var(--nt)" stroke-width="1" opacity=".5"/>
+          <line x1="102" y1="280" x2="196" y2="280" stroke="var(--nt)" stroke-width="1" opacity=".5"/>
+          <line x1="102" y1="288" x2="196" y2="354" stroke="var(--nt)" stroke-width="1" opacity=".5"/>
+
+          <!-- gossip 传播边 -->
+          <!-- hop1 韩彻→郑凯 8% -->
+          <line x1="228" y1="200" x2="366" y2="272" stroke="var(--nt)" stroke-width="2" marker-end="url(#arr)"/>
+          <text x="296" y="212" class="dlab" fill="var(--nt)">hop1 · 失真 8%</text>
+          <text x="296" y="228" class="qlab">“赔偿按 ¥500 基数”</text>
+          <!-- hop1b 白鹿→何雨桐 11% -->
+          <line x1="228" y1="360" x2="366" y2="416" stroke="var(--nt)" stroke-width="2" marker-end="url(#arr)"/>
+          <text x="296" y="352" class="dlab" fill="var(--nt)">hop1 · 失真 11%</text>
+          <text x="296" y="368" class="qlab">“好像要裁人”</text>
+          <!-- hop2 郑凯→叶蓁 24% -->
+          <line x1="398" y1="280" x2="546" y2="280" stroke="var(--warn)" stroke-width="2" stroke-dasharray="5 4" opacity=".8" marker-end="url(#arr)"/>
+          <text x="472" y="252" class="dlab" fill="var(--warn)">hop2 · 失真 24%</text>
+          <text x="472" y="268" class="qlab">“赔偿封顶 ¥2,000”</text>
+          <!-- hop2b 何雨桐→孙倩 19% -->
+          <line x1="398" y1="424" x2="546" y2="444" stroke="var(--warn)" stroke-width="2" stroke-dasharray="5 4" opacity=".8" marker-end="url(#arr)"/>
+          <text x="472" y="400" class="dlab" fill="var(--warn)">hop2 · 失真 19%</text>
+          <text x="472" y="416" class="qlab">“赔偿很少”</text>
+          <!-- hop3 叶蓁→苏蔓 41% -->
+          <line x1="578" y1="280" x2="726" y2="280" stroke="var(--neg)" stroke-width="2" stroke-dasharray="5 4" opacity=".6" marker-end="url(#arr)"/>
+          <text x="652" y="252" class="dlab" fill="var(--neg)">hop3 · 失真 41%</text>
+          <text x="652" y="268" class="qlab">“裁一半 · 名单有陈屿 · ¥5,000”</text>
+          <!-- hop4 苏蔓→陈屿 63% -->
+          <line x1="758" y1="280" x2="874" y2="280" stroke="var(--neg)" stroke-width="2" stroke-dasharray="5 4" opacity=".45" marker-end="url(#arr)"/>
+          <text x="816" y="252" class="dlab" fill="var(--neg)">hop4 · 失真 63%</text>
+          <text x="816" y="268" class="qlab">“你月底走人 · ¥5,000 封顶”</text>
+
+          <!-- 源事件节点：24px accent 脉冲 -->
+          <circle cx="90" cy="280" r="12" fill="var(--ac)" class="pulse"/>
+          <circle cx="90" cy="280" r="12" fill="var(--ac)"/>
+          <text x="90" y="312" class="nlab">周叙</text>
+          <text x="90" y="326" class="slab">e1187 · ★A级</text>
+
+          <!-- 投影节点：12px 签名色 70% -->
+          <circle cx="212" cy="200" r="6" fill="#BE2A42" opacity=".7"/>
+          <text x="212" y="186" class="nlab">韩彻</text>
+          <text x="212" y="222" class="slab">当事·目击</text>
+          <circle cx="212" cy="280" r="6" fill="#BF700F" opacity=".7"/>
+          <text x="212" y="266" class="nlab">赵启</text>
+          <text x="212" y="302" class="slab">目击</text>
+          <circle cx="212" cy="360" r="6" fill="#BE2A42" opacity=".7"/>
+          <text x="212" y="346" class="nlab">白鹿</text>
+          <text x="212" y="382" class="slab">目击</text>
+
+          <!-- 链上节点 -->
+          <circle cx="382" cy="280" r="6" fill="#61191E" opacity=".85"/>
+          <text x="382" y="302" class="nlab">郑凯</text>
+          <text x="382" y="316" class="slab">18:20 工位</text>
+          <circle cx="382" cy="424" r="6" fill="#A432A1" opacity=".85"/>
+          <text x="382" y="446" class="nlab">何雨桐</text>
+          <text x="382" y="460" class="slab">18:47 电梯厅</text>
+
+          <circle cx="562" cy="280" r="6" fill="#FADB40" opacity=".85"/>
+          <text x="562" y="302" class="nlab">叶蓁</text>
+          <text x="562" y="316" class="slab">19:05 快递柜</text>
+          <circle cx="562" cy="448" r="6" fill="#EB6999" opacity=".85"/>
+          <text x="562" y="470" class="nlab">孙倩</text>
+          <text x="562" y="484" class="slab">19:26 校外私信</text>
+
+          <circle cx="742" cy="280" r="6" fill="#EB6999" opacity=".85"/>
+          <text x="742" y="302" class="nlab">苏蔓</text>
+          <text x="742" y="316" class="slab">19:31 · 504</text>
+
+          <circle cx="890" cy="280" r="9" fill="none" stroke="var(--neg)" stroke-width="1.5"/>
+          <circle cx="890" cy="280" r="6" fill="#1A5E80"/>
+          <text x="890" y="302" class="nlab">陈屿（当事人）</text>
+          <text x="890" y="316" class="slab">20:15 听到失真版</text>
+
+          <!-- 后续事件：菱形 -->
+          <line x1="882" y1="290" x2="650" y2="378" stroke="var(--nt)" stroke-width="1" stroke-dasharray="2 3" opacity=".6"/>
+          <line x1="890" y1="292" x2="780" y2="378" stroke="var(--nt)" stroke-width="1" stroke-dasharray="2 3" opacity=".6"/>
+          <line x1="896" y1="290" x2="900" y2="378" stroke="var(--nt)" stroke-width="1" stroke-dasharray="2 3" opacity=".6"/>
+          <rect x="633" y="383" width="14" height="14" transform="rotate(45 640 390)" fill="var(--bg2)" stroke="#E6E9EF" stroke-width="2"/>
+          <text x="640" y="414" class="slab">e1301 think</text>
+          <text x="640" y="428" class="slab">陈屿自我怀疑</text>
+          <rect x="763" y="383" width="14" height="14" transform="rotate(45 770 390)" fill="var(--bg2)" stroke="#E6E9EF" stroke-width="2"/>
+          <text x="770" y="414" class="slab">e1312 argue</text>
+          <text x="770" y="428" class="slab">陈屿⇄周叙当面对质</text>
+          <rect x="883" y="383" width="14" height="14" transform="rotate(45 890 390)" fill="var(--bg2)" stroke="#E6E9EF" stroke-width="2"/>
+          <text x="890" y="414" class="slab">e1340 私信经理</text>
+          <text x="890" y="428" class="slab">求证裁员名单</text>
+        </svg>
+      </div>
+
+      <!-- 终点关系变化卡（迷你版） -->
+      <div class="mini">
+        <div class="mcard"><div class="tt">终点关系变化 · 陈屿 → 周叙</div><div class="vv">aff <b style="color:var(--neg)">-8</b> · ten <b style="color:var(--neg)">+22</b>　辟谣后部分修复</div></div>
+        <div class="mcard"><div class="tt">终点关系变化 · 陈屿 → 苏蔓</div><div class="vv">aff <b style="color:var(--neg)">-3</b> · ten <b style="color:var(--warn)">+9</b>　“你也瞒着我？”</div></div>
+        <div class="mcard"><div class="tt">八卦同盟 · 叶蓁 ⇄ 苏蔓</div><div class="vv">aff <b style="color:var(--pos)">+2</b> · ten ±0　共同议论拉近</div></div>
+      </div>
+
+      <!-- 今日热涟漪 Top 5 -->
+      <div class="hot">
+        <div class="ct" style="margin-bottom:4px;white-space:nowrap"><span style="color:var(--warn)">◆</span> 今日热涟漪 Top5<small>投影×手数×关系变更</small></div>
+        <div class="hotrow" style="background:var(--bg2);border-radius:6px"><span class="rk">1</span><span>e1187 裁员小道消息链</span><span class="st">9人·4手·63%</span></div>
+        <div class="hotrow"><span class="rk">2</span><span>e1204 天台告白成功</span><span class="st">6人目击·❤</span></div>
+        <div class="hotrow"><span class="rk">3</span><span>e1170 爽约被撞破</span><span class="st">4人·2手</span></div>
+        <div class="hotrow"><span class="rk">4</span><span>e1156 韩彻赵启争功</span><span class="st">5人·2手</span></div>
+        <div class="hotrow"><span class="rk">5</span><span>e1198 林晚深夜借款</span><span class="st">3人·1手</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

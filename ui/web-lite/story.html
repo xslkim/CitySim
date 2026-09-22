@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>故事 · WorldSim · 404 公寓</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg0:#0E1116;--bg1:#161B22;--bg2:#1F2630;--bd:#2D333D;--t0:#E6E9EF;--t1:#9AA4B2;--ac:#5AC3ED;--pos:#2EFA8D;--neg:#F75752;--warn:#FEAE3E;--nt:#8A93A0;--dir:#BF86E8}
+html,body{height:100%}
+body{background:var(--bg0);color:var(--t0);font:15px/1.7 -apple-system,"Segoe UI","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;overflow:hidden}
+a{color:inherit;text-decoration:none}
+.topnav{height:60px;display:flex;align-items:center;gap:20px;padding:0 24px;background:var(--bg1);border-bottom:1px solid var(--bd)}
+.logo{font-size:18px;font-weight:700;white-space:nowrap}
+.logo b{color:var(--ac)}
+.nav{display:flex;gap:6px;margin-left:12px}
+.nav a{padding:7px 16px;border-radius:10px;font-size:14px;color:var(--t1)}
+.nav a:hover{background:var(--bg2);color:var(--t0)}
+.nav a.on{background:var(--bg2);color:var(--ac);font-weight:600}
+.clock{margin-left:auto;font-size:14px;color:var(--t1);font-variant-numeric:tabular-nums}
+.clock b{color:var(--t0)}
+.layout{padding:16px 24px;height:calc(100vh - 60px);display:flex;flex-direction:column;gap:16px;overflow-y:auto}
+.layout::-webkit-scrollbar{width:8px}
+.layout::-webkit-scrollbar-thumb{background:var(--bd);border-radius:4px}
+.card{background:var(--bg1);border:1px solid var(--bd);border-radius:14px;padding:18px}
+.ct{font-size:17px;font-weight:700;display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.ct small{font-size:13px;color:var(--t1);font-weight:400}
+/* banner */
+.banner{background:linear-gradient(120deg,rgba(247,87,82,.14),rgba(191,134,232,.10) 60%,rgba(22,27,34,0)),var(--bg1);border:1px solid #43303a;border-radius:14px;padding:20px 24px}
+.banner .kick{font-size:13px;color:var(--neg);font-weight:700;letter-spacing:2px}
+.banner h1{font-size:24px;margin:4px 0 6px}
+.banner .sub{font-size:14.5px;color:var(--t1)}
+.banner .chips{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.bchip{background:rgba(22,27,34,.7);border:1px solid var(--bd);border-radius:10px;font-size:13px;padding:4px 12px;color:var(--t0)}
+/* chain */
+.chain{display:flex;gap:0;align-items:stretch}
+.step{flex:1;min-width:0;background:var(--bg1);border:1px solid var(--bd);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.step.src{border-color:#2c4a5e}
+.step.dst{border-color:#5e2c2c;background:linear-gradient(160deg,rgba(247,87,82,.08),rgba(22,27,34,0) 60%),var(--bg1)}
+.connector{align-self:center;flex:none;color:var(--t1);font-size:22px;padding:0 10px}
+.step .head{display:flex;align-items:center;gap:10px}
+.av{width:38px;height:38px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#0E1116;flex:none}
+.av.sm{width:26px;height:26px;font-size:12px}
+.step .nm{font-size:16px;font-weight:700}
+.step .role{font-size:12px;color:var(--t1)}
+.quote{background:var(--bg2);border-radius:12px;padding:10px 14px;font-size:14.5px;line-height:1.65}
+.dtag{align-self:flex-start;font-size:12px;font-weight:600;border-radius:8px;padding:2px 10px;border:1px solid var(--bd);color:var(--t1)}
+.dtag.y{color:var(--warn);border-color:var(--warn)}
+.dtag.r{color:var(--neg);border-color:var(--neg)}
+.dtag.g{color:var(--nt);border-color:var(--bd)}
+.step .tm{font-size:12px;color:var(--t1);margin-top:auto}
+.after{display:flex;gap:14px;align-items:center}
+.after .tx{font-size:14.5px;line-height:1.7}
+.after .tx em{font-style:normal;color:var(--ac)}
+.up{color:var(--pos)} .down{color:var(--neg)}
+img.pf{border-radius:50%;object-fit:cover;background:var(--bg2);border:2px solid var(--sig,#8A93A0);flex:none}
+/* mini chains */
+.mini{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.mchain{background:var(--bg1);border:1px solid var(--bd);border-radius:14px;padding:16px}
+.mrow{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+.mstep{display:flex;flex-direction:column;gap:4px;align-items:center;text-align:center;max-width:150px}
+.mstep .q{font-size:12.5px;color:var(--t0);line-height:1.5}
+.mstep .r{font-size:11px;color:var(--t1)}
+.marr{color:var(--t1);font-size:16px;flex:none}
+.msum{font-size:13.5px;color:var(--t1);margin-top:12px;border-top:1px dashed var(--bd);padding-top:10px}
+.msum em{font-style:normal;color:var(--warn)}
+</style>
+</head>
+<body>
+<header class="topnav">
+  <div class="logo"><b>◆ WorldSim</b> · 404 公寓</div>
+  <nav class="nav">
+    <a href="index.html">地图</a>
+    <a href="agent.html">角色</a>
+    <a href="story.html" class="on">故事</a>
+  </nav>
+  <div class="clock">Day <b>12</b> · <b>19:42</b> 晚</div>
+</header>
+
+<div class="layout">
+  <div class="banner">
+    <div class="kick">今日最炸的一条</div>
+    <h1>一句话，四张嘴，面目全非</h1>
+    <div class="sub">周叙随口一句裁员传闻，两个小时后传到了「被裁员的主角」陈屿耳朵里——金额翻了 10 倍，还多出一份不存在的名单。</div>
+    <div class="chips">
+      <span class="bchip">经过 4 个人</span>
+      <span class="bchip">¥500 → ¥5,000</span>
+      <span class="bchip">当事人已听闻</span>
+      <span class="bchip">误会已当场对质</span>
+    </div>
+  </div>
+
+  <div class="chain">
+    <div class="step src">
+      <div class="head"><img class="pf" src="../assets/portraits/zhouxu.png" style="--sig:#5583C9;width:44px;height:44px" alt=""><div><div class="nm">周叙</div><div class="role">源头 · 随口一句</div></div></div>
+      <div class="quote">「听说技术部要优化，赔偿基数才 ¥500。」</div>
+      <span class="dtag g">原话</span>
+      <div class="tm">今天 18:02 · 公司茶水间</div>
+    </div>
+    <div class="connector">→</div>
+    <div class="step">
+      <div class="head"><img class="pf" src="../assets/portraits/hanche.png" style="--sig:#BE2A42;width:44px;height:44px" alt=""><div><div class="nm">韩彻</div><div class="role">第 1 手 · 加工</div></div></div>
+      <div class="quote">「技术部要裁人，赔偿封顶 ¥2,000。」</div>
+      <span class="dtag y">金额 ¥500 → ¥2,000</span>
+      <div class="tm">18:20 · 加班工位</div>
+    </div>
+    <div class="connector">→</div>
+    <div class="step">
+      <div class="head"><img class="pf" src="../assets/portraits/suman.png" style="--sig:#EB6999;width:44px;height:44px" alt=""><div><div class="nm">苏蔓</div><div class="role">第 3 手 · 加料</div></div></div>
+      <div class="quote">「技术部裁一半，名单上有陈屿，赔偿 ¥5,000。」</div>
+      <span class="dtag r">多出一份「名单」</span>
+      <div class="tm">19:31 · 中间又传了两手才到她这</div>
+    </div>
+    <div class="connector">→</div>
+    <div class="step dst">
+      <div class="head"><img class="pf" src="../assets/portraits/chenyu.png" style="--sig:#1A5E80;width:44px;height:44px" alt=""><div><div class="nm">陈屿</div><div class="role">当事人 · 耳朵里</div></div></div>
+      <div class="quote">「你月底要走人，¥5,000 封顶，做好心理准备。」</div>
+      <span class="dtag r">面目全非</span>
+      <div class="tm">20:15 · 他听到的就是这个版本</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ct">后来呢？</div>
+    <div class="after">
+      <img class="pf" src="../assets/portraits/chenyu.png" style="--sig:#1A5E80;width:26px;height:26px" alt="">
+      <div class="tx">陈屿当晚就找周叙当面对质——原版只是「听说要优化」。误会当场解开，两人约好明天一起找经理问清楚。不过这周见面，<em>还是会有点尴尬</em>。</div>
+      <img class="pf" src="../assets/portraits/zhouxu.png" style="--sig:#5583C9;width:26px;height:26px" alt="">
+      <span class="down" style="white-space:nowrap;font-size:13px">↘ 闹了点别扭</span>
+    </div>
+  </div>
+
+  <div class="mini">
+    <div class="mchain">
+      <div class="ct" style="margin-bottom:0;font-size:15px">同场加映：一句吐槽如何传遍全楼<small>爽约被撞破 · 后续</small></div>      <div class="mrow">
+        <div class="mstep"><span class="av sm" style="background:#EB6999">程</span><div class="q">「她放我鸽子，还在厨房聊得开心」</div><div class="r">程一诺 · 健身房</div></div>
+        <span class="marr">→</span>
+        <div class="mstep"><span class="av sm" style="background:#C3CDDA">米</span><div class="q">「林晚好像完全不当回事」</div><div class="r">米雪 · 洗衣房</div></div>
+        <span class="marr">→</span>
+        <div class="mstep"><span class="av sm" style="background:#6A6C6F">孙</span><div class="q">「听说她俩翻脸了」</div><div class="r">孙岩 · 大堂</div></div>
+      </div>
+      <div class="msum">情绪被放大了一档：<em>「爽约」传成了「翻脸」</em>。林晚还不知道自己已经成了今晚的谈资。</div>
+    </div>
+    <div class="mchain">
+      <div class="ct" style="margin-bottom:0;font-size:15px">暗线：网文里的男主角是谁？<small>秘密泄露链 · 进行中</small></div>
+      <div class="mrow">
+        <div class="mstep"><img class="pf" src="../assets/portraits/linwan.png" style="--sig:#C3CDDA;width:26px;height:26px" alt=""><div class="q">把心事写进连载，主角原型是周叙</div><div class="r">林晚 · 深夜更新</div></div>
+        <span class="marr">→</span>
+        <div class="mstep"><span class="av sm" style="background:#1A5E80">江</span><div class="q">追更时发现「这主角越看越眼熟」</div><div class="r">江宁 · 303 的读者</div></div>
+        <span class="marr">→</span>
+        <div class="mstep"><img class="pf" src="../assets/portraits/yezhen.png" style="--sig:#FADB40;width:26px;height:26px" alt=""><div class="q">评论区开始猜：是我们楼的人吧？</div><div class="r">叶蓁 · 也追这本书</div></div>
+      </div>
+      <div class="msum">林晚最大的秘密正在漏风：<em>读者里有两个就住她楼上楼下</em>。</div>
+    </div>
+  </div>
+
+  <div class="card" style="display:flex;align-items:center;gap:16px;background:linear-gradient(90deg,rgba(90,195,237,.08),rgba(22,27,34,0) 60%),var(--bg1)">
+    <span style="font-size:13px;color:var(--ac);font-weight:700;letter-spacing:2px;flex:none">明天看点</span>
+    <span style="font-size:14.5px">陈屿和周叙约好一起找经理问裁员真相 · 林晚连载的评论区还在猜男主角是谁 · 韩彻那笔 ¥4,000 的借款还剩 3 天到期</span>
+  </div>
+</div>
+</body>
+</html>

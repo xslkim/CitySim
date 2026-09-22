@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <title>陈屿 · 天青 #1A5E80 · 三七分微卷/西装</title>
+  <defs>
+    <clipPath id="face"><rect x="57" y="52" width="86" height="86" rx="28"/></clipPath>
+  </defs>
+  <path d="M34,200 L34,176 Q34,150 66,146 L134,146 Q166,150 166,176 L166,200 Z" fill="#1A5E80" stroke="#2E3A45" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M84,146 L100,164 L90,176 L76,150 Z" fill="#12465F" stroke="#2E3A45" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M116,146 L100,164 L110,176 L124,150 Z" fill="#12465F" stroke="#2E3A45" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M94,146 L100,164 L106,146 Z" fill="#E6E9EF" stroke="#2E3A45" stroke-width="3" stroke-linejoin="round"/>
+  <rect x="89" y="124" width="22" height="28" rx="6" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <ellipse cx="100" cy="140" rx="11" ry="3.5" fill="#E5B892"/>
+  <circle cx="57" cy="104" r="9" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <circle cx="143" cy="104" r="9" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <rect x="57" y="52" width="86" height="86" rx="28" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <g clip-path="url(#face)">
+    <ellipse cx="78" cy="72" rx="24" ry="15" fill="#FFFFFF" opacity=".14"/>
+    <ellipse cx="132" cy="100" rx="11" ry="34" fill="#E5B892" opacity=".4"/>
+  </g>
+  <path d="M72,86 Q81,83 91,86" fill="none" stroke="#2A2320" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M109,86 Q119,83 128,86" fill="none" stroke="#2A2320" stroke-width="3.5" stroke-linecap="round"/>
+  <ellipse cx="82" cy="107" rx="6" ry="6.8" fill="#2A2320"/>
+  <ellipse cx="120" cy="107" rx="5.4" ry="6.8" fill="#2A2320"/>
+  <circle cx="80" cy="104" r="1.8" fill="#FFFFFF"/>
+  <circle cx="118" cy="104" r="1.6" fill="#FFFFFF"/>
+  <path d="M100,112 Q103,115 101,118" fill="none" stroke="#D9A878" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M91,129 Q101,132 112,125" fill="none" stroke="#8C5A4A" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M52,90 Q46,44 98,40 Q154,42 150,92 Q146,70 136,72 Q142,60 128,56 Q116,52 108,60 Q96,50 80,56 Q64,60 66,74 Q56,72 52,90 Z" fill="#2A2320" stroke="#2E3A45" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M148,86 Q158,92 152,102" fill="none" stroke="#2E3A45" stroke-width="4" stroke-linecap="round"/>
+</svg>

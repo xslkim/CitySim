@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>WorldSim 观察端 · 关系结构时间演化</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg0:#0E1116;--bg1:#161B22;--bg2:#1F2630;--bd:#2D333D;--t0:#E6E9EF;--t1:#9AA4B2;--ac:#5AC3ED;--pos:#2EFA8D;--neg:#F75752;--warn:#FEAE3E;--nt:#8A93A0;--dir:#BF86E8}
+html,body{height:100%}
+body{background:var(--bg0);color:var(--t0);font:13px/1.55 -apple-system,"Segoe UI","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;overflow:hidden}
+a{color:inherit;text-decoration:none}
+.topnav{height:48px;display:flex;align-items:center;gap:20px;padding:0 16px;background:var(--bg1);border-bottom:1px solid var(--bd)}
+.logo{font-size:14px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
+.logo b{color:var(--ac)}
+.logo small{font-weight:400;color:var(--t1);font-size:11px;margin-left:6px}
+.nav{display:flex;gap:4px}
+.nav a{padding:6px 12px;border-radius:8px;font-size:13px;color:var(--t1);white-space:nowrap}
+.nav a:hover{background:var(--bg2);color:var(--t0)}
+.nav a.on{background:var(--bg2);color:var(--ac);font-weight:600}
+.nav .dbg{font-style:normal;font-size:10px;color:var(--dir);border:1px solid var(--dir);border-radius:4px;padding:0 3px;margin-left:4px;vertical-align:1px}
+.sim{margin-left:auto;display:flex;gap:14px;font-size:12px;color:var(--t1);font-variant-numeric:tabular-nums;white-space:nowrap}
+.sim b{color:var(--t0);font-weight:600}
+.sim .lag{color:var(--pos)}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:8px;padding:8px;height:calc(100vh - 48px)}
+.col{display:flex;flex-direction:column;gap:8px;min-height:0;min-width:0}
+.card{background:var(--bg1);border:1px solid var(--bd);border-radius:8px;padding:12px}
+.scroll{overflow-y:auto;min-height:0}
+.scroll::-webkit-scrollbar{width:8px}
+.scroll::-webkit-scrollbar-thumb{background:var(--bd);border-radius:4px}
+.ct{font-size:14px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.ct small{font-size:11px;color:var(--t1);font-weight:400}
+.sub{font-size:11px;color:var(--t1)}
+.gwrap{flex:1;min-height:0}
+.gwrap svg{width:100%;height:100%}
+.nlab{fill:var(--t0);font-size:11px;text-anchor:middle}
+.nlab.s{fill:var(--t1);font-size:10px}
+.mlab{fill:var(--ac);font-size:10px}
+.alab{fill:var(--t1);font-size:9px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--t1);margin-top:8px}
+.legend i{font-style:normal}
+.chip{display:inline-block;border-radius:8px;padding:1px 8px;font-size:11px;border:1px solid var(--bd);background:var(--bg2)}
+.chip.ok{color:var(--pos);border-color:var(--pos)}
+.sel{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.sel .who{flex:1;display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:6px 10px;font-size:12px}
+.av{width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#0E1116;flex:none}
+.av.star{box-shadow:0 0 0 1px var(--bg0),0 0 0 2.5px #fff}
+.kv{display:flex;gap:6px;font-size:12px;margin-top:6px}
+.kv .k{color:var(--t1);width:76px;flex:none}
+.tl{display:flex;align-items:center;gap:12px}
+.play{width:34px;height:34px;border-radius:50%;background:var(--ac);border:none;color:#0E1116;font-size:14px;cursor:pointer;flex:none}
+.track{position:relative;flex:1;height:28px}
+.track .rail{position:absolute;left:0;right:0;top:13px;height:4px;border-radius:2px;background:var(--bg2)}
+.track .fill{position:absolute;left:0;top:13px;height:4px;border-radius:2px;background:var(--ac);width:84.6%}
+.track .knob{position:absolute;top:8px;width:14px;height:14px;border-radius:50%;background:var(--t0);border:3px solid var(--ac);left:84.6%;transform:translateX(-50%)}
+.tick{position:absolute;top:0;font-size:9px;color:var(--t1);transform:translateX(-50%)}
+.amark{position:absolute;top:22px;width:5px;height:5px;border-radius:50%;background:var(--neg);transform:translateX(-50%)}
+.pair-stat{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.pstat{background:var(--bg2);border-radius:8px;padding:8px 10px;font-size:12px}
+.pstat b{font-size:16px;font-variant-numeric:tabular-nums}
+.toprow{display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px dashed var(--bd);font-size:12px}
+.toprow:last-child{border-bottom:none}
+.toprow .v{margin-left:auto;font-variant-numeric:tabular-nums;font-size:11px;white-space:nowrap}
+</style>
+</head>
+<body>
+<header class="topnav">
+  <div class="logo">◆ <b>WorldSim</b> 观察端<small>阶段 0 · 占位视觉</small></div>
+  <nav class="nav">
+    <a href="index.html">地图</a>
+    <a href="timeline.html">时间轴</a>
+    <a href="ripple.html">涟漪</a>
+    <a href="relations.html" class="on">关系</a>
+    <a href="health.html">健康度<i class="dbg">调试</i></a>
+  </nav>
+  <div class="sim">
+    <span>sim <b>Day12 19:42</b></span>
+    <span>压缩比 <b>3.2×</b></span>
+    <span class="lag">数据延迟 2s</span>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="col">
+    <div class="card" style="flex:1;display:flex;flex-direction:column;min-height:0">
+      <div class="ct">关系结构 · Day12<small>40 节点 · 布局已钉住（演化只变边不变位，02 §7.5）</small>
+        <span style="margin-left:auto" class="chip ok">周变化率 +12% · 健康区 8~25%</span>
+      </div>
+      <div class="gwrap">
+        <svg viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid meet">
+<line x1="500" y1="182" x2="382" y2="300" stroke="var(--pos)" stroke-width="3.7" opacity="0.62"/>
+<line x1="583" y1="217" x2="500" y2="182" stroke="var(--pos)" stroke-width="2.8" opacity="0.51"/>
+<line x1="382" y1="300" x2="417" y2="383" stroke="var(--neg)" stroke-width="1.6" opacity="0.36"/>
+<line x1="382" y1="300" x2="417" y2="383" stroke="var(--warn)" stroke-width="1" opacity=".9"/>
+<line x1="417" y1="217" x2="382" y2="300" stroke="var(--pos)" stroke-width="2.2" opacity="0.43"/>
+<line x1="417" y1="383" x2="417" y2="217" stroke="var(--neg)" stroke-width="1.8" opacity="0.38"/>
+<line x1="618" y1="300" x2="583" y2="383" stroke="var(--neg)" stroke-width="2.2" opacity="0.43"/>
+<line x1="618" y1="300" x2="583" y2="383" stroke="var(--warn)" stroke-width="1" opacity=".9"/>
+<line x1="500" y1="182" x2="583" y2="383" stroke="var(--pos)" stroke-width="2.6" opacity="0.48"/>
+<line x1="618" y1="300" x2="583" y2="217" stroke="var(--neg)" stroke-width="1.2" opacity="0.31"/>
+<line x1="382" y1="300" x2="500" y2="418" stroke="var(--pos)" stroke-width="3.2" opacity="0.56"/>
+<line x1="500" y1="418" x2="401" y2="471" stroke="var(--pos)" stroke-width="2.2" opacity="0.43"/>
+<line x1="583" y1="383" x2="500" y2="102" stroke="var(--pos)" stroke-width="1.6" opacity="0.36"/>
+<line x1="417" y1="383" x2="583" y2="217" stroke="var(--pos)" stroke-width="1.8" opacity="0.38"/>
+<line x1="583" y1="217" x2="382" y2="300" stroke="var(--pos)" stroke-width="2.5" opacity="0.47"/>
+<line x1="500" y1="102" x2="599" y2="129" stroke="var(--neg)" stroke-width="2.0" opacity="0.41"/>
+<line x1="500" y1="102" x2="599" y2="129" stroke="var(--warn)" stroke-width="1" opacity=".9"/>
+<line x1="500" y1="498" x2="401" y2="471" stroke="var(--pos)" stroke-width="2.4" opacity="0.46"/>
+<line x1="671" y1="201" x2="698" y2="300" stroke="var(--pos)" stroke-width="1.8" opacity="0.38"/>
+<line x1="671" y1="399" x2="599" y2="471" stroke="var(--pos)" stroke-width="2.0" opacity="0.41"/>
+<line x1="329" y1="201" x2="401" y2="129" stroke="var(--pos)" stroke-width="1.7" opacity="0.37"/>
+<line x1="329" y1="399" x2="583" y2="217" stroke="var(--neg)" stroke-width="1.3" opacity="0.32"/>
+<line x1="416" y1="41" x2="329" y2="399" stroke="var(--pos)" stroke-width="1.6" opacity="0.36"/>
+<line x1="241" y1="216" x2="280" y2="140" stroke="var(--pos)" stroke-width="1.4" opacity="0.33"/>
+<line x1="340" y1="80" x2="302" y2="300" stroke="var(--pos)" stroke-width="1.5" opacity="0.34"/>
+<line x1="500" y1="572" x2="583" y2="383" stroke="var(--pos)" stroke-width="1.9" opacity="0.39"/>
+<line x1="500" y1="572" x2="618" y2="300" stroke="var(--pos)" stroke-width="1.6" opacity="0.36"/>
+<line x1="720" y1="140" x2="417" y2="217" stroke="var(--pos)" stroke-width="1.7" opacity="0.37"/>
+<line x1="759" y1="216" x2="500" y2="418" stroke="var(--pos)" stroke-width="1.6" opacity="0.36"/>
+<line x1="720" y1="460" x2="382" y2="300" stroke="var(--pos)" stroke-width="1.8" opacity="0.38"/>
+<line x1="500" y1="28" x2="584" y2="41" stroke="var(--pos)" stroke-width="1.5" opacity="0.34"/>
+<line x1="660" y1="80" x2="500" y2="102" stroke="var(--neg)" stroke-width="1.4" opacity="0.33"/>
+<line x1="772" y1="300" x2="759" y2="384" stroke="var(--pos)" stroke-width="1.6" opacity="0.35"/>
+<line x1="660" y1="520" x2="584" y2="559" stroke="var(--pos)" stroke-width="1.6" opacity="0.36"/>
+<line x1="416" y1="559" x2="671" y2="201" stroke="var(--pos)" stroke-width="1.4" opacity="0.33"/>
+<line x1="340" y1="520" x2="302" y2="300" stroke="var(--pos)" stroke-width="1.7" opacity="0.37"/>
+<line x1="241" y1="384" x2="671" y2="399" stroke="var(--pos)" stroke-width="1.5" opacity="0.34"/>
+<line x1="759" y1="384" x2="401" y2="471" stroke="var(--pos)" stroke-width="1.4" opacity="0.33"/>
+<g transform="translate(500,182)">
+<circle r="12.5" fill="none" stroke="var(--bg0)"/><circle r="11.5" fill="none" stroke="#fff" stroke-width="1.5"/><circle r="10" fill="#5583C9"/>
+<text y="26" class="nlab">周叙</text></g>
+<g transform="translate(583,217)">
+<circle r="12.5" fill="none" stroke="var(--bg0)"/><circle r="11.5" fill="none" stroke="#fff" stroke-width="1.5"/><circle r="10" fill="#C3CDDA"/>
+<text y="26" class="nlab">林晚</text></g>
+<g transform="translate(618,300)">
+<circle r="12.5" fill="none" stroke="var(--bg0)"/><circle r="11.5" fill="none" stroke="#fff" stroke-width="1.5"/><circle r="10" fill="#BE2A42"/>
+<text y="26" class="nlab">韩彻</text></g>
+<g transform="translate(583,383)">
+<circle r="12.5" fill="none" stroke="var(--bg0)"/><circle r="11.5" fill="none" stroke="#fff" stroke-width="1.5"/><circle r="10" fill="#BF700F"/>
+<text y="26" class="nlab">赵启</text></g>
+<g transform="translate(500,418)">
+<circle r="12.5" fill="none" stroke="var(--bg0)"/><circle r="11.5" fill="none" stroke="#fff" stroke-width="1.5"/><circle r="10" fill="#FADB40"/>
+<text y="26" class="nlab">叶蓁</text></g>
+<g transform="translate(417,383)">
+<circle r="12.5" fill="none" stroke="var(--bg0)"/><circle r="11.5" fill="none" stroke="#fff" stroke-width="1.5"/><circle r="10" fill="#1A5E80"/>
+<text y="26" class="nlab">陈屿</text></g>
+<g transform="translate(382,300)">
+<circle r="12.5" fill="none" stroke="var(--bg0)"/><circle r="11.5" fill="none" stroke="#fff" stroke-width="1.5"/><circle r="10" fill="#EB6999"/>
+<text y="26" class="nlab">苏蔓</text></g>
+<g transform="translate(417,217)">
+<circle r="12.5" fill="none" stroke="var(--bg0)"/><circle r="11.5" fill="none" stroke="#fff" stroke-width="1.5"/><circle r="10" fill="#209C68"/>
+<text y="26" class="nlab">沈知行</text></g>
+<g transform="translate(500,102)"><circle r="8" fill="#61191E"/><text y="20" class="nlab s">郑凯</text></g>
+<g transform="translate(599,129)"><circle r="8" fill="#209894"/><text y="20" class="nlab s">宋勉</text></g>
+<g transform="translate(671,201)"><circle r="8" fill="#209894"/><text y="20" class="nlab s">顾远</text></g>
+<g transform="translate(698,300)"><circle r="8" fill="#7D4F30"/><text y="20" class="nlab s">陆一鸣</text></g>
+<g transform="translate(671,399)"><circle r="8" fill="#A432A1"/><text y="20" class="nlab s">温阮</text></g>
+<g transform="translate(599,471)"><circle r="8" fill="#A4C394"/><text y="20" class="nlab s">纪云舒</text></g>
+<g transform="translate(500,498)"><circle r="8" fill="#A432A1"/><text y="20" class="nlab s">何雨桐</text></g>
+<g transform="translate(401,471)"><circle r="8" fill="#BE2A42"/><text y="20" class="nlab s">白鹿</text></g>
+<g transform="translate(329,399)"><circle r="8" fill="#EB6999"/><text y="20" class="nlab s">程一诺</text></g>
+<g transform="translate(302,300)"><circle r="8" fill="#1A5E80"/><text y="20" class="nlab s">江宁</text></g>
+<g transform="translate(329,201)"><circle r="8" fill="#5583C9"/><text y="20" class="nlab s">罗铮</text></g>
+<g transform="translate(401,129)"><circle r="8" fill="#BF700F"/><text y="20" class="nlab s">高翔</text></g>
+<g transform="translate(500,28)"><circle r="6" fill="#5583C9"/><text y="17" class="nlab s">刘畅</text></g>
+<g transform="translate(584,41)"><circle r="6" fill="#7D4F30"/><text y="17" class="nlab s">张帆</text></g>
+<g transform="translate(660,80)"><circle r="6" fill="#61191E"/><text y="17" class="nlab s">王硕</text></g>
+<g transform="translate(720,140)"><circle r="6" fill="#7D4F30"/><text y="17" class="nlab s">秦峰</text></g>
+<g transform="translate(759,216)"><circle r="6" fill="#A432A1"/><text y="17" class="nlab s">戚岚</text></g>
+<g transform="translate(772,300)"><circle r="6" fill="#BE2A42"/><text y="17" class="nlab s">李娜</text></g>
+<g transform="translate(759,384)"><circle r="6" fill="#209894"/><text y="17" class="nlab s">陈晨</text></g>
+<g transform="translate(720,460)"><circle r="6" fill="#209C68"/><text y="17" class="nlab s">穆远</text></g>
+<g transform="translate(660,520)"><circle r="6" fill="#BF700F"/><text y="17" class="nlab s">赵磊</text></g>
+<g transform="translate(584,559)"><circle r="6" fill="#EB6999"/><text y="17" class="nlab s">孙倩</text></g>
+<g transform="translate(500,572)"><circle r="6" fill="#6A6C6F"/><text y="17" class="nlab s">贺鸣</text></g>
+<g transform="translate(416,559)"><circle r="6" fill="#A4C394"/><text y="17" class="nlab s">徐斌</text></g>
+<g transform="translate(340,520)"><circle r="6" fill="#C3CDDA"/><text y="17" class="nlab s">周洁</text></g>
+<g transform="translate(280,460)"><circle r="6" fill="#A8B82E"/><text y="17" class="nlab s">白桦</text></g>
+<g transform="translate(241,384)"><circle r="6" fill="#FADB40"/><text y="17" class="nlab s">吴敏</text></g>
+<g transform="translate(228,300)"><circle r="6" fill="#4A2999"/><text y="17" class="nlab s">钱进</text></g>
+<g transform="translate(241,216)"><circle r="6" fill="#6A6C6F"/><text y="17" class="nlab s">孙岩</text></g>
+<g transform="translate(280,140)"><circle r="6" fill="#A8B82E"/><text y="17" class="nlab s">许晴</text></g>
+<g transform="translate(340,80)"><circle r="6" fill="#4A2999"/><text y="17" class="nlab s">方茴</text></g>
+<g transform="translate(416,41)"><circle r="6" fill="#C3CDDA"/><text y="17" class="nlab s">米雪</text></g>
+        </svg>
+      </div>
+      <div class="legend">
+        <span><i style="color:var(--pos)">—</i> affinity&gt;0</span>
+        <span><i style="color:var(--neg)">—</i> affinity&lt;0</span>
+        <span><i style="color:var(--warn)">—</i> tension&gt;50 叠加 1px 内芯</span>
+        <span>边宽 ∝ |affinity|（1~5px）</span>
+        <span><i style="color:#fff">◯</i> 白描边 = 明星层</span>
+        <span>拖动时间轴：边宽/边色 300ms 缓动过渡</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="tl">
+        <button class="play">▶</button>
+        <div class="track">
+          <div class="rail"></div><div class="fill"></div><div class="knob"></div>
+          <span class="tick" style="left:0%">D1</span>
+          <span class="tick" style="left:23%">D4</span>
+          <span class="tick" style="left:46.2%">D7</span>
+          <span class="tick" style="left:69.2%">D10</span>
+          <span class="tick" style="left:92.3%">D13</span>
+          <span class="amark" style="left:15.4%" title="Day3 A级"></span>
+          <span class="amark" style="left:46.2%"></span>
+          <span class="amark" style="left:69.2%"></span>
+          <span class="amark" style="left:84.6%"></span>
+        </div>
+        <div style="font-size:12px;color:var(--t1);white-space:nowrap">Day <b style="color:var(--t0)">12</b> / 14 · 步进 1 模拟日 · <span style="color:var(--neg)">●</span> = 当日有 A 级事件</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col scroll">
+    <div class="card">
+      <div class="ct">双人对比<small>/relations?pair=A12,A21</small></div>
+      <div class="sel">
+        <div class="who"><span class="av star" style="background:#5583C9">周</span>周叙 A12</div>
+        <div style="color:var(--t1)">⇄</div>
+        <div class="who"><span class="av star" style="background:#EB6999">苏</span>苏蔓 A21</div>
+      </div>
+      <svg viewBox="0 0 316 170" style="width:100%">
+<line x1="34" y1="142" x2="306" y2="142" stroke="var(--bd)" stroke-width="0.5"/><text x="30" y="145" class="alab" text-anchor="end">-100</text>
+<line x1="34" y1="112" x2="306" y2="112" stroke="var(--bd)" stroke-width="0.5"/><text x="30" y="115" class="alab" text-anchor="end">-50</text>
+<line x1="34" y1="82" x2="306" y2="82" stroke="var(--bd)" stroke-width="1"/><text x="30" y="85" class="alab" text-anchor="end">0</text>
+<line x1="34" y1="52" x2="306" y2="52" stroke="var(--bd)" stroke-width="0.5"/><text x="30" y="55" class="alab" text-anchor="end">50</text>
+<line x1="34" y1="22" x2="306" y2="22" stroke="var(--bd)" stroke-width="0.5"/><text x="30" y="25" class="alab" text-anchor="end">100</text>
+<text x="34" y="156" class="alab" text-anchor="middle">D1</text>
+<text x="76" y="156" class="alab" text-anchor="middle">D3</text>
+<text x="118" y="156" class="alab" text-anchor="middle">D5</text>
+<text x="160" y="156" class="alab" text-anchor="middle">D7</text>
+<text x="201" y="156" class="alab" text-anchor="middle">D9</text>
+<text x="243" y="156" class="alab" text-anchor="middle">D11</text>
+<text x="285" y="156" class="alab" text-anchor="middle">D13</text>
+        <polyline points="34,77 55,75 76,73 97,71 118,68 139,66 160,64 180,60 201,58 222,54 243,51 264,41" fill="none" stroke="var(--pos)" stroke-width="2"/>
+        <polyline points="34,118 55,120 76,120 97,124 118,128 139,128 160,130 180,131 201,132 222,135 243,136 264,137" fill="none" stroke="var(--warn)" stroke-width="2" stroke-dasharray="1 0"/>
+<circle cx="118" cy="68" r="3" fill="var(--ac)"/>
+<text x="118" y="60" class="mlab" text-anchor="middle">加班同组</text>
+<circle cx="180" cy="60" r="3" fill="var(--ac)"/>
+<text x="180" y="52" class="mlab" text-anchor="middle">叶蓁助攻</text>
+<circle cx="222" cy="54" r="3" fill="var(--ac)"/>
+<text x="222" y="46" class="mlab" text-anchor="middle">深聊</text>
+<circle cx="264" cy="41" r="3" fill="var(--ac)"/>
+<text x="264" y="33" class="mlab" text-anchor="end">天台告白 ❤</text>
+        <text x="308" y="30" class="alab" text-anchor="end" fill="var(--pos)">affinity</text>
+        <text x="308" y="42" class="alab" text-anchor="end" fill="var(--warn)">tension</text>
+      </svg>
+      <div class="pair-stat">
+        <div class="pstat"><span class="sub">affinity（周叙→苏蔓）</span><br><b style="color:var(--pos)">+68</b> <span style="color:var(--pos);font-size:11px">↑ 7日 +33</span></div>
+        <div class="pstat"><span class="sub">tension</span><br><b>4</b> <span style="color:var(--pos);font-size:11px">↓ 告白成功 -10</span></div>
+      </div>
+      <div class="kv"><span class="k">关系标签</span><span><span class="chip" style="color:var(--pos);border-color:var(--pos)">恋人</span> <span class="chip">同楼 L5/L2</span> <span class="chip">arc_crush_01</span></span></div>
+      <div class="kv"><span class="k">关键事件</span><span><a href="timeline.html" style="color:var(--ac)">e1204 告白成功</a> · <a href="ripple.html" style="color:var(--ac)">e1187 波及</a></span></div>
+    </div>
+
+    <div class="card">
+      <div class="ct">本周 |Δaffinity| Top<small>7 模拟日 · 点边跳事件</small></div>
+      <div class="toprow"><span class="av star" style="background:#5583C9">周</span><span>周叙 → 苏蔓</span><span class="v">aff <b style="color:var(--pos)">+33</b> · 告白成功</span></div>
+      <div class="toprow"><span class="av star" style="background:#1A5E80">陈</span><span>陈屿 → 周叙</span><span class="v">aff <b style="color:var(--neg)">-8</b> · 谣言对质</span></div>
+      <div class="toprow"><span class="av star" style="background:#C3CDDA">林</span><span>林晚 → 周叙</span><span class="v">aff <b style="color:var(--pos)">+7</b> · 克制中</span></div>
+      <div class="toprow"><span class="av star" style="background:#BE2A42">韩</span><span>韩彻 → 赵启</span><span class="v">aff <b style="color:var(--neg)">-9</b> · 争功结怨</span></div>
+      <div class="toprow"><span class="av star" style="background:#FADB40">叶</span><span>叶蓁 → 苏蔓</span><span class="v">aff <b style="color:var(--pos)">+6</b> · 助攻+八卦同盟</span></div>
+    </div>
+
+    <div class="card">
+      <div class="ct">结构读数<small>阈值口径 01 §9</small></div>
+      <div class="kv"><span class="k">活跃边</span><span>148 条（|aff|≥10）</span></div>
+      <div class="kv"><span class="k">高张力边</span><span>tension&gt;60：14 条 · 占比 9.4% <span style="color:var(--warn)">●</span></span></div>
+      <div class="kv"><span class="k">活跃冲突边</span><span>14 条 · 明星层每人 ≥1 <span style="color:var(--pos)">●</span></span></div>
+      <div class="kv"><span class="k">周变化率</span><span>+12% · 8~25% 健康区 <span style="color:var(--pos)">●</span></span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

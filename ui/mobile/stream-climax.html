@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>WorldSim 推流画面 · 名场面：天台告白</title>
+<style>
+  :root{
+    --bg0:#0E1116; --border:#2D333D;
+    --text0:#E6E9EF; --text1:#9AA4B2;
+    --accent:#5AC3ED; --positive:#2EFA8D; --warn:#FEAE3E; --neutral:#8A93A0; --director:#BF86E8;
+    --c-zhouxu:#5583C9; --c-suman:#EB6999;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{background:#05070A}
+  body{font-family:"Noto Sans SC",-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--text0)}
+  .phone{position:relative;width:390px;height:844px;margin:0 auto;overflow:hidden;background:var(--bg0)}
+
+  /* ---------- 全幅演出画面 ---------- */
+  .stage{position:absolute;inset:0}
+  .stage svg{display:block;width:390px;height:844px}
+  .scrim-top{position:absolute;top:0;left:0;right:0;height:110px;pointer-events:none;
+    background:linear-gradient(180deg,rgba(14,17,22,.5),rgba(14,17,22,0))}
+  .warm-filter{position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse 320px 300px at 195px 430px, rgba(244,167,185,.17), rgba(244,167,185,.05) 55%, rgba(244,167,185,0) 78%),
+               radial-gradient(ellipse 700px 900px at 195px 380px, rgba(244,167,185,0) 55%, rgba(14,17,22,.28) 100%)}
+
+  /* ---------- 画面内小标签：左上 地点+模拟时间 ---------- */
+  .tag-tl{position:absolute;top:12px;left:12px;z-index:20;display:flex;align-items:center;gap:5px;
+    background:rgba(8,10,14,.62);border:1px solid rgba(45,51,61,.9);border-radius:10px;
+    padding:4px 9px;font-size:10px;color:var(--text1);white-space:nowrap}
+  .tag-tl svg{width:10px;height:10px;stroke:var(--accent);flex:none}
+  .tag-tl b{color:var(--text0);font-weight:600}
+
+  /* ---------- 右上 AI 生成内容水印（内容侧合规） ---------- */
+  .ai-wm{position:absolute;top:12px;right:12px;z-index:20;display:flex;align-items:center;gap:4px;
+    background:rgba(254,174,62,.10);border:1px solid rgba(254,174,62,.6);border-radius:10px;
+    padding:4px 8px}
+  .ai-wm svg{width:10px;height:10px;stroke:var(--warn)}
+  .ai-wm span{font-size:10px;font-weight:700;color:var(--warn);white-space:nowrap}
+
+  /* ---------- 名场面标签 ---------- */
+  .tag-climax{position:absolute;top:46px;left:12px;z-index:20;display:flex;align-items:center;gap:4px;
+    background:rgba(191,134,232,.14);border:1px solid rgba(191,134,232,.55);border-radius:10px;
+    padding:4px 9px;font-size:10px;font-weight:700;color:var(--director);white-space:nowrap}
+  .tag-climax svg{width:10px;height:10px;stroke:var(--director)}
+
+  /* ---------- 飘屏致谢：礼物（画面内元素，非平台按钮） ---------- */
+  .gift-float{position:absolute;top:76px;right:12px;z-index:22;width:192px;
+    background:rgba(22,27,34,.92);border:1px solid rgba(90,195,237,.5);border-radius:10px;
+    padding:7px 9px;box-shadow:0 2px 12px rgba(90,195,237,.18)}
+  .gf-row1{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text0)}
+  .gf-row1 svg{width:13px;height:13px;stroke:var(--warn);flex:none}
+  .gf-row1 b{color:var(--warn)}
+  .gf-row1 .gx{margin-left:auto;color:var(--text1);font-size:10px;flex:none}
+  .gf-row2{margin-top:4px;display:flex;align-items:center;gap:4px;font-size:10px;color:var(--accent);font-weight:600}
+  .gf-row2 svg{width:10px;height:10px;stroke:var(--accent);flex:none}
+
+  /* ---------- 人物特写卡（可复用结构，Web 端同 class 参考） ---------- */
+  .pcard{--sig:#C3CDDA;--sigtext:#10141B;position:absolute;width:120px;padding:7px 7px 10px;
+    background:#161B22;border:2px solid var(--sig);border-radius:14px;
+    box-shadow:0 4px 16px rgba(0,0,0,.45),0 0 12px color-mix(in srgb,var(--sig) 32%,transparent);
+    animation:pcard-in .45s ease-out both}
+  .pcard img{display:block;width:100%;aspect-ratio:1/1;border-radius:9px;background:#1F2630}
+  .pcard figcaption{position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);
+    background:var(--sig);color:var(--sigtext);font-size:11px;font-weight:700;
+    padding:2px 12px;border-radius:9px;white-space:nowrap;
+    border:2px solid rgba(14,17,22,.9)}
+  @keyframes pcard-in{from{opacity:0;transform:translateY(10px) scale(.95)}to{opacity:1;transform:none}}
+  /* VN 式双人位：当前说话人在前，另一人错位缩小退后 */
+  .pstack{position:absolute;left:12px;top:86px;z-index:21}
+  .pstack .pcard-front{left:0;top:0;width:120px;z-index:2;
+    box-shadow:0 4px 18px rgba(0,0,0,.5),0 0 16px color-mix(in srgb,var(--sig) 45%,transparent)}
+  .pstack .pcard-back{left:96px;top:44px;width:84px;z-index:1;filter:opacity(.6) saturate(.85);
+    animation-delay:.15s}
+  .pstack .pcard-back figcaption{font-size:9px;padding:1px 8px;bottom:-7px}
+
+  /* ---------- 字幕条（避开底部 220px 平台安全区） ---------- */
+  .subtitle{position:absolute;left:12px;right:12px;bottom:228px;z-index:25;
+    display:flex;align-items:stretch;
+    background:rgba(8,10,14,.68);border:1px solid rgba(235,105,153,.45);
+    border-radius:10px;overflow:hidden}
+  .sub-chip{flex:none;width:48px;display:flex;align-items:center;justify-content:center;background:var(--c-suman)}
+  .sub-chip span{font-size:13px;font-weight:700;color:#FFF}
+  .sub-body{flex:1;padding:8px 11px 7px}
+  .sub-text{font-size:16px;font-weight:700;line-height:1.42;color:#FFF;
+    text-shadow:0 1px 3px rgba(0,0,0,.9),0 0 6px rgba(0,0,0,.5)}
+  .sub-meta{margin-top:3px;font-size:9px;color:var(--text1);display:flex;align-items:center;gap:4px}
+  .sub-meta .dotp{width:5px;height:5px;border-radius:50%;background:var(--c-suman)}
+  .sub-meta .pos{color:var(--positive);font-weight:700}
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- ================= 全幅演出画面：天台夜景 ================= -->
+  <div class="stage">
+    <svg viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice" aria-label="404 公寓天台：告白名场面">
+      <defs>
+        <linearGradient id="nsky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#10101F"/><stop offset=".6" stop-color="#232344"/><stop offset="1" stop-color="#3B3A55"/>
+        </linearGradient>
+        <linearGradient id="roof" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#2E3A45"/><stop offset="1" stop-color="#161D26"/>
+        </linearGradient>
+        <filter id="glowP" x="-60%" y="-60%" width="220%" height="220%">
+          <feDropShadow dx="0" dy="0" stdDeviation="4.5" flood-color="#EB6999" flood-opacity=".9"/>
+        </filter>
+        <filter id="glowA2" x="-40%" y="-40%" width="180%" height="180%">
+          <feDropShadow dx="0" dy="0" stdDeviation="3.5" flood-color="#F4A7B9" flood-opacity=".8"/>
+        </filter>
+        <path id="heart" d="M6 11 C 2.4 7.4 0 5.2 0 3.1 C 0 1.2 1.5 0 3.2 0 C 4.5 0 5.6 0.8 6 1.9 C 6.4 0.8 7.5 0 8.8 0 C 10.5 0 12 1.2 12 3.1 C 12 5.2 9.6 7.4 6 11 Z"/>
+      </defs>
+
+      <!-- ===== 夜空（月色层次） ===== -->
+      <rect x="0" y="0" width="390" height="310" fill="url(#nsky)"/>
+      <g fill="#E6E9EF">
+        <circle cx="26" cy="30" r="1.2" opacity=".8"/><circle cx="64" cy="86" r="1" opacity=".5"/>
+        <circle cx="98" cy="20" r="1.3" opacity=".9"/><circle cx="140" cy="56" r="1" opacity=".5"/>
+        <circle cx="176" cy="116" r="1.2" opacity=".6"/><circle cx="206" cy="26" r="1" opacity=".7"/>
+        <circle cx="238" cy="88" r="1.3" opacity=".5"/><circle cx="262" cy="34" r="1" opacity=".8"/>
+        <circle cx="296" cy="150" r="1.1" opacity=".5"/><circle cx="366" cy="140" r="1.2" opacity=".7"/>
+        <circle cx="120" cy="150" r="1" opacity=".4"/><circle cx="52" cy="130" r="1.1" opacity=".5"/>
+        <circle cx="352" cy="24" r="1" opacity=".6"/><circle cx="20" cy="170" r="1" opacity=".4"/>
+        <circle cx="160" cy="180" r="1" opacity=".35"/><circle cx="220" cy="196" r="1.2" opacity=".4"/>
+      </g>
+      <!-- 流星 -->
+      <line x1="58" y1="42" x2="96" y2="60" stroke="#E6E9EF" stroke-width="1.2" opacity=".45" stroke-linecap="round"/>
+      <circle cx="58" cy="42" r="1.6" fill="#FFF" opacity=".7"/>
+      <!-- 月亮 + 月晕 -->
+      <circle cx="330" cy="168" r="44" fill="#F5F0DC" opacity=".05"/>
+      <circle cx="330" cy="168" r="31" fill="#F5F0DC" opacity=".12"/>
+      <circle cx="330" cy="168" r="21" fill="#F5F0DC"/>
+      <circle cx="324" cy="162" r="3.6" fill="#E3DCC2"/><circle cx="336" cy="174" r="2.5" fill="#E3DCC2"/><circle cx="332" cy="158" r="1.6" fill="#E3DCC2"/>
+      <!-- 云 -->
+      <g fill="#232744" opacity=".78">
+        <rect x="170" y="50" width="120" height="18" rx="9"/>
+        <rect x="20" y="142" width="150" height="20" rx="10"/>
+        <rect x="216" y="112" width="104" height="15" rx="7.5"/>
+        <rect x="60" y="196" width="130" height="16" rx="8" opacity=".6"/>
+      </g>
+
+      <!-- ===== 城市天际线 ===== -->
+      <g>
+        <rect x="0" y="252" width="52" height="100" fill="#12172A"/>
+        <rect x="57" y="226" width="44" height="126" fill="#151B30"/>
+        <rect x="106" y="268" width="50" height="84" fill="#12172A"/>
+        <rect x="161" y="240" width="48" height="112" fill="#151B30"/>
+        <rect x="214" y="278" width="46" height="74" fill="#12172A"/>
+        <rect x="266" y="244" width="48" height="108" fill="#151B30"/>
+        <rect x="320" y="262" width="70" height="90" fill="#12172A"/>
+        <g fill="#FFD166">
+          <rect x="10" y="264" width="5" height="7" opacity=".45"/><rect x="30" y="282" width="5" height="7" opacity=".3"/>
+          <rect x="66" y="240" width="5" height="7" opacity=".5"/><rect x="84" y="258" width="5" height="7" opacity=".3"/>
+          <rect x="66" y="282" width="5" height="7" opacity=".35"/><rect x="116" y="280" width="5" height="7" opacity=".4"/>
+          <rect x="172" y="254" width="5" height="7" opacity=".5"/><rect x="190" y="274" width="5" height="7" opacity=".3"/>
+          <rect x="226" y="290" width="5" height="7" opacity=".4"/><rect x="276" y="256" width="5" height="7" opacity=".5"/>
+          <rect x="296" y="276" width="5" height="7" opacity=".3"/><rect x="332" y="274" width="5" height="7" opacity=".45"/>
+          <rect x="358" y="290" width="5" height="7" opacity=".3"/><rect x="140" y="292" width="5" height="7" opacity=".35"/>
+        </g>
+      </g>
+
+      <!-- ===== 天台地面与护栏 ===== -->
+      <rect x="0" y="378" width="390" height="466" fill="url(#roof)"/>
+      <g stroke="#232B35" stroke-width="1.5">
+        <line x1="0" y1="440" x2="390" y2="440"/><line x1="0" y1="510" x2="390" y2="510"/>
+        <line x1="0" y1="590" x2="390" y2="590"/><line x1="0" y1="680" x2="390" y2="680"/>
+        <line x1="0" y1="780" x2="390" y2="780"/>
+      </g>
+      <rect x="0" y="350" width="390" height="28" fill="#39434F"/>
+      <rect x="0" y="350" width="390" height="2.5" fill="#4A5563"/>
+      <rect x="0" y="334" width="390" height="4" fill="#39434F"/>
+      <g fill="#39434F">
+        <rect x="18" y="334" width="3" height="16"/><rect x="58" y="334" width="3" height="16"/>
+        <rect x="98" y="334" width="3" height="16"/><rect x="138" y="334" width="3" height="16"/>
+        <rect x="178" y="334" width="3" height="16"/><rect x="218" y="334" width="3" height="16"/>
+        <rect x="258" y="334" width="3" height="16"/><rect x="298" y="334" width="3" height="16"/>
+        <rect x="338" y="334" width="3" height="16"/><rect x="372" y="334" width="3" height="16"/>
+      </g>
+      <!-- 地面光晕：月色 + 暖光 -->
+      <ellipse cx="320" cy="620" rx="120" ry="34" fill="#F5F0DC" opacity=".045"/>
+      <ellipse cx="210" cy="540" rx="130" ry="40" fill="#FFD166" opacity=".05"/>
+
+      <!-- 楼梯间小屋 -->
+      <rect x="0" y="286" width="74" height="92" fill="#3A4656" stroke="#2E3A45" stroke-width="2"/>
+      <rect x="0" y="280" width="80" height="8" fill="#2E3A45"/>
+      <rect x="30" y="326" width="30" height="52" rx="2" fill="#232B35"/>
+      <circle cx="55" cy="354" r="2" fill="#8A93A0"/>
+      <rect x="10" y="300" width="18" height="16" fill="#FFD166" opacity=".5"/>
+
+      <!-- 晾衣架 -->
+      <rect x="96" y="330" width="4" height="72" fill="#39434F"/>
+      <rect x="168" y="330" width="4" height="72" fill="#39434F"/>
+      <line x1="98" y1="337" x2="170" y2="337" stroke="#8A93A0" stroke-width="1.5"/>
+      <rect x="106" y="337" width="17" height="28" rx="2" fill="#C3CDDA" opacity=".92"/>
+      <rect x="129" y="337" width="15" height="22" rx="2" fill="#EB6999" opacity=".85"/>
+      <rect x="150" y="337" width="11" height="15" rx="2" fill="#F2E6D4" opacity=".9"/>
+
+      <!-- 盆栽 -->
+      <g>
+        <polygon points="78,428 96,428 93,444 81,444" fill="#A9714B" stroke="#2E3A45" stroke-width="1.5"/>
+        <circle cx="84" cy="422" r="7" fill="#7FA98C"/><circle cx="92" cy="424" r="6" fill="#7FA98C"/>
+      </g>
+      <g>
+        <polygon points="282,430 300,430 297,446 285,446" fill="#A9714B" stroke="#2E3A45" stroke-width="1.5"/>
+        <circle cx="288" cy="424" r="7" fill="#7FA98C"/><circle cx="296" cy="426" r="6" fill="#7FA98C"/>
+      </g>
+
+      <!-- 水箱 -->
+      <rect x="310" y="344" width="5" height="34" fill="#2E3A45"/><rect x="351" y="344" width="5" height="34" fill="#2E3A45"/>
+      <rect x="304" y="280" width="56" height="66" rx="6" fill="#5B7B9A" stroke="#2E3A45" stroke-width="2"/>
+      <polygon points="300,280 364,280 332,258" fill="#46586B" stroke="#2E3A45" stroke-width="2"/>
+      <line x1="304" y1="306" x2="360" y2="306" stroke="#2E3A45" stroke-width="1.5" opacity=".6"/>
+
+      <!-- 串灯（小屋 → 水箱） -->
+      <path d="M74,292 Q130,330 190,296 Q250,332 304,288" fill="none" stroke="#39434F" stroke-width="1.5"/>
+      <g fill="#FFD166">
+        <circle cx="92" cy="302" r="4.5" opacity=".18"/><circle cx="92" cy="302" r="2.2"/>
+        <circle cx="116" cy="312" r="4.5" opacity=".18"/><circle cx="116" cy="312" r="2.2"/>
+        <circle cx="142" cy="315" r="4.5" opacity=".18"/><circle cx="142" cy="315" r="2.2"/>
+        <circle cx="168" cy="309" r="4.5" opacity=".18"/><circle cx="168" cy="309" r="2.2"/>
+        <circle cx="208" cy="302" r="4.5" opacity=".18"/><circle cx="208" cy="302" r="2.2"/>
+        <circle cx="232" cy="310" r="4.5" opacity=".18"/><circle cx="232" cy="310" r="2.2"/>
+        <circle cx="256" cy="313" r="4.5" opacity=".18"/><circle cx="256" cy="313" r="2.2"/>
+        <circle cx="280" cy="303" r="4.5" opacity=".18"/><circle cx="280" cy="303" r="2.2"/>
+      </g>
+
+      <!-- ===== 连线：虚线转实线（告白成功） ===== -->
+      <line x1="182" y1="483" x2="238" y2="483" stroke="#8A93A0" stroke-width="2.5"/>
+
+      <!-- ===== 大爱心（放大演出） ===== -->
+      <use href="#heart" transform="translate(190,404) scale(3.4)" fill="#EB6999" filter="url(#glowP)"/>
+      <use href="#heart" transform="translate(130,412) scale(1.3)" fill="#F4A7B9" opacity=".95"/>
+      <use href="#heart" transform="translate(288,318) scale(1.3)" fill="#EB6999" opacity=".9"/>
+      <use href="#heart" transform="translate(208,280) scale(1.1)" fill="#F4A7B9" opacity=".85"/>
+      <use href="#heart" transform="translate(104,292) scale(1)" fill="#EB6999" opacity=".7"/>
+
+      <!-- ===== 角色：周叙（高亮） ===== -->
+      <g filter="url(#glowA2)">
+        <ellipse cx="168" cy="527" rx="14" ry="3.5" fill="#000" opacity=".35"/>
+        <rect x="159" y="516" width="7" height="10" fill="#23262E"/><rect x="170" y="516" width="7" height="10" fill="#23262E"/>
+        <rect x="155" y="492" width="26" height="26" rx="4" fill="#5583C9" stroke="#2E3A45" stroke-width="2"/>
+        <rect x="158" y="474" width="20" height="18" rx="4" fill="#F0C8A0" stroke="#2E3A45" stroke-width="2"/>
+        <rect x="157" y="470" width="22" height="9" rx="4" fill="#2A2320"/>
+        <rect x="156" y="477" width="4" height="6" fill="#2A2320"/><rect x="176" y="477" width="4" height="6" fill="#2A2320"/>
+        <circle cx="164" cy="483" r="1.4" fill="#2E3A45"/><circle cx="172" cy="483" r="1.4" fill="#2E3A45"/>
+      </g>
+      <g>
+        <rect x="148" y="442" width="40" height="16" rx="8" fill="rgba(8,10,14,.8)"/>
+        <rect x="148" y="456" width="40" height="2" rx="1" fill="#5583C9"/>
+        <text x="168" y="453.5" font-size="10.5" fill="#FFF" text-anchor="middle">周叙</text>
+      </g>
+
+      <!-- ===== 角色：苏蔓（高亮） ===== -->
+      <g filter="url(#glowA2)">
+        <ellipse cx="252" cy="527" rx="14" ry="3.5" fill="#000" opacity=".35"/>
+        <rect x="243" y="516" width="7" height="10" fill="#23262E"/><rect x="254" y="516" width="7" height="10" fill="#23262E"/>
+        <rect x="239" y="492" width="26" height="26" rx="4" fill="#EB6999" stroke="#2E3A45" stroke-width="2"/>
+        <rect x="242" y="474" width="20" height="18" rx="4" fill="#F0C8A0" stroke="#2E3A45" stroke-width="2"/>
+        <rect x="241" y="470" width="22" height="9" rx="4" fill="#2A2320"/>
+        <rect x="240" y="477" width="4" height="12" fill="#2A2320"/>
+        <rect x="261" y="475" width="5" height="20" rx="2.5" fill="#2A2320"/>
+        <circle cx="262" cy="484" r="1.6" fill="#FEAE3E"/>
+        <circle cx="248" cy="483" r="1.4" fill="#2E3A45"/><circle cx="256" cy="483" r="1.4" fill="#2E3A45"/>
+      </g>
+      <g>
+        <rect x="232" y="442" width="40" height="16" rx="8" fill="rgba(8,10,14,.8)"/>
+        <rect x="232" y="456" width="40" height="2" rx="1" fill="#EB6999"/>
+        <text x="252" y="453.5" font-size="10.5" fill="#FFF" text-anchor="middle">苏蔓</text>
+      </g>
+
+      <!-- ===== 气泡：周叙（签名色描边 2px） ===== -->
+      <g>
+        <rect x="40" y="372" width="160" height="30" rx="10" fill="#FFF" stroke="#5583C9" stroke-width="2"/>
+        <polygon points="148,400 168,400 162,438" fill="#FFF"/>
+      </g>
+      <text x="120" y="391" font-size="12" fill="#1A1D24" text-anchor="middle">这句话，我憋了四十天。</text>
+
+      <!-- ===== 气泡：苏蔓（当前句，签名色描边 2px + 高亮） ===== -->
+      <g filter="url(#glowP)">
+        <rect x="232" y="408" width="128" height="30" rx="10" fill="#FFF" stroke="#EB6999" stroke-width="2"/>
+        <polygon points="252,436 266,436 256,441" fill="#FFF"/>
+      </g>
+      <text x="296" y="427" font-size="12" fill="#1A1D24" text-anchor="middle">……我也是。</text>
+      <rect x="316" y="399" width="38" height="14" rx="7" fill="#EB6999"/>
+      <text x="335" y="409.5" font-size="9" fill="#FFF" text-anchor="middle" font-weight="700">播放中</text>
+
+      <!-- 温馨滤镜（叠 15% #F4A7B9 的 SVG 部分） -->
+      <rect x="0" y="0" width="390" height="844" fill="#F4A7B9" opacity=".08"/>
+    </svg>
+    <div class="warm-filter"></div>
+    <div class="scrim-top"></div>
+  </div>
+
+  <!-- 左上：地点 + 模拟时间 -->
+  <div class="tag-tl">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 21s-7-5.8-7-11a7 7 0 0 1 14 0c0 5.2-7 11-7 11z"/><circle cx="12" cy="10" r="2.4"/></svg>
+    <b>404 公寓 · 天台</b>&nbsp;Day 14 · 21:36
+  </div>
+
+  <!-- 名场面标签 -->
+  <div class="tag-climax">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linejoin="round"><polygon points="12 3 14.4 9.1 21 9.6 16.2 13.9 17.7 20.4 12 16.9 6.3 20.4 7.8 13.9 3 9.6 9.6 9.1"/></svg>
+    名场面 · 告白成功
+  </div>
+
+  <!-- 右上：AI 生成内容水印 -->
+  <div class="ai-wm">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><rect x="5" y="9" width="14" height="10" rx="2.5"/><line x1="12" y1="9" x2="12" y2="5"/><circle cx="12" cy="4" r="1" fill="currentColor"/><circle cx="9.5" cy="13.5" r=".9" fill="currentColor"/><circle cx="14.5" cy="13.5" r=".9" fill="currentColor"/><line x1="9" y1="16.8" x2="15" y2="16.8"/></svg>
+    <span>AI 生成内容</span>
+  </div>
+
+  <!-- 人物特写双人位：苏蔓（当前说话人）在前，周叙退后 -->
+  <div class="pstack">
+    <figure class="pcard pcard-back" style="--sig:#5583C9;--sigtext:#FFF">
+      <img src="../assets/portraits/zhouxu.png" alt="周叙特写">
+      <figcaption>周叙</figcaption>
+    </figure>
+    <figure class="pcard pcard-front" style="--sig:#EB6999;--sigtext:#FFF">
+      <img src="../assets/portraits/suman.png" alt="苏蔓特写">
+      <figcaption>苏蔓</figcaption>
+    </figure>
+  </div>
+
+  <!-- 飘屏致谢：礼物 -->
+  <div class="gift-float">
+    <div class="gf-row1">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="10" width="16" height="10" rx="1.5"/><line x1="12" y1="10" x2="12" y2="20"/><rect x="3" y="6.5" width="18" height="3.5" rx="1"/><path d="M12 6.5C10 6.5 8.5 5 9 3.5c.4-1.2 2-1.5 3 0 1-1.5 2.6-1.2 3 0 .5 1.5-1 3-3 3z"/></svg>
+      <b>芒果布丁</b>&nbsp;送出 小心心<span class="gx">×3</span>
+    </div>
+    <div class="gf-row2">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><polyline points="4 12 19 12"/><polyline points="13 6 19 12 13 18"/></svg>
+      已写入「下一段」排期
+    </div>
+  </div>
+
+  <!-- 字幕条 -->
+  <div class="subtitle">
+    <div class="sub-chip"><span>苏蔓</span></div>
+    <div class="sub-body">
+      <div class="sub-text">我也喜欢你。其实……我等这句话很久了。</div>
+      <div class="sub-meta"><i class="dotp"></i>第 6/6 句 · dialogue.confess · result=accepted · 亲密度 双向 <span class="pos">+15</span></div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

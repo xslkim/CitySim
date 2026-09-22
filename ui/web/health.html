@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>WorldSim 观察端 · 叙事健康度（调试态）</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg0:#0E1116;--bg1:#161B22;--bg2:#1F2630;--bd:#2D333D;--t0:#E6E9EF;--t1:#9AA4B2;--ac:#5AC3ED;--pos:#2EFA8D;--neg:#F75752;--warn:#FEAE3E;--nt:#8A93A0;--dir:#BF86E8}
+html,body{height:100%}
+body{background:var(--bg0);color:var(--t0);font:13px/1.55 -apple-system,"Segoe UI","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;overflow:hidden}
+a{color:inherit;text-decoration:none}
+.topnav{height:48px;display:flex;align-items:center;gap:20px;padding:0 16px;background:var(--bg1);border-bottom:1px solid var(--bd)}
+.logo{font-size:14px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
+.logo b{color:var(--ac)}
+.logo small{font-weight:400;color:var(--t1);font-size:11px;margin-left:6px}
+.nav{display:flex;gap:4px}
+.nav a{padding:6px 12px;border-radius:8px;font-size:13px;color:var(--t1);white-space:nowrap}
+.nav a:hover{background:var(--bg2);color:var(--t0)}
+.nav a.on{background:var(--bg2);color:var(--ac);font-weight:600}
+.nav .dbg{font-style:normal;font-size:10px;color:var(--dir);border:1px solid var(--dir);border-radius:4px;padding:0 3px;margin-left:4px;vertical-align:1px}
+.sim{margin-left:auto;display:flex;gap:14px;font-size:12px;color:var(--t1);font-variant-numeric:tabular-nums;white-space:nowrap}
+.sim b{color:var(--t0);font-weight:600}
+.sim .lag{color:var(--pos)}
+.layout{padding:8px;height:calc(100vh - 48px);display:flex;flex-direction:column;gap:8px}
+.card{background:var(--bg1);border:1px solid var(--bd);border-radius:8px;padding:12px}
+.ct{font-size:14px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.ct small{font-size:11px;color:var(--t1);font-weight:400}
+.sub{font-size:11px;color:var(--t1)}
+.grid7{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.mc{background:var(--bg1);border:1px solid var(--bd);border-radius:8px;padding:12px;border-top:3px solid var(--pos)}
+.mc.warn{border-top-color:var(--warn)}
+.mc .nm{font-size:12px;color:var(--t1)}
+.mc .vl{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;margin:4px 0 2px}
+.mc .vl small{font-size:12px;color:var(--t1);font-weight:400}
+.st{font-size:11px;margin:2px 0 6px}
+.st b{font-weight:600}
+.g{color:var(--pos)} .y{color:var(--warn)} .r{color:var(--neg)}
+.act{background:var(--bg2);border-radius:6px;padding:6px 8px;font-size:11px;color:var(--t1);margin-top:8px}
+.act b{color:var(--t0);font-weight:600}
+.row3{display:grid;grid-template-columns:1fr 2fr 1fr;gap:8px;flex:1;min-height:0}
+.pbar{position:relative;height:14px;border-radius:7px;background:var(--bg2);margin:14px 0 6px}
+.pbar>i{position:absolute;left:0;top:0;bottom:0;border-radius:7px;background:var(--pos)}
+.pbar .red{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--neg)}
+.pbar .redlab{position:absolute;top:-20px;transform:translateX(-50%);font-size:10px;color:var(--neg);white-space:nowrap}
+.kv{display:flex;gap:6px;font-size:12px;margin-top:8px}
+.kv .k{color:var(--t1);width:96px;flex:none}
+.note{border:1px dashed var(--dir);border-radius:8px;padding:10px;font-size:11px;color:var(--t1);background:rgba(191,134,232,.05)}
+.scroll{overflow-y:auto;min-height:0}
+.scroll::-webkit-scrollbar{width:8px}
+.scroll::-webkit-scrollbar-thumb{background:var(--bd);border-radius:4px}
+</style>
+</head>
+<body>
+<header class="topnav">
+  <div class="logo">◆ <b>WorldSim</b> 观察端<small>阶段 0 · 占位视觉</small></div>
+  <nav class="nav">
+    <a href="index.html">地图</a>
+    <a href="timeline.html">时间轴</a>
+    <a href="ripple.html">涟漪</a>
+    <a href="relations.html">关系</a>
+    <a href="health.html" class="on">健康度<i class="dbg">调试</i></a>
+  </nav>
+  <div class="sim">
+    <span>sim <b>Day12 19:42</b></span>
+    <span>压缩比 <b>3.2×</b></span>
+    <span class="lag">数据延迟 2s</span>
+  </div>
+</header>
+
+<div class="layout scroll">
+  <div class="note">调试态页面（快捷键 <b>d</b> 启用，不进外部观察者导航）· 指标值与阈值均由 <b>/api/health</b> 下发，阈值唯一持有方 = 01 §9 · 数据源：health_daily（05）</div>
+
+  <div class="grid7">
+    <div class="mc">
+      <div class="nm">A 级事件间隔</div>
+      <div class="vl">0.8<small> 模拟日</small></div>
+      <div class="st g">● 健康 ≤1 · 预警 1~2 · 报警 &gt;2</div>
+      <svg width="110" height="28"><polyline points="2,3 20,12 37,16 55,7 73,21 90,25 108,21" fill="none" stroke="var(--pos)" stroke-width="1.5"/></svg>
+      <div class="act"><b>建议动作：</b>编剧该排弧线了（L1/L2 干预）；连续 2 日无 A 级即启动休眠弧线</div>
+    </div>
+    <div class="mc">
+      <div class="nm">事件类型熵</div>
+      <div class="vl">2.8<small> bit</small></div>
+      <div class="st g">● 健康 ≥2.4 · 预警 2.0~2.4 · 报警 &lt;2.0</div>
+      <svg width="110" height="28"><polyline points="2,25 20,19 37,14 55,19 73,9 90,3 108,9" fill="none" stroke="var(--pos)" stroke-width="1.5"/></svg>
+      <div class="act"><b>建议动作：</b>退化为吃饭睡觉循环 → 查动机系统，提高 chat/invite/gossip 权重</div>
+    </div>
+    <div class="mc warn">
+      <div class="nm">出场基尼系数</div>
+      <div class="vl">0.52</div>
+      <div class="st y">● 预警 0.45~0.6（健康 ≤0.45 · 报警 &gt;0.6）</div>
+      <svg width="110" height="28"><polyline points="2,25 20,21 37,15 55,9 73,7 90,3 108,3" fill="none" stroke="var(--warn)" stroke-width="1.5"/></svg>
+      <div class="act"><b>建议动作：</b>驱动明星层轮换（源方案 §3.2 同向指标）；给冷门角色发 L2 动机助推</div>
+    </div>
+    <div class="mc warn">
+      <div class="nm">对话 3-gram 重复度</div>
+      <div class="vl">9.1<small> %</small></div>
+      <div class="st y">● 预警 8~12%（健康 ≤8% · 报警 &gt;12%）</div>
+      <svg width="110" height="28"><polyline points="2,25 20,18 37,18 55,11 73,4 90,4 108,3" fill="none" stroke="var(--warn)" stroke-width="1.5"/></svg>
+      <div class="act"><b>建议动作：</b>台词套路化 → 扩充话题库 + 重写重复率最高者的 speech_style</div>
+    </div>
+    <div class="mc">
+      <div class="nm">关系图周变化率</div>
+      <div class="vl">+12<small> %</small></div>
+      <div class="st g">● 健康 8~25% · 预警 5~8 / 25~40 · 报警 &lt;5 / &gt;40</div>
+      <svg width="110" height="28"><polyline points="2,25 20,21 37,3 55,16 73,7 90,12 108,12" fill="none" stroke="var(--pos)" stroke-width="1.5"/></svg>
+      <div class="act"><b>建议动作：</b>过低=死水（注新八卦源）· 过高=沸腾（减少随机扰动）</div>
+    </div>
+    <div class="mc warn">
+      <div class="nm">高张力边占比（结构）</div>
+      <div class="vl">9.4<small> %</small></div>
+      <div class="st y">● 预警 8~15%（健康 ≤8% · 报警 &gt;15%）</div>
+      <svg width="110" height="28"><polyline points="2,25 20,20 37,16 55,11 73,8 90,6 108,3" fill="none" stroke="var(--warn)" stroke-width="1.5"/></svg>
+      <div class="act"><b>建议动作：</b>tension 淤积 → L2 修复助推（apologize 动机）+ 减少对立性 L0 扰动</div>
+    </div>
+    <div class="mc">
+      <div class="nm">活跃冲突边密度（结构）</div>
+      <div class="vl">14<small> 条</small></div>
+      <div class="st g">● 健康 ≥12 且明星每人 ≥1 · 预警 8~12 · 报警 &lt;8</div>
+      <svg width="110" height="28"><polyline points="2,25 20,14 37,14 55,3 73,3 90,3 108,3" fill="none" stroke="var(--pos)" stroke-width="1.5"/></svg>
+      <div class="act"><b>建议动作：</b>戏不够 → 按 01 §11.2 点火一台冲突发生器（同厨/同项目组/同班）</div>
+    </div>
+    <div class="mc" style="border-top-color:var(--ac)">
+      <div class="nm">读数口径</div>
+      <div class="sub" style="line-height:1.8">
+      冲突边取边方向：gossip 取 teller→about；argue/refuse/爽约/抢功取施→受<br>
+      A 级以 event_grade_view 最新物化值为准（ui.grade 初值 + director.grade_revise）<br>
+      每日结算 → 04 §10.2 聚合 → 05 health_daily</div>
+    </div>
+  </div>
+
+  <div class="row3">
+    <div class="card">
+      <div class="ct">干预率<small>trigger ∈ director/gift/vote · 7 日滑动</small></div>
+      <div class="vl" style="font-size:28px;font-weight:700">8.3<span style="font-size:13px;color:var(--t1)">% · </span><span class="g" style="font-size:13px">● 低于红线</span></div>
+      <div class="pbar"><i style="width:8.3%"></i><span class="red" style="left:15%"></span><span class="redlab" style="left:15%">红线 15%</span></div>
+      <div class="kv"><span class="k">今日干预</span><span>L1 ×3（电梯排期 / 同厨时段 / 值班同班）· L2 ×1（tension 修复助推）</span></div>
+      <div class="kv"><span class="k">审计</span><span>干预事件 trigger=director 全量落库 · 超线自动只许 L0 · L3 心智控制永禁</span></div>
+    </div>
+    <div class="card">
+      <div class="ct">¥/模拟日 vs 熔断线<small>唯一成本口径 · 源方案 §5.2 / 04 §8.4</small>
+        <span style="margin-left:auto;font-size:12px;color:var(--t1)">实测 <b style="color:var(--ac)">¥14.2</b> · 基线 ¥12.6（+12.7%）</span>
+      </div>
+      <svg viewBox="0 0 700 160" style="width:100%;height:auto">
+<line x1="44" y1="55.0" x2="560" y2="55.0" stroke="var(--warn)" stroke-width="1" stroke-dasharray="5 4"/><text x="564" y="59.0" font-size="10" fill="var(--warn)">1.5× 报警 ¥18.9</text>
+<line x1="44" y1="28.0" x2="560" y2="28.0" stroke="var(--neg)" stroke-width="1" stroke-dasharray="5 4"/><text x="564" y="32.0" font-size="10" fill="var(--neg)">2× 降速 ¥25.2</text>
+<line x1="44" y1="82.0" x2="560" y2="82.0" stroke="var(--t1)" stroke-width="1" stroke-dasharray="2 3"/><text x="564" y="86.0" font-size="10" fill="var(--t1)">基线 ¥12.6</text>
+<text x="38" y="140.0" font-size="9" fill="var(--t1)" text-anchor="end">¥0</text>
+<text x="38" y="110.0" font-size="9" fill="var(--t1)" text-anchor="end">¥7</text>
+<text x="38" y="80.0" font-size="9" fill="var(--t1)" text-anchor="end">¥14</text>
+<text x="38" y="50.0" font-size="9" fill="var(--t1)" text-anchor="end">¥21</text>
+<text x="38" y="20.0" font-size="9" fill="var(--t1)" text-anchor="end">¥28</text>
+<text x="44" y="152.0" font-size="9" fill="var(--t1)" text-anchor="middle">Day1</text>
+<text x="282" y="152.0" font-size="9" fill="var(--t1)" text-anchor="middle">Day7</text>
+<text x="560" y="152.0" font-size="9" fill="var(--t1)" text-anchor="middle">Day14</text>
+        <polyline points="44,84.1 84,81.1 123,80.3 163,82.9 203,78.1 242,76.4 282,79.4 322,76.0 362,73.4 401,76.9 441,75.1 481,72.1 520,75.1 560,75.1" fill="none" stroke="var(--ac)" stroke-width="2"/>
+<circle cx="44" cy="84.1" r="2.5" fill="var(--ac)"/><circle cx="84" cy="81.1" r="2.5" fill="var(--ac)"/><circle cx="123" cy="80.3" r="2.5" fill="var(--ac)"/><circle cx="163" cy="82.9" r="2.5" fill="var(--ac)"/><circle cx="203" cy="78.1" r="2.5" fill="var(--ac)"/><circle cx="242" cy="76.4" r="2.5" fill="var(--ac)"/><circle cx="282" cy="79.4" r="2.5" fill="var(--ac)"/><circle cx="322" cy="76.0" r="2.5" fill="var(--ac)"/><circle cx="362" cy="73.4" r="2.5" fill="var(--ac)"/><circle cx="401" cy="76.9" r="2.5" fill="var(--ac)"/><circle cx="441" cy="75.1" r="2.5" fill="var(--ac)"/><circle cx="481" cy="72.1" r="2.5" fill="var(--ac)"/><circle cx="520" cy="75.1" r="2.5" fill="var(--ac)"/><circle cx="560" cy="75.1" r="2.5" fill="var(--ac)"/>
+<circle cx="560" cy="75.1" r="4" fill="none" stroke="var(--ac)" stroke-width="1.5"/>
+      </svg>
+    </div>
+    <div class="card">
+      <div class="ct">运行指标<small>随 /api/health 每分钟下发</small></div>
+      <div class="kv"><span class="k">副本库延迟</span><span><b class="g">● 2s</b>（&gt;60s 黄 · &gt;10min 红）</span></div>
+      <div class="kv"><span class="k">WS 吞吐</span><span>0.7 事件/s（峰值预算 2/s）</span></div>
+      <div class="kv"><span class="k">今日事件量</span><span>1,872 / 双档估算 1,500~2,500</span></div>
+      <div class="kv"><span class="k">熔断状态</span><span><b class="g">● 未触发</b> · 对话场次上限 100%（降速时 60%）</span></div>
+      <div class="kv"><span class="k">模型分层</span><span>明星 Qwen3-32B · 次要 8B · 背景 4B</span></div>
+      <div class="kv"><span class="k">黄金档密度</span><span>对话 4.2 场/模拟小时（目标 ≥3~5）</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

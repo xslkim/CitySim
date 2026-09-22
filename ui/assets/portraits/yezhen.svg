@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <title>叶蓁 · 杏黄 #FADB40 · 双丸子头/元气</title>
+  <defs>
+    <clipPath id="face"><rect x="57" y="52" width="86" height="86" rx="28"/></clipPath>
+  </defs>
+  <circle cx="62" cy="40" r="16" fill="#2A2320" stroke="#2E3A45" stroke-width="4"/>
+  <circle cx="138" cy="40" r="16" fill="#2A2320" stroke="#2E3A45" stroke-width="4"/>
+  <rect x="55" y="52" width="14" height="7" rx="3.5" fill="#FADB40" stroke="#2E3A45" stroke-width="3"/>
+  <rect x="131" y="52" width="14" height="7" rx="3.5" fill="#FADB40" stroke="#2E3A45" stroke-width="3"/>
+  <path d="M34,200 L34,176 Q34,150 66,146 L134,146 Q166,150 166,176 L166,200 Z" fill="#FADB40" stroke="#2E3A45" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M78,146 Q100,162 122,146 L122,155 Q100,171 78,155 Z" fill="#D9B52C" stroke="#2E3A45" stroke-width="3.5" stroke-linejoin="round"/>
+  <circle cx="100" cy="172" r="2.5" fill="#BF700F"/>
+  <circle cx="100" cy="184" r="2.5" fill="#BF700F"/>
+  <rect x="89" y="124" width="22" height="28" rx="6" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <ellipse cx="100" cy="140" rx="11" ry="3.5" fill="#E5B892"/>
+  <circle cx="57" cy="104" r="9" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <circle cx="143" cy="104" r="9" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <rect x="57" y="52" width="86" height="86" rx="28" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <g clip-path="url(#face)">
+    <ellipse cx="78" cy="72" rx="24" ry="15" fill="#FFFFFF" opacity=".14"/>
+    <ellipse cx="132" cy="100" rx="11" ry="34" fill="#E5B892" opacity=".4"/>
+  </g>
+  <ellipse cx="72" cy="118" rx="6" ry="3.5" fill="#EB6999" opacity=".3"/>
+  <ellipse cx="128" cy="118" rx="6" ry="3.5" fill="#EB6999" opacity=".3"/>
+  <path d="M70,84 Q80,79 91,82" fill="none" stroke="#2A2320" stroke-width="4" stroke-linecap="round"/>
+  <path d="M109,82 Q120,79 130,84" fill="none" stroke="#2A2320" stroke-width="4" stroke-linecap="round"/>
+  <ellipse cx="82" cy="105" rx="6.5" ry="9" fill="#2A2320"/>
+  <ellipse cx="120" cy="105" rx="5.8" ry="9" fill="#2A2320"/>
+  <circle cx="79.5" cy="101" r="2.4" fill="#FFFFFF"/>
+  <circle cx="85" cy="109" r="1.2" fill="#FFFFFF" opacity=".85"/>
+  <circle cx="117.5" cy="101" r="2.2" fill="#FFFFFF"/>
+  <path d="M100,112 Q103,115 101,118" fill="none" stroke="#D9A878" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M89,123 L111,123 Q109,137 100,138 Q91,137 89,123 Z" fill="#6E3A30" stroke="#2E3A45" stroke-width="3" stroke-linejoin="round"/>
+  <rect x="93" y="124.5" width="14" height="3.6" fill="#FFFFFF"/>
+  <path d="M56,88 Q52,48 100,46 Q148,48 144,88 Q137,72 129,80 Q121,68 113,77 Q105,68 96,77 Q88,68 79,80 Q71,68 63,80 Q59,74 56,88 Z" fill="#2A2320" stroke="#2E3A45" stroke-width="4" stroke-linejoin="round"/>
+</svg>

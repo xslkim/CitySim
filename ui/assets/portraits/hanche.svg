@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <title>韩彻 · 朱红 #BE2A42 · 背头/立领夹克/眉眼锋利</title>
+  <defs>
+    <clipPath id="face"><rect x="57" y="52" width="86" height="86" rx="28"/></clipPath>
+  </defs>
+  <path d="M34,200 L34,176 Q34,150 66,146 L134,146 Q166,150 166,176 L166,200 Z" fill="#BE2A42" stroke="#2E3A45" stroke-width="4" stroke-linejoin="round"/>
+  <rect x="76" y="138" width="48" height="18" rx="6" fill="#8E1F32" stroke="#2E3A45" stroke-width="3.5"/>
+  <line x1="100" y1="158" x2="100" y2="196" stroke="#8E1F32" stroke-width="3.5" stroke-linecap="round"/>
+  <rect x="96.5" y="164" width="7" height="9" rx="2" fill="#D9A0AA" stroke="#2E3A45" stroke-width="2.5"/>
+  <rect x="89" y="124" width="22" height="28" rx="6" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <ellipse cx="100" cy="140" rx="11" ry="3.5" fill="#E5B892"/>
+  <circle cx="57" cy="104" r="9" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <circle cx="143" cy="104" r="9" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <rect x="57" y="52" width="86" height="86" rx="28" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <g clip-path="url(#face)">
+    <ellipse cx="78" cy="72" rx="24" ry="15" fill="#FFFFFF" opacity=".14"/>
+    <ellipse cx="132" cy="100" rx="11" ry="34" fill="#E5B892" opacity=".4"/>
+  </g>
+  <path d="M70,83 L90,90" fill="none" stroke="#2A2320" stroke-width="4.5" stroke-linecap="round"/>
+  <path d="M110,90 L130,83" fill="none" stroke="#2A2320" stroke-width="4.5" stroke-linecap="round"/>
+  <ellipse cx="82" cy="107" rx="6" ry="4.8" fill="#2A2320"/>
+  <ellipse cx="120" cy="107" rx="5.4" ry="4.8" fill="#2A2320"/>
+  <path d="M75,102 L89,105" fill="none" stroke="#2E3A45" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M111,105 L125,102" fill="none" stroke="#2E3A45" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="80.5" cy="105" r="1.2" fill="#FFFFFF" opacity=".9"/>
+  <circle cx="118.5" cy="105" r="1.1" fill="#FFFFFF" opacity=".9"/>
+  <path d="M100,112 Q103,115 101,118" fill="none" stroke="#D9A878" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M93,130 Q103,133 113,127" fill="none" stroke="#8C5A4A" stroke-width="3" stroke-linecap="round"/>
+  <path d="M54,92 Q50,40 100,36 Q150,40 146,92 Q140,68 130,66 Q136,54 100,52 Q64,54 70,66 Q60,68 54,92 Z" fill="#2A2320" stroke="#2E3A45" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M96,66 L100,73 L104,66 Z" fill="#2A2320"/>
+</svg>

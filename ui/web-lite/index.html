@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>WorldSim · 404 公寓</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg0:#0E1116;--bg1:#161B22;--bg2:#1F2630;--bd:#2D333D;--t0:#E6E9EF;--t1:#9AA4B2;--ac:#5AC3ED;--pos:#2EFA8D;--neg:#F75752;--warn:#FEAE3E;--nt:#8A93A0;--dir:#BF86E8}
+html,body{height:100%}
+body{background:var(--bg0);color:var(--t0);font:15px/1.7 -apple-system,"Segoe UI","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;overflow:hidden}
+a{color:inherit;text-decoration:none}
+.topnav{height:60px;display:flex;align-items:center;gap:20px;padding:0 24px;background:var(--bg1);border-bottom:1px solid var(--bd)}
+.logo{font-size:18px;font-weight:700;white-space:nowrap}
+.logo b{color:var(--ac)}
+.nav{display:flex;gap:6px;margin-left:12px}
+.nav a{padding:7px 16px;border-radius:10px;font-size:14px;color:var(--t1)}
+.nav a:hover{background:var(--bg2);color:var(--t0)}
+.nav a.on{background:var(--bg2);color:var(--ac);font-weight:600}
+.clock{margin-left:auto;font-size:14px;color:var(--t1);font-variant-numeric:tabular-nums}
+.clock b{color:var(--t0)}
+.layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:16px;padding:16px 24px;height:calc(100vh - 60px)}
+.card{background:var(--bg1);border:1px solid var(--bd);border-radius:14px;padding:16px}
+.ct{font-size:17px;font-weight:700;display:flex;align-items:center;gap:10px}
+.ct small{font-size:13px;color:var(--t1);font-weight:400}
+/* map */
+.maphead{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.tabs{display:flex;gap:6px}
+.tabs button{background:var(--bg2);border:1px solid var(--bd);color:var(--t1);border-radius:10px;padding:7px 20px;font-size:14px;cursor:pointer}
+.tabs button.on{color:var(--ac);border-color:var(--ac);font-weight:600}
+.maphint{margin-left:auto;font-size:13px;color:var(--t1)}
+.mapwrap{flex:1;min-height:0;display:flex}
+.mapwrap svg{width:100%;height:100%}
+.room{fill:var(--bg2);stroke:var(--bd);stroke-width:1}
+.corr{fill:var(--bg0);stroke:var(--bd);stroke-width:1}
+.rlab{fill:var(--t1);font-size:11px}
+.flab{fill:var(--t1);font-size:12px;text-anchor:middle}
+.hl{fill:var(--ac);opacity:.08}
+.breathe{animation:bre 2.4s ease-in-out infinite}
+@keyframes bre{0%,100%{opacity:.05}50%{opacity:.16}}
+.np{fill:rgba(0,0,0,.82)}
+.npt{fill:#fff;font-size:11px;text-anchor:middle}
+.emo{font-size:13px;text-anchor:middle;font-weight:700}
+.bub{fill:var(--bg2);stroke-width:2}
+.bubt{fill:var(--t0);font-size:11px;text-anchor:middle}
+.dline{stroke:var(--nt);stroke-width:1.5;stroke-dasharray:4 4}
+.heartbig{animation:hb .6s ease-out infinite alternate;transform-box:fill-box;transform-origin:center}
+@keyframes hb{from{transform:scale(1)}to{transform:scale(1.18)}}
+.legend{display:flex;gap:20px;font-size:13px;color:var(--t1);margin-top:10px}
+.legend i{font-style:normal}
+/* story cards */
+.feed{display:flex;flex-direction:column;gap:12px;min-height:0;overflow-y:auto}
+.feed::-webkit-scrollbar{width:8px}
+.feed::-webkit-scrollbar-thumb{background:var(--bd);border-radius:4px}
+.sc{border-radius:14px;padding:14px 16px;background:var(--bg1);border:1px solid var(--bd)}
+.sc.hero{background:linear-gradient(160deg,rgba(235,105,153,.10),rgba(22,27,34,0) 55%),var(--bg1);border-color:#43303a}
+.sc .tt{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
+.sc .tt .tag{font-size:11px;font-weight:600;border-radius:6px;padding:1px 8px;flex:none}
+.sc .tx{font-size:14px;color:var(--t0);margin-top:8px;line-height:1.7}
+.sc .tx em{font-style:normal;color:var(--ac)}
+.sc .who{display:flex;align-items:center;gap:6px;margin-top:10px}
+.av{width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#0E1116;flex:none}
+.av.sm{width:22px;height:22px;font-size:11px}
+.whoname{font-size:12px;color:var(--t1)}
+.arr{color:var(--t1);font-size:12px}
+.up{color:var(--pos)} .down{color:var(--neg)}
+img.pf{border-radius:50%;object-fit:cover;background:var(--bg2);border:2px solid var(--sig,#8A93A0);flex:none}
+</style>
+</head>
+<body>
+<header class="topnav">
+  <div class="logo"><b>◆ WorldSim</b> · 404 公寓</div>
+  <nav class="nav">
+    <a href="index.html" class="on">地图</a>
+    <a href="agent.html">角色</a>
+    <a href="story.html">故事</a>
+  </nav>
+  <div class="clock">Day <b>12</b> · <b>19:42</b> 晚</div>
+</header>
+
+<div class="layout">
+  <!-- 左：地图 -->
+  <div class="card" style="display:flex;flex-direction:column;min-height:0">
+    <div class="maphead">
+      <div class="tabs" id="sitetabs">
+        <button class="on" data-s="apt">公寓</button>
+        <button data-s="corp">公司</button>
+      </div>
+      <div class="maphint">气泡 = 正在进行的对话</div>
+    </div>
+    <div class="mapwrap" id="site-apt">
+      <svg viewBox="0 0 780 744" preserveAspectRatio="xMidYMid meet">
+        <!-- 天台 -->
+        <rect x="40" y="8" width="616" height="60" rx="6" class="room"/>
+        <rect x="40" y="8" width="616" height="60" rx="6" class="hl breathe"/>
+        <text x="48" y="22" class="rlab">天台</text>
+        <line x1="272" y1="40" x2="388" y2="40" stroke="var(--pos)" stroke-width="2"/>
+        <path class="heartbig" fill="#F75752" d="M330,21 C323,15 319,11.5 319,8 C319,4.5 321.5,2.5 324.5,2.5 C326.5,2.5 328.5,3.5 330,5.5 C331.5,3.5 333.5,2.5 335.5,2.5 C338.5,2.5 341,4.5 341,8 C341,11.5 337,15 330,21 Z"/>
+        <rect x="150" y="12" width="100" height="20" rx="10" class="bub" stroke="#5583C9"/>
+        <text x="200" y="26" class="bubt">我喜欢你很久了</text>
+        <rect x="412" y="12" width="86" height="20" rx="10" class="bub" stroke="#EB6999"/>
+        <text x="455" y="26" class="bubt">……我也是</text>
+        <g transform="translate(260,40)">
+          <circle r="10" fill="#5583C9"/>
+          <text y="-16" class="emo" fill="#F75752">❤</text>
+          <rect x="-19" y="13" width="38" height="14" rx="4" class="np"/><text y="23.5" class="npt">周叙</text>
+        </g>
+        <g transform="translate(400,40)">
+          <circle r="10" fill="#EB6999"/>
+          <text y="-16" class="emo" fill="#F75752">❤</text>
+          <rect x="-19" y="13" width="38" height="14" rx="4" class="np"/><text y="23.5" class="npt">苏蔓</text>
+        </g>
+
+        <!-- L6 -->
+        <text x="18" y="120" class="flab">L6</text>
+        <rect x="40" y="76" width="148" height="78" rx="4" class="room"/><text x="46" y="90" class="rlab">601</text>
+        <rect x="196" y="76" width="148" height="78" rx="4" class="room"/><text x="202" y="90" class="rlab">602</text>
+        <rect x="352" y="76" width="148" height="78" rx="4" class="room"/><text x="358" y="90" class="rlab">603</text>
+        <rect x="508" y="76" width="148" height="78" rx="4" class="room"/><text x="514" y="90" class="rlab">604</text>
+        <rect x="40" y="154" width="616" height="14" class="corr"/>
+        <!-- L5 -->
+        <text x="18" y="220" class="flab">L5</text>
+        <rect x="40" y="176" width="148" height="78" rx="4" class="room"/><text x="46" y="190" class="rlab">501</text>
+        <rect x="196" y="176" width="148" height="78" rx="4" class="room"/><text x="202" y="190" class="rlab">502</text>
+        <rect x="352" y="176" width="148" height="78" rx="4" class="room"/><text x="358" y="190" class="rlab">503</text>
+        <rect x="508" y="176" width="148" height="78" rx="4" class="room"/><text x="514" y="190" class="rlab">504</text>
+        <rect x="40" y="254" width="616" height="14" class="corr"/>
+        <!-- L4 -->
+        <text x="18" y="320" class="flab">L4</text>
+        <rect x="40" y="276" width="148" height="78" rx="4" class="room"/><text x="46" y="290" class="rlab">401</text>
+        <rect x="196" y="276" width="148" height="78" rx="4" class="room"/><text x="202" y="290" class="rlab">402</text>
+        <rect x="352" y="276" width="148" height="78" rx="4" class="room"/><text x="358" y="290" class="rlab">403</text>
+        <rect x="508" y="276" width="148" height="78" rx="4" class="room"/><text x="514" y="290" class="rlab">404</text>
+        <rect x="40" y="354" width="616" height="14" class="corr"/>
+        <!-- L3 -->
+        <text x="18" y="420" class="flab">L3</text>
+        <rect x="40" y="376" width="148" height="78" rx="4" class="room"/><text x="46" y="390" class="rlab">301</text>
+        <rect x="196" y="376" width="148" height="78" rx="4" class="room"/><text x="202" y="390" class="rlab">302</text>
+        <rect x="352" y="376" width="148" height="78" rx="4" class="room"/><text x="358" y="390" class="rlab">303</text>
+        <rect x="508" y="376" width="148" height="78" rx="4" class="room"/><text x="514" y="390" class="rlab">304</text>
+        <rect x="40" y="454" width="616" height="14" class="corr"/>
+        <!-- L2 -->
+        <text x="18" y="520" class="flab">L2</text>
+        <rect x="40" y="476" width="148" height="78" rx="4" class="room"/><text x="46" y="490" class="rlab">201</text>
+        <rect x="196" y="476" width="148" height="78" rx="4" class="room"/><text x="202" y="490" class="rlab">202</text>
+        <rect x="352" y="476" width="148" height="78" rx="4" class="room"/><text x="358" y="490" class="rlab">203</text>
+        <rect x="508" y="476" width="148" height="78" rx="4" class="room"/><text x="514" y="490" class="rlab">204</text>
+        <rect x="40" y="554" width="616" height="14" class="corr"/>
+        <!-- L1 -->
+        <text x="18" y="620" class="flab">L1</text>
+        <rect x="40" y="576" width="148" height="78" rx="4" class="room"/><text x="46" y="590" class="rlab">101</text>
+        <rect x="196" y="576" width="148" height="78" rx="4" class="room"/><text x="202" y="590" class="rlab">102</text>
+        <rect x="352" y="576" width="148" height="78" rx="4" class="room"/><text x="358" y="590" class="rlab">103</text>
+        <rect x="508" y="576" width="148" height="78" rx="4" class="room"/><text x="514" y="590" class="rlab">104</text>
+        <rect x="40" y="654" width="616" height="14" class="corr"/>
+        <!-- B1 -->
+        <text x="18" y="712" class="flab">B1</text>
+        <rect x="40" y="676" width="300" height="60" rx="4" class="room"/><text x="46" y="690" class="rlab">健身房</text>
+        <rect x="348" y="676" width="308" height="60" rx="4" class="room"/><text x="354" y="690" class="rlab">洗衣房</text>
+        <!-- 侧翼 -->
+        <rect x="660" y="476" width="116" height="78" rx="4" class="room"/>
+        <rect x="660" y="476" width="116" height="78" rx="4" class="hl"/>
+        <text x="666" y="490" class="rlab">厨房餐厅</text>
+        <rect x="660" y="576" width="116" height="78" rx="4" class="room"/>
+        <text x="666" y="590" class="rlab">大堂</text>
+
+        <!-- 各房间的人 -->
+        <g transform="translate(114,116)"><circle r="9.5" fill="#209C68"/><text y="-15" class="emo" fill="var(--neg)">⚡</text><rect x="-23" y="12" width="46" height="14" rx="4" class="np"/><text y="22.5" class="npt">沈知行</text></g>
+        <g transform="translate(270,116)"><circle r="9.5" fill="#BF700F"/><text y="-15" class="emo" fill="var(--t1)">☾</text><rect x="-19" y="12" width="38" height="14" rx="4" class="np"/><text y="22.5" class="npt">高翔</text></g>
+        <g transform="translate(582,216)"><circle r="9.5" fill="#FADB40"/><text y="-15" class="emo" fill="var(--t1)">走</text><rect x="-19" y="12" width="38" height="14" rx="4" class="np"/><text y="22.5" class="npt">叶蓁</text></g>
+        <g transform="translate(270,316)"><circle r="9.5" fill="#209894"/><text y="-15" class="emo" fill="var(--t1)">☾</text><rect x="-19" y="12" width="38" height="14" rx="4" class="np"/><text y="22.5" class="npt">宋勉</text></g>
+        <g transform="translate(426,316)"><circle r="9.5" fill="#A432A1"/><text y="-15" class="emo" fill="var(--warn)">饭</text><rect x="-23" y="12" width="46" height="14" rx="4" class="np"/><text y="22.5" class="npt">何雨桐</text></g>
+        <g transform="translate(582,316)"><circle r="9.5" fill="#BE2A42"/><text y="-15" class="emo" fill="var(--warn)">饭</text><rect x="-19" y="12" width="38" height="14" rx="4" class="np"/><text y="22.5" class="npt">白鹿</text></g>
+        <g transform="translate(114,416)"><circle r="9.5" fill="#BE2A42"/><text y="-15" class="emo" fill="var(--neg)">⚡</text><rect x="-19" y="12" width="38" height="14" rx="4" class="np"/><text y="22.5" class="npt">韩彻</text></g>
+        <g transform="translate(270,416)"><circle r="9.5" fill="#BF700F"/><text y="-15" class="emo" fill="var(--nt)">思</text><rect x="-19" y="12" width="38" height="14" rx="4" class="np"/><text y="22.5" class="npt">赵启</text></g>
+        <g transform="translate(426,416)"><circle r="9.5" fill="#1A5E80"/><text y="-15" class="emo" fill="var(--warn)">饭</text><rect x="-19" y="12" width="38" height="14" rx="4" class="np"/><text y="22.5" class="npt">江宁</text></g>
+        <g transform="translate(582,416)"><circle r="9.5" fill="#4A2999"/><text y="-15" class="emo" fill="var(--t1)">☾</text><rect x="-19" y="12" width="38" height="14" rx="4" class="np"/><text y="22.5" class="npt">方茴</text></g>
+        <g transform="translate(114,616)"><circle r="9.5" fill="#209894"/><text y="-15" class="emo" fill="var(--t1)">☾</text><rect x="-19" y="12" width="38" height="14" rx="4" class="np"/><text y="22.5" class="npt">顾远</text></g>
+        <g transform="translate(270,616)"><circle r="9.5" fill="#7D4F30"/><text y="-15" class="emo" fill="var(--warn)">饭</text><rect x="-23" y="12" width="46" height="14" rx="4" class="np"/><text y="22.5" class="npt">陆一鸣</text></g>
+        <g transform="translate(426,616)"><circle r="9.5" fill="#A432A1"/><text y="-15" class="emo" fill="var(--t1)">☾</text><rect x="-19" y="12" width="38" height="14" rx="4" class="np"/><text y="22.5" class="npt">温阮</text></g>
+        <g transform="translate(582,616)"><circle r="9.5" fill="#A4C394"/><text y="-15" class="emo" fill="var(--ac)">工</text><rect x="-23" y="12" width="46" height="14" rx="4" class="np"/><text y="22.5" class="npt">纪云舒</text></g>
+        <g transform="translate(150,710)"><circle r="9.5" fill="#EB6999"/><text y="-15" class="emo" fill="var(--neg)">⚡</text><rect x="-23" y="12" width="46" height="14" rx="4" class="np"/><text y="22.5" class="npt">程一诺</text></g>
+        <g transform="translate(500,710)"><circle r="9.5" fill="#C3CDDA"/><text y="-15" class="emo" fill="var(--t1)">走</text><rect x="-19" y="12" width="38" height="14" rx="4" class="np"/><text y="22.5" class="npt">米雪</text></g>
+
+        <!-- 厨房对话 -->
+        <line x1="706" y1="520" x2="734" y2="520" class="dline"/>
+        <rect x="664" y="478" width="78" height="18" rx="9" class="bub" stroke="#1A5E80"/>
+        <text x="703" y="491" class="bubt">还放不下她？</text>
+        <g transform="translate(694,520)">
+          <circle r="10" fill="#1A5E80"/>
+          <text y="-14" class="emo" fill="var(--ac)">话</text>
+          <rect x="-19" y="13" width="38" height="14" rx="4" class="np"/><text y="23.5" class="npt">陈屿</text>
+        </g>
+        <g transform="translate(748,520)">
+          <circle r="10" fill="#C3CDDA"/>
+          <text y="-14" class="emo" fill="var(--ac)">话</text>
+          <rect x="-19" y="13" width="38" height="14" rx="4" class="np"/><text y="23.5" class="npt">林晚</text>
+        </g>
+        <!-- 大堂 -->
+        <g transform="translate(694,620)"><circle r="9.5" fill="#6A6C6F"/><text y="-15" class="emo" fill="var(--t1)">走</text><rect x="-19" y="12" width="38" height="14" rx="4" class="np"/><text y="22.5" class="npt">孙岩</text></g>
+        <g transform="translate(748,620)"><circle r="9.5" fill="#A8B82E"/><text y="-15" class="emo" fill="var(--t1)">走</text><rect x="-19" y="12" width="38" height="14" rx="4" class="np"/><text y="22.5" class="npt">许晴</text></g>
+      </svg>
+    </div>
+    <div class="mapwrap" id="site-corp" style="display:none">
+      <svg viewBox="0 0 780 744" preserveAspectRatio="xMidYMid meet">
+        <text x="40" y="34" class="rlab" font-size="14" fill="var(--t0)">星澜科技 · 今晚技术部加班（18:30~21:00）</text>
+        <rect x="40" y="56" width="340" height="200" rx="6" class="room"/><text x="52" y="78" class="rlab">产品部 · 已下班</text>
+        <rect x="396" y="56" width="340" height="200" rx="6" class="room"/>
+        <rect x="396" y="56" width="340" height="200" rx="6" class="hl breathe"/>
+        <text x="408" y="78" class="rlab">技术部 · 5 人在加班</text>
+        <rect x="40" y="280" width="340" height="200" rx="6" class="room"/><text x="52" y="302" class="rlab">市场部 · 已下班</text>
+        <rect x="396" y="280" width="340" height="200" rx="6" class="room"/><text x="408" y="302" class="rlab">运营部 · 已下班</text>
+        <rect x="40" y="504" width="340" height="200" rx="6" class="room"/><text x="52" y="526" class="rlab">设计部 · 已下班</text>
+        <rect x="396" y="504" width="165" height="200" rx="6" class="room"/><text x="408" y="526" class="rlab">职能部 · 已下班</text>
+        <rect x="571" y="504" width="165" height="200" rx="6" class="room"/><text x="583" y="526" class="rlab">茶水间 · 会议室</text>
+        <g transform="translate(470,130)"><circle r="9.5" fill="#61191E"/><text y="-15" class="emo" fill="var(--ac)">工</text><rect x="-19" y="12" width="38" height="14" rx="4" class="np"/><text y="22.5" class="npt">郑凯</text></g>
+        <g transform="translate(560,130)"><circle r="9.5" fill="#BF700F"/><text y="-15" class="emo" fill="var(--ac)">工</text><rect x="-19" y="12" width="38" height="14" rx="4" class="np"/><text y="22.5" class="npt">高翔</text></g>
+        <g transform="translate(650,130)"><circle r="9.5" fill="#5583C9"/><text y="-15" class="emo" fill="var(--ac)">工</text><rect x="-19" y="12" width="38" height="14" rx="4" class="np"/><text y="22.5" class="npt">罗铮</text></g>
+        <g transform="translate(515,200)"><circle r="9.5" fill="#5583C9"/><text y="-15" class="emo" fill="var(--ac)">工</text><rect x="-19" y="12" width="38" height="14" rx="4" class="np"/><text y="22.5" class="npt">刘畅</text></g>
+        <g transform="translate(610,200)"><circle r="9.5" fill="#7D4F30"/><text y="-15" class="emo" fill="var(--neg)">⚡</text><rect x="-19" y="12" width="38" height="14" rx="4" class="np"/><text y="22.5" class="npt">张帆</text></g>
+      </svg>
+    </div>
+    <div class="legend">
+      <span><i style="color:var(--nt)">----</i> 正在聊天</span>
+      <span><i style="color:var(--pos)">——</i> 刚刚在一起 ❤</span>
+      <span><i style="color:var(--ac)">话</i> 聊天　<i style="color:var(--warn)">饭</i> 吃饭　<i style="color:var(--t1)">☾</i> 休息　<i style="color:var(--ac)">工</i> 工作　<i style="color:var(--neg)">⚡</i> 闹情绪</span>
+    </div>
+  </div>
+
+  <!-- 右：今日看点 -->
+  <div class="feed">
+    <div class="ct" style="padding:2px 4px 0">今日看点<small>Day12 · 黄金档</small></div>
+
+    <div class="sc hero">
+      <div class="tt"><span class="tag" style="background:rgba(247,87,82,.15);color:#F75752">❤ 名场面</span>天台告白，成了</div>
+      <div class="tx">周叙攒了三周的勇气，今晚在天台说出了口。苏蔓愣了几秒，说「……我也是」。<em>全楼第一对恋人诞生了。</em></div>
+      <div class="who"><img class="pf" src="../assets/portraits/zhouxu.png" style="--sig:#5583C9;width:30px;height:30px" alt=""><span class="whoname">周叙</span><span class="arr">❤</span><img class="pf" src="../assets/portraits/suman.png" style="--sig:#EB6999;width:30px;height:30px" alt=""><span class="whoname">苏蔓</span></div>
+    </div>
+
+    <div class="sc">
+      <div class="tt"><span class="tag" style="background:rgba(254,174,62,.13);color:var(--warn)">热涟漪</span>一句话越传越离谱</div>
+      <div class="tx">周叙在茶水间随口一句「赔偿基数才 ¥500」，传了四手之后变成「陈屿月底走人，赔偿 ¥5,000」。<em>正主已经听到了。</em><a href="story.html" style="color:var(--ac)"> 看完整传播链 →</a></div>
+      <div class="who"><img class="pf" src="../assets/portraits/zhouxu.png" style="--sig:#5583C9;width:24px;height:24px" alt=""><span class="arr">→</span><img class="pf" src="../assets/portraits/hanche.png" style="--sig:#BE2A42;width:24px;height:24px" alt=""><span class="arr">→</span><img class="pf" src="../assets/portraits/suman.png" style="--sig:#EB6999;width:24px;height:24px" alt=""><span class="arr">→</span><img class="pf" src="../assets/portraits/chenyu.png" style="--sig:#1A5E80;width:24px;height:24px" alt=""></div>
+    </div>
+
+    <div class="sc">
+      <div class="tt"><span class="tag" style="background:rgba(247,87,82,.12);color:var(--neg)">⚡ 翻车</span>爽约被撞破</div>
+      <div class="tx">程一诺在健身房等了 40 分钟，林晚却说在厨房「聊忘了」。放鸽子被抓现行，两人现在见面都绕着走。</div>
+      <div class="who"><span class="av sm" style="background:#EB6999">程</span><span class="whoname">程一诺</span><span class="arr down">↘ 闹掰了</span><img class="pf" src="../assets/portraits/linwan.png" style="--sig:#C3CDDA;width:24px;height:24px" alt=""><span class="whoname">林晚</span></div>
+    </div>
+
+    <div class="sc">
+      <div class="tt"><span class="tag" style="background:rgba(90,195,237,.12);color:var(--ac)">日常</span>发工资日</div>
+      <div class="tx">今天 10 点到账。有人立刻还了欠租，有人已经在约周末的餐厅——<em>林晚却找赵启借了 ¥1,500。</em></div>
+      <div class="who"><img class="pf" src="../assets/portraits/linwan.png" style="--sig:#C3CDDA;width:24px;height:24px" alt=""><span class="arr">← 借款</span><span class="av sm" style="background:#BF700F">赵</span></div>
+    </div>
+
+    <div class="sc">
+      <div class="tt"><span class="tag" style="background:rgba(191,134,232,.12);color:var(--dir)">新敌友</span>绩效署名之争</div>
+      <div class="tx">韩彻和赵启为了「季度汇报谁署名」在茶水间吵了起来。这对技术部的老对手，<em>梁子结得更深了。</em></div>
+      <div class="who"><img class="pf" src="../assets/portraits/hanche.png" style="--sig:#BE2A42;width:24px;height:24px" alt=""><span class="whoname">韩彻</span><span class="arr down">↘</span><span class="av sm" style="background:#BF700F">赵</span><span class="whoname">赵启</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const tabs=document.querySelectorAll('#sitetabs button');
+tabs.forEach(b=>b.addEventListener('click',()=>{
+  tabs.forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  ['apt','corp'].forEach(s=>{document.getElementById('site-'+s).style.display=(s===b.dataset.s)?'flex':'none';});
+}));
+</script>
+</body>
+</html>

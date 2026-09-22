@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <title>苏蔓 · 蔷薇 #EB6999 · 高马尾/琥珀耳环/连衣裙</title>
+  <defs>
+    <clipPath id="face"><rect x="57" y="52" width="86" height="86" rx="28"/></clipPath>
+  </defs>
+  <path d="M120,34 Q186,38 182,98 Q179,146 158,166 Q143,154 148,118 Q154,84 138,60 Z" fill="#2A2320" stroke="#2E3A45" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M34,200 L34,176 Q34,150 66,146 L134,146 Q166,150 166,176 L166,200 Z" fill="#EB6999" stroke="#2E3A45" stroke-width="4" stroke-linejoin="round"/>
+  <circle cx="44" cy="158" r="11" fill="#EB6999" stroke="#2E3A45" stroke-width="4"/>
+  <circle cx="156" cy="158" r="11" fill="#EB6999" stroke="#2E3A45" stroke-width="4"/>
+  <path d="M78,146 Q100,164 122,146 L122,157 Q100,175 78,157 Z" fill="#D14F80" stroke="#2E3A45" stroke-width="3.5" stroke-linejoin="round"/>
+  <rect x="89" y="124" width="22" height="28" rx="6" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <ellipse cx="100" cy="140" rx="11" ry="3.5" fill="#E5B892"/>
+  <circle cx="57" cy="104" r="9" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <circle cx="143" cy="104" r="9" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <rect x="57" y="52" width="86" height="86" rx="28" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <g clip-path="url(#face)">
+    <ellipse cx="78" cy="72" rx="24" ry="15" fill="#FFFFFF" opacity=".14"/>
+    <ellipse cx="132" cy="100" rx="11" ry="34" fill="#E5B892" opacity=".4"/>
+  </g>
+  <path d="M70,86 Q80,81 91,84" fill="none" stroke="#2A2320" stroke-width="4" stroke-linecap="round"/>
+  <path d="M109,84 Q120,81 130,86" fill="none" stroke="#2A2320" stroke-width="4" stroke-linecap="round"/>
+  <ellipse cx="82" cy="105" rx="6.5" ry="8.5" fill="#2A2320"/>
+  <ellipse cx="120" cy="105" rx="5.8" ry="8.5" fill="#2A2320"/>
+  <circle cx="79.5" cy="101.5" r="2.2" fill="#FFFFFF"/>
+  <circle cx="85" cy="108" r="1.1" fill="#FFFFFF" opacity=".85"/>
+  <circle cx="117.5" cy="101.5" r="2" fill="#FFFFFF"/>
+  <path d="M100,112 Q103,115 101,118" fill="none" stroke="#D9A878" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M88,123 L112,123 Q110,138 100,139 Q90,138 88,123 Z" fill="#6E3A30" stroke="#2E3A45" stroke-width="3" stroke-linejoin="round"/>
+  <rect x="93" y="124.5" width="14" height="3.6" fill="#FFFFFF"/>
+  <circle cx="57" cy="110" r="2.6" fill="#FEAE3E"/>
+  <circle cx="54" cy="121" r="4.6" fill="#FEAE3E" stroke="#2E3A45" stroke-width="3"/>
+  <path d="M52,92 Q46,44 104,42 Q150,44 148,86 Q138,66 124,68 Q112,58 96,62 Q72,66 66,84 Q58,82 52,92 Z" fill="#2A2320" stroke="#2E3A45" stroke-width="4" stroke-linejoin="round"/>
+  <circle cx="128" cy="50" r="7" fill="#FEAE3E" stroke="#2E3A45" stroke-width="3.5"/>
+</svg>

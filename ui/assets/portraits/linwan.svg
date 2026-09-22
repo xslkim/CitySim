@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <title>林晚 · 雾蓝 #C3CDDA · 锁骨发/眼镜/卫衣</title>
+  <defs>
+    <clipPath id="face"><rect x="57" y="52" width="86" height="86" rx="28"/></clipPath>
+  </defs>
+  <path d="M52,72 Q38,122 42,170 L70,170 Q62,132 64,100 Z" fill="#2A2320" stroke="#2E3A45" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M148,72 Q162,122 158,170 L130,170 Q138,132 136,100 Z" fill="#2A2320" stroke="#2E3A45" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M34,200 L34,176 Q34,150 66,146 L134,146 Q166,150 166,176 L166,200 Z" fill="#C3CDDA" stroke="#2E3A45" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M62,150 Q100,132 138,150 Q138,161 130,163 Q100,148 70,163 Q62,161 62,150 Z" fill="#A8B4C4" stroke="#2E3A45" stroke-width="3.5" stroke-linejoin="round"/>
+  <line x1="95" y1="152" x2="92" y2="170" stroke="#7C8694" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="105" y1="152" x2="108" y2="170" stroke="#7C8694" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M74,179 L126,179 L120,196 L80,196 Z" fill="none" stroke="#A8B4C4" stroke-width="3.5" stroke-linejoin="round"/>
+  <rect x="89" y="124" width="22" height="28" rx="6" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <ellipse cx="100" cy="140" rx="11" ry="3.5" fill="#E5B892"/>
+  <circle cx="57" cy="104" r="9" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <circle cx="143" cy="104" r="9" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <rect x="57" y="52" width="86" height="86" rx="28" fill="#F0C8A0" stroke="#2E3A45" stroke-width="4"/>
+  <g clip-path="url(#face)">
+    <ellipse cx="78" cy="72" rx="24" ry="15" fill="#FFFFFF" opacity=".14"/>
+    <ellipse cx="132" cy="100" rx="11" ry="34" fill="#E5B892" opacity=".4"/>
+  </g>
+  <path d="M70,91 Q81,88 90,85" fill="none" stroke="#2A2320" stroke-width="4" stroke-linecap="round"/>
+  <path d="M110,85 Q119,88 130,91" fill="none" stroke="#2A2320" stroke-width="4" stroke-linecap="round"/>
+  <ellipse cx="82" cy="108" rx="6" ry="6.5" fill="#2A2320"/>
+  <ellipse cx="120" cy="108" rx="5.4" ry="6.5" fill="#2A2320"/>
+  <path d="M75,104 Q82,101 89,104" fill="none" stroke="#2E3A45" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M114,104 Q120,101 126,104" fill="none" stroke="#2E3A45" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="80" cy="106" r="1.6" fill="#FFFFFF" opacity=".85"/>
+  <circle cx="118" cy="106" r="1.5" fill="#FFFFFF" opacity=".85"/>
+  <path d="M100,112 Q103,115 101,118" fill="none" stroke="#D9A878" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M93,130 Q100,131.5 107,130" fill="none" stroke="#8C5A4A" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="82" cy="106" r="12.5" fill="#FFFFFF" opacity=".07" stroke="#2E3A45" stroke-width="3.5"/>
+  <circle cx="120" cy="106" r="12.5" fill="#FFFFFF" opacity=".07" stroke="#2E3A45" stroke-width="3.5"/>
+  <path d="M94.5,104 Q100,100 105.5,104" fill="none" stroke="#2E3A45" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M50,96 Q42,46 100,44 Q158,46 150,96 Q144,74 134,72 Q138,88 128,86 Q120,66 100,64 Q80,66 72,86 Q62,88 66,72 Q56,74 50,96 Z" fill="#2A2320" stroke="#2E3A45" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M59,86 Q55,124 58,158" fill="none" stroke="#C3CDDA" stroke-width="4" stroke-linecap="round" opacity=".9"/>
+</svg>
