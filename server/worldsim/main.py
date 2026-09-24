@@ -38,6 +38,7 @@ import asyncpg
 import yaml
 
 from . import logconf
+from .adjudicator.dialogue import DialogueEngine
 from .adjudicator.pipeline import Pipeline, adjudication_loop
 from .adjudicator.queue import AdjudicationQueue
 from .adjudicator.state_events import StateAggregator
@@ -52,6 +53,7 @@ from .relations.cooldown import CooldownEngine
 from .relations.goals import GoalEngine, load_goals
 from .relations.needs import NeedsEngine, load_needs_config
 from .relations.relations import RelationEngine, load_relations_config
+from .relations.topics import TopicSystem, load_rules as load_topic_rules, load_topics
 from .scheduler.lod import LodScheduler
 from .scheduler.residence import ResidenceEngine
 from .scheduler.rotation import EventDrivenLOD, StarRotation
@@ -170,11 +172,22 @@ async def _run(args: argparse.Namespace) -> int:
             pool, gateway, relations_cfg,
             agg=agg, cooldown=cooldown_engine, relations=relation_engine, tick_of=clock.tick_of,
         )
+        # T-ADJ-04：对话整段生成引擎（话题注入 T-REL-06 + 降速读取点 ThrottleState seam）
+        topic_system = TopicSystem(
+            pool, load_topics(str(SERVER_ROOT / "config" / "topics.yaml")),
+            load_topic_rules(str(SERVER_ROOT / "config" / "topics.yaml")),
+        )
+        dialogue_engine = DialogueEngine(
+            pool, gateway, topics=topic_system, relations=relation_engine, cooldown=cooldown_engine,
+            needs_engine=needs_engine, agg=agg,
+            default_daily_cap=int(models_cfg.get("thresholds", {}).get("dialogue", {}).get("daily_cap", 42)),
+        )
         action_validator = ActionValidator(
             pool, world=world_cfg, needs_engine=needs_engine, cooldown=cooldown_engine,
             relations=relation_engine, relations_cfg=relations_cfg, agg=agg, gateway=gateway,
             invite=invite_machine, residence=residence,
             wakeup=lambda t, aid: queue.put_wakeup(t, aid, reason="interaction"),
+            dialogue_settle=dialogue_engine.settle_chat,
         )
         pipeline = Pipeline(
             pool, gateway, world_cfg,

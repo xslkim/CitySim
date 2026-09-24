@@ -43,11 +43,18 @@ class ThrottleState(Protocol):
         """当前生效的深度反思触发阈值（未降速返回 default=20；降速档返回 35，04 §8.4 ④）。"""
         ...
 
+    def dialogue_daily_cap(self, default: int) -> int:
+        """当前生效的每模拟日对话场次上限（未降速返回 default；降速档降为 60%，04 §8.4 ③）。"""
+        ...
+
 
 class NullThrottleState:
     """M1 默认：未接降速（T-OPS-02 以同协议替换注入）。"""
 
     def reflection_threshold(self, default: int) -> int:
+        return default
+
+    def dialogue_daily_cap(self, default: int) -> int:
         return default
 
 

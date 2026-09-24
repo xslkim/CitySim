@@ -156,16 +156,17 @@ class MockProvider:
 
     def _render_dialogue(self, rng: random.Random, obs: dict[str, Any], tag: int) -> dict[str, Any]:
         speakers = [p for p in obs.get("participants", []) if isinstance(p, str)] or ["A", "B"]
-        turns = rng.randint(6, 8)
+        lo, hi = (obs.get("rounds") or [6, 8])  # 轮数区间（01 §7 钦定 6~8；argue 等经 OBS_JSON 收窄）
+        turns = rng.randint(int(lo), int(hi))
         lines = [
             {"speaker": speakers[i % len(speakers)], "text": f"第{i + 1}句：{tag:06x}"}
             for i in range(turns)
         ]
-        band = rng.choice(["愉快", "平淡", "敷衍"])
         return {
             "lines": lines,
-            "opening_fact": f"开场由头（{tag:06x}）",
-            "self_eval": {"band": band, "score": rng.randint(1, 5)},
+            "opening_fact": {"type": rng.choice(["memory", "scene", "state"]), "ref": f"开场由头（{tag:06x}）"},
+            "self_eval": {"a_enjoy": rng.randint(0, 10), "b_enjoy": rng.randint(0, 10),
+                          "basis": f"自评（{tag:06x}）"},  # 01 §7 结构化自评（愉快/平淡/敷衍判定源）
             "quotable_lines": [lines[0]["text"]],
         }
 

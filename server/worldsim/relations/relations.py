@@ -95,28 +95,34 @@ class RelationEngine:
 
     async def settle_chat(
         self, agg: StateAggregator, *, a_id: str, b_id: str, band: str, cause: str, sim_now: dt.datetime,
+        exclude_seq: int | None = None,
     ) -> list[dict[str, Any]]:
         """chat 结算：愉快/平淡按矩阵（敷衍无矩阵行、不进关系结算，冷却归 T-REL-04）；
-        当日同对第 3 次起减半（01 §3.2 chat 行；当日计数查事件流，回放一致）。"""
+        当日同对第 3 次起减半（01 §3.2 chat 行；当日计数查事件流，回放一致）。
+
+        `exclude_seq`：调用方在落 dialogue.chat 事件后才结算时传入该事件 seq，减半计数只计
+        此前场次（"第 3 次起"语义不含本场，T-ADJ-04 对话引擎口径）。
+        """
         if band not in CHAT_BANDS:
             raise ValueError(f"未知 chat 档位 {band!r}（01 §7：{CHAT_BANDS}）")
         if band == "perfunctory":
             return []
-        prior = await self.chats_today(a_id, b_id, sim_now)
+        prior = await self.chats_today(a_id, b_id, sim_now, exclude_seq=exclude_seq)
         halving_from = int(self._cfg["chat"]["same_pair_daily_halving_from"])
         factor = 0.5 if prior + 1 >= halving_from else 1.0
         kind = "chat_enjoyable" if band == "enjoyable" else "chat_flat"
         return await self.settle(agg, kind=kind, a_id=a_id, b_id=b_id, cause=cause, factor=factor, scope="both")
 
-    async def chats_today(self, a_id: str, b_id: str, sim_now: dt.datetime) -> int:
+    async def chats_today(self, a_id: str, b_id: str, sim_now: dt.datetime, *, exclude_seq: int | None = None) -> int:
         """当日（本地日界）两人间已落库的 dialogue.chat 场次数（减半规则数据源）。"""
         day_start = sim_now.replace(hour=0, minute=0, second=0, microsecond=0)
         return await self._pool.fetchval(
             """
             SELECT count(*) FROM events
             WHERE type='dialogue.chat' AND actors @> $1::text[] AND sim_time >= $2 AND sim_time < $3
+              AND ($4::bigint IS NULL OR seq <> $4)
             """,
-            sorted([a_id, b_id]), day_start, day_start + dt.timedelta(days=1),
+            sorted([a_id, b_id]), day_start, day_start + dt.timedelta(days=1), exclude_seq,
         )
 
     # ---- 自然回归（每周结算一次，01 §3.2 末段） ------------------------------------
