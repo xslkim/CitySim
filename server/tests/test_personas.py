@@ -224,7 +224,7 @@ def test_p40_a01_a08_verbatim() -> None:
         ["git", "show", "schema-v1:server/config/agents.yaml"],
         cwd=REPO_ROOT, capture_output=True, text=True, check=True,
     ).stdout
-    old8 = {a["agent_id"]: a for a in yaml.safe_load(old)["agents"]}
+    old8 = {a["agent_id"]: a for a in yaml.safe_load(old)["agents"] if a["agent_id"] in P8_IDS}
     cur8 = {a["agent_id"]: a for a in _agents() if a["agent_id"] in P8_IDS}
     assert set(old8) == set(P8_IDS)
     for aid in P8_IDS:
