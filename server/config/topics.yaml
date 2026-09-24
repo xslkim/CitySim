@@ -1,0 +1,85 @@
+# topics.yaml —— 话题库 ≥60 条（01 §7 话题库规模行逐字镜像；数字唯一持有方 = 01 §7，勿改数字，修订先回改 01）
+# 6 类配比：日常 12 / 工作 12 / 八卦 10 / 情感 10 / 秘密 8 / 冲突 8（合计 60 ≥60）
+# topic_id 形态 = 工程默认（T-<类码>-nn，02 文档偏差表 D21）；每条带 topic_id/分类/引用模板
+# 八卦类 = 动态引用 gossip 记忆条目的种子模板（dynamic: gossip；{gossip} 槽由 T-MEM-01 检索供数，T-ADJ-04 注入）
+
+meta:
+  total_min: 60
+  category_counts: { 日常: 12, 工作: 12, 八卦: 10, 情感: 10, 秘密: 8, 冲突: 8 }   # 01 §7 话题库规模行配比
+  per_dialogue: [1, 2]                    # 每场对话 1~2 个话题（01 §7 话题系统行）
+
+rules:                                    # 解锁与权重/去重冷却（01 §7 话题系统行逐行）
+  deep_unlock_affinity: 20                # 情感类 affinity≥20 解锁
+  secret_unlock_affinity: 60              # 秘密类 affinity≥60 且一方主动
+  conflict_tension_threshold: 30          # 冲突类 tension≥30 时
+  conflict_weight_factor: 3               #   权重 ×3
+  cooldown_hours: 72                      # 同一 Agent 同一 topic_id 冷却 72h = 72 模拟小时（02 D11 口径）
+  affinity_direction: max                 # 双向 affinity/tension 取大值判定（工程默认，D21）
+
+topics:
+  # —— 日常 12（天气/外卖/快递/睡眠/通勤/房租/健身/厨艺/剧集/游戏/周末计划/宠物）——
+  - { topic_id: T-DAY-01, category: 日常, title: 天气, template: "今天这天气也太{weather}了，你出门没带伞吧？" }
+  - { topic_id: T-DAY-02, category: 日常, title: 外卖, template: "你中午又点的那家外卖？我上次吃拉肚子了。" }
+  - { topic_id: T-DAY-03, category: 日常, title: 快递, template: "楼下快递柜又满了，你有件堵在那儿吗？" }
+  - { topic_id: T-DAY-04, category: 日常, title: 睡眠, template: "你昨晚几点睡的？我看你黑眼圈都出来了。" }
+  - { topic_id: T-DAY-05, category: 日常, title: 通勤, template: "今早地铁挤死了，你上班路上顺吗？" }
+  - { topic_id: T-DAY-06, category: 日常, title: 房租, template: "听说房东又要涨租了，你一个月房租多少来着？" }
+  - { topic_id: T-DAY-07, category: 日常, title: 健身, template: "健身房最近人少了不少，你还坚持去吗？" }
+  - { topic_id: T-DAY-08, category: 日常, title: 厨艺, template: "你上次做的那个菜绝了，什么时候再露一手？" }
+  - { topic_id: T-DAY-09, category: 日常, title: 剧集, template: "最近那部剧你追到第几集了？别给我剧透啊。" }
+  - { topic_id: T-DAY-10, category: 日常, title: 游戏, template: "那款游戏新赛季开了，你上分了吗？" }
+  - { topic_id: T-DAY-11, category: 日常, title: 周末计划, template: "这周末有什么安排？要不要一起出去走走？" }
+  - { topic_id: T-DAY-12, category: 日常, title: 宠物, template: "楼下那只橘猫又胖了，你说谁一直在喂它？" }
+  # —— 工作 12（需求变更/加班/周报/绩效/晋升/经理吐槽/跨部门扯皮/客户/出差/调休/oncall/年终奖）——
+  - { topic_id: T-WRK-01, category: 工作, title: 需求变更, template: "产品又改需求了，这版你那边动多少？" }
+  - { topic_id: T-WRK-02, category: 工作, title: 加班, template: "这周又要加班，你们部门也这样吗？" }
+  - { topic_id: T-WRK-03, category: 工作, title: 周报, template: "周报你写了吗？我每次都不知道写什么。" }
+  - { topic_id: T-WRK-04, category: 工作, title: 绩效, template: "绩效季快到了，你心里有没有底？" }
+  - { topic_id: T-WRK-05, category: 工作, title: 晋升, template: "这次晋升窗口你觉得谁最有戏？" }
+  - { topic_id: T-WRK-06, category: 工作, title: 经理吐槽, template: "你们经理最近那个操作，你忍得住不吐槽？" }
+  - { topic_id: T-WRK-07, category: 工作, title: 跨部门扯皮, template: "又是跨部门扯皮的一天，你们那边谁卡着不批？" }
+  - { topic_id: T-WRK-08, category: 工作, title: 客户, template: "那个难搞的客户又来找你了没？" }
+  - { topic_id: T-WRK-09, category: 工作, title: 出差, template: "听说下个月要出差，你想去吗？" }
+  - { topic_id: T-WRK-10, category: 工作, title: 调休, template: "你上个月的调休批下来了吗？" }
+  - { topic_id: T-WRK-11, category: 工作, title: oncall, template: "这周轮到你 oncall 了吧？昨晚告警响了几回？" }
+  - { topic_id: T-WRK-12, category: 工作, title: 年终奖, template: "你说今年年终奖能发几个月？" }
+  # —— 八卦 10（动态引用 gossip 记忆条目的种子模板，dynamic: gossip，{gossip} 槽由 T-MEM-01 供数）——
+  - { topic_id: T-GOS-01, category: 八卦, title: 传闻开场, template: "哎你听说了吗，{gossip}……", dynamic: gossip }
+  - { topic_id: T-GOS-02, category: 八卦, title: 求证, template: "有件事我只跟你说：{gossip}。真的假的？", dynamic: gossip }
+  - { topic_id: T-GOS-03, category: 八卦, title: 添油加醋, template: "我听说的版本是{gossip}，可比这夸张多了。", dynamic: gossip }
+  - { topic_id: T-GOS-04, category: 八卦, title: 欲言又止, template: "{gossip}……算了，当我没说。", dynamic: gossip }
+  - { topic_id: T-GOS-05, category: 八卦, title: 旁敲侧击, template: "你最近有没有觉得那谁不对劲？{gossip}。", dynamic: gossip }
+  - { topic_id: T-GOS-06, category: 八卦, title: 拉同盟, template: "{gossip}，你说咱俩要不要提醒他一下？", dynamic: gossip }
+  - { topic_id: T-GOS-07, category: 八卦, title: 反转, template: "之前传的那个{gossip}，好像完全不是那么回事。", dynamic: gossip }
+  - { topic_id: T-GOS-08, category: 八卦, title: 消化瓜, template: "我到现在还在消化那个事——{gossip}。", dynamic: gossip }
+  - { topic_id: T-GOS-09, category: 八卦, title: 新瓜速递, template: "新鲜出炉的：{gossip}，你绝对想不到。", dynamic: gossip }
+  - { topic_id: T-GOS-10, category: 八卦, title: 旧事重提, template: "还记得{gossip}吗？我后来才想明白怎么回事。", dynamic: gossip }
+  # —— 情感 10（暗恋心事/失恋/孤独/想家/友情/暧昧试探/前任/相亲/告白排练/吃醋；affinity≥20 解锁）——
+  - { topic_id: T-EMO-01, category: 情感, title: 暗恋心事, template: "你有没有那种，看见一个人就不敢说话的时候？" }
+  - { topic_id: T-EMO-02, category: 情感, title: 失恋, template: "走出来了吗？我那时候可是缓了好几个月。" }
+  - { topic_id: T-EMO-03, category: 情感, title: 孤独, template: "有时候整层楼都亮着灯，还是觉得只有自己一个人。" }
+  - { topic_id: T-EMO-04, category: 情感, title: 想家, template: "我妈昨天又打电话了，问我什么时候回家。" }
+  - { topic_id: T-EMO-05, category: 情感, title: 友情, template: "咱俩认识这么久了，有些话我只跟你说。" }
+  - { topic_id: T-EMO-06, category: 情感, title: 暧昧试探, template: "你觉得……我们这样算什么关系？" }
+  - { topic_id: T-EMO-07, category: 情感, title: 前任, template: "你会偶尔想起前任吗？不是怀念，就是想起。" }
+  - { topic_id: T-EMO-08, category: 情感, title: 相亲, template: "家里又安排相亲了，你说我要不要去？" }
+  - { topic_id: T-EMO-09, category: 情感, title: 告白排练, template: "如果要跟一个人表白，你觉得怎么开口比较好？" }
+  - { topic_id: T-EMO-10, category: 情感, title: 吃醋, template: "看到他们两个走那么近，你心里会不会有点酸？" }
+  # —— 秘密 8（债务/跳槽意向/家庭变故/健康/副业/学历心结/暗恋对象/过去糗事；affinity≥60 且一方主动）——
+  - { topic_id: T-SEC-01, category: 秘密, title: 债务, template: "有件事压我很久了……我最近手头真的很紧。" }
+  - { topic_id: T-SEC-02, category: 秘密, title: 跳槽意向, template: "这话你别跟别人说——我其实在看外面的机会。" }
+  - { topic_id: T-SEC-03, category: 秘密, title: 家庭变故, template: "我家里最近出了点事，一直没跟人说。" }
+  - { topic_id: T-SEC-04, category: 秘密, title: 健康, template: "体检报告出来了，有几项不太好，我有点怕。" }
+  - { topic_id: T-SEC-05, category: 秘密, title: 副业, template: "我下班其实在搞一个副业，你先替我保密。" }
+  - { topic_id: T-SEC-06, category: 秘密, title: 学历心结, template: "说实话，学历这事我一直挺自卑的。" }
+  - { topic_id: T-SEC-07, category: 秘密, title: 暗恋对象, template: "我喜欢一个人很久了，只敢告诉你。" }
+  - { topic_id: T-SEC-08, category: 秘密, title: 过去糗事, template: "我干过一件特别丢人的事，说出来你别笑我。" }
+  # —— 冲突 8（房租/噪音/卫生值日/抢功/借钱不还/爽约/误会澄清/立场之争；tension≥30 时权重 ×3）——
+  - { topic_id: T-CNF-01, category: 冲突, title: 房租, template: "房租这事咱得说清楚，你到底怎么打算的？" }
+  - { topic_id: T-CNF-02, category: 冲突, title: 噪音, template: "你半夜能不能小点声？我第二天还要上班。" }
+  - { topic_id: T-CNF-03, category: 冲突, title: 卫生值日, template: "这周卫生值日又是我，轮也该轮到你了吧？" }
+  - { topic_id: T-CNF-04, category: 冲突, title: 抢功, template: "那个方案明明是我先做的，你凭什么拿去汇报？" }
+  - { topic_id: T-CNF-05, category: 冲突, title: 借钱不还, template: "你借我的钱，到底什么时候还？" }
+  - { topic_id: T-CNF-06, category: 冲突, title: 爽约, template: "上次你放我鸽子那事，你到现在没个说法。" }
+  - { topic_id: T-CNF-07, category: 冲突, title: 误会澄清, template: "外面传的那个版本根本不对，你听我说。" }
+  - { topic_id: T-CNF-08, category: 冲突, title: 立场之争, template: "这件事咱俩立场不一样，今天必须掰扯清楚。" }
