@@ -99,6 +99,15 @@ generation_params:                              # 04 §8.6 逐行照抄（7 行�
 thresholds:                                     # 阈值集中段（04 §12.4）；数字引用持有方，不新造
   retrieval_quota: { N: 10, M: 5, K: 10 }       # 配额制检索（04 §7.1）
   rotation: { promote_in: 0.62, demote_out: 0.45 }  # 明星轮换滞回带（04 §4.2）
+  lod:                                    # LOD 调度阈值（04 §4.2 镜像；路径一权重为设计未定值的等权初值，02 文档 D4）
+    secondary_cap: 16                     # secondary 层总人数硬上限（评审二轮 N-P1-7，04 §4.2）
+    cooldown_demote_sim_days: 2           # 事件驱动升入 secondary 连续 2 模拟日零新交互 → 回落（04 §4.2）
+    star_count: 8                         # 明星层席位数（06 §3 LOD 三层，源方案 §3.2 持有）
+    daily_churn_cap: 2                    # 路径一每模拟日最多变动 2 人（04 §4.2）
+    consecutive_over: 2                   # 升星迟滞：连续得分超 PROMOTE_IN 次数（04 §4.2）
+    consecutive_under: 3                  # 降星迟滞：连续得分低于 DEMOTE_OUT 次数（04 §4.2）
+    weights: { w_arc: 1.0, w_dir: 1.0, w_int: 1.0, w_cold: 1.0 }   # 路径一 score 四因子等权初值（设计未给，02 D4）
+    gini_cold_bonus_above: 0.45           # 出场基尼超预警线时 cold_bonus 权重上调 ×2（阈值持有方 = 01 §9 预警线，02 D23）
   reflection: { importance_acc: 20 }            # 反思触发阈值（04 §7.2）
   cost_breaker: { alarm_ratio: 1.5, throttle_ratio: 2.0 }   # 熔断倍数（数值持有方 = 源方案 §5.2，06 §3 登记；04 §8.4 镜像）
   intervention_rate_cap: 0.15                   # 干预率上限（数值持有方 = 源方案 §4.8，06 §3 登记；消费方 = 04 T-DIR-03 滑窗 / 08 T-AUD-05 审计④，本段唯一写入方）

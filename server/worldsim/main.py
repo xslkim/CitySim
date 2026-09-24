@@ -51,6 +51,7 @@ from .relations.goals import GoalEngine, load_goals
 from .relations.needs import NeedsEngine, load_needs_config
 from .relations.relations import RelationEngine, load_relations_config
 from .scheduler.lod import LodScheduler
+from .scheduler.rotation import EventDrivenLOD
 from .time_engine.batch_hooks import register_batch_hook
 from .time_engine.clock import LOCAL_TZ, TimeEngine
 from .time_engine.speed_table import SpeedTableReloader, load as load_speed_table
@@ -147,10 +148,24 @@ async def _run(args: argparse.Namespace) -> int:
                 aid, content, importance=importance,
             ),
         )
+        # T-LOD-02：事件驱动即时升格（被交互/被邀约/进镜头当 tick 升格；secondary ≤16 + LRU 挤出）
+        lod_events = EventDrivenLOD(pool, models_cfg.get("thresholds", {}).get("lod", {}))
+
+        async def after_settle(decision: Any, seqs: list[int]) -> None:
+            """step5 收尾挂点：新落库事件触发路径二升格判定（当 tick 生效，04 §4.2）。"""
+            for seq in seqs:
+                row = await pool.fetchrow(
+                    "SELECT seq, tick, sim_time, type, source, visibility, payload, ui FROM events WHERE seq=$1", seq,
+                )
+                if row is None:
+                    continue
+                await lod_events.on_event(tick=int(row["tick"]), sim_now=row["sim_time"], event=dict(row))
+
         pipeline = Pipeline(
             pool, gateway, world_cfg,
             retrieve=make_retrieve_hook(pool, gateway, models_cfg),
             reflect=reflector.hook,
+            after_settle=after_settle,
         )
 
         agent_ids = tuple(r["id"] for r in await pool.fetch("SELECT id FROM agents ORDER BY id"))
@@ -221,6 +236,8 @@ async def _run(args: argparse.Namespace) -> int:
             cause = str(await pool.fetchval("SELECT coalesce(max(seq), 0) FROM events"))
             if now.date() != before.date():
                 await goal_engine.daily_recovery()
+                # T-LOD-02 回落：事件驱动升入 secondary 连续 2 模拟日零新交互 → cooldown 回落（日界扫描）
+                await lod_events.demote_inactive(tick=ctx.clock.current_tick, sim_now=now)
             if goal_engine.week_of(now) != goal_engine.week_of(before):
                 await goal_engine.refresh_weekly(agg, sim_now=now, cause=cause)
                 await relation_engine.weekly_regression(agg, cause=cause)
