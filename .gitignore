@@ -1,0 +1,10 @@
+# WorldSim 仓库忽略规则（T-ENV-05；04 §11.2 密钥不进 git）
+.env
+__pycache__/
+.venv/
+server/.venv/
+*.pyc
+node_modules/
+dist/
+# 运行期产物（00 §2 布局）
+var/
