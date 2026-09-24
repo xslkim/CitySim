@@ -93,10 +93,11 @@ class Observation:
 
 
 RetrieveFn = Callable[[str, Observation], Awaitable[list[Any]]]
-ValidateFn = Callable[[Observation, str, dict[str, Any]], tuple[bool, str | None]]
+ValidateFn = Callable[[Observation, str, dict[str, Any]], Any]
 ReflectFn = Callable[[str, Decision], Awaitable[None]]
 AfterSettleFn = Callable[[Decision, list[int]], Awaitable[None]]
 ObsBuilderFn = Callable[[str, dt.datetime], Awaitable[Observation]]
+SettleFn = Callable[[Observation, Decision, int, dt.datetime, int], Awaitable[list[int]]]
 
 
 class Pipeline:
@@ -113,6 +114,7 @@ class Pipeline:
         reflect: ReflectFn | None = None,
         after_settle: AfterSettleFn | None = None,
         obs_builder: ObsBuilderFn | None = None,
+        settler: SettleFn | None = None,
     ) -> None:
         self._pool = pool
         self._gw = gateway
@@ -122,6 +124,7 @@ class Pipeline:
         self._reflect = reflect
         self._after_settle = after_settle
         self._obs_builder = obs_builder
+        self._settler = settler  # T-ADJ-03：19 动作结算总线（None = M1 骨架 think/move 内置路径）
 
     # ---- tick 驱动（04 §2.2：LLM 并发、落库串行） -------------------------
 
@@ -260,7 +263,10 @@ class Pipeline:
 
     async def _settle_one(self, tick: int, sim_now: dt.datetime, rng_seed: int, decision: Decision) -> list[int]:
         obs = await self._build_obs(decision.agent_id, sim_now)  # 结算前重读最新态（串行安全）
-        ok, reason = self._validate(obs, decision.action_type, decision.action_args)
+        verdict = self._validate(obs, decision.action_type, decision.action_args)
+        if asyncio.iscoroutine(verdict):
+            verdict = await verdict  # T-ADJ-03 校验器为异步（DB 读取），M1 默认校验器保持同步
+        ok, reason = verdict
         seqs: list[int] = []
         if not ok:
             decision.blocked_reason = reason
@@ -268,7 +274,9 @@ class Pipeline:
             if self._after_settle:
                 await self._after_settle(decision, seqs)
             return seqs
-        if decision.action_type == "move":
+        if self._settler is not None:
+            seqs.extend(await self._settler(obs, decision, tick, sim_now, rng_seed))
+        elif decision.action_type == "move":
             seqs.append(await self._settle_move(obs, decision, tick, sim_now, rng_seed))
         else:  # think（含降级）与未实现动作被拦截后兜底不到的 think
             seqs.append(await self._settle_think(obs, decision, tick, sim_now, rng_seed))

@@ -29,9 +29,10 @@ decay_per_sim_hour:            # 衰减率表（01 §3.1 逐行照抄；负值 =
 satisfy:                       # 主要满足动作与满足量（01 §3.1 满足量列；±20% Big Five 修正为 P1，M1 中性 1.0）
   hunger:      { cook: 35, bento: 25, canteen: 30, restaurant: 40 }       # 自炊/便当/快餐/正餐
   energy:      { sleep_per_hour: 9.0, coffee: 8, nap_30min: 10 }
-  mood:        { chat_enjoyable_min: 10, chat_enjoyable_max: 18, entertainment: 12 }   # 负事件见 01 §3.2
-  social:      { chat: 15, deep_chat: 25, group: 20 }
-  achievement: { task_done: 12, praised: 15, promoted: 30, criticized: -12 }
+  mood:        { chat_enjoyable_min: 10, chat_enjoyable_max: 18, entertainment: 12,
+                 think_normal: 2, think_n_high: -2, shop: 4 }   # think 情绪 +2（N 高者 -2）/ shop 情绪 +4（01 §4 动作行镜像，02 D24）
+  social:      { chat: 15, deep_chat: 25, group: 20, send_message: 6 }    # send_message 社交 +6（01 §4 动作行镜像，02 D24）
+  achievement: { task_done: 12, praised: 15, promoted: 30, criticized: -12, help: 4 }  # help 成就 +4（01 §4 help 行，02 D24）
   wealth:      { salary: 25, bill_min: -8, bill_max: -12, stock_divisor: 500, stock_cap: 10 }
 
 schedule:                      # 睡眠/工作时段判定（01 §1.4 作息日历 + 01 §5.1 睡眠行 0:30~6:30）

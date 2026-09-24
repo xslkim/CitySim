@@ -28,6 +28,10 @@ matrix:                          # 01 §3.2 变化矩阵逐行（tier = P0/P1/P2
   a_level_ally:       { delta_affinity: 5,  delta_tension: -3,  tier: P2 }   # 共同经历 A 级事件（同阵营）
   a_level_rival:      { delta_affinity: -3, delta_tension: 5,   tier: P2 }   # 共同经历 A 级事件（对立阵营）
 
+action_rows:                     # 01 §4 动作表"主要影响"列的非矩阵零散行（镜像；02 文档偏差表 D24 登记）
+  send_message: { delta_affinity: 1, delta_tension: 0, scope: both }   # send_message affinity +1（双向为工程默认）
+  borrow_refused: { delta_affinity: -4, delta_tension: 3, scope: a_to_b }  # borrow 被拒挂 refuse 同形行（01 §4"拒绝：§3.2"未指名行，工程默认借 refuse 行，D24）
+
 regression:                      # 自然回归（每周结算一次，01 §3.2 末段）
   affinity_rate: 0.05            # affinity 向 0 回归 5%
   tension_min_rate: 0.05         # tension 周回归率 = max(5%, tension×10%)（存量非线性，评审 P1-9）

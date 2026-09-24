@@ -41,6 +41,8 @@ from . import logconf
 from .adjudicator.pipeline import Pipeline, adjudication_loop
 from .adjudicator.queue import AdjudicationQueue
 from .adjudicator.state_events import StateAggregator
+from .adjudicator.validators import ActionValidator
+from .invite.state_machine import InviteMachine
 from .llm_gateway import LLMGateway
 from .llm_gateway.providers.mock import MockProvider
 from .memory.hygiene import MemoryHygiene
@@ -162,11 +164,27 @@ async def _run(args: argparse.Namespace) -> int:
                     continue
                 await lod_events.on_event(tick=int(row["tick"]), sim_now=row["sim_time"], event=dict(row))
 
+        # T-ADJ-03：19 动作校验器 + step5 结算总线（含 debts 写入/核销；通用规则表五条）
+        residence = ResidenceEngine(pool, world_cfg)
+        invite_machine = InviteMachine(
+            pool, gateway, relations_cfg,
+            agg=agg, cooldown=cooldown_engine, relations=relation_engine, tick_of=clock.tick_of,
+        )
+        action_validator = ActionValidator(
+            pool, world=world_cfg, needs_engine=needs_engine, cooldown=cooldown_engine,
+            relations=relation_engine, relations_cfg=relations_cfg, agg=agg, gateway=gateway,
+            invite=invite_machine, residence=residence,
+            wakeup=lambda t, aid: queue.put_wakeup(t, aid, reason="interaction"),
+        )
         pipeline = Pipeline(
             pool, gateway, world_cfg,
             retrieve=make_retrieve_hook(pool, gateway, models_cfg),
             reflect=reflector.hook,
             after_settle=after_settle,
+            validate=action_validator.check,
+            settler=lambda obs, decision, tick, sim_now, seed: action_validator.settle(
+                obs, decision, tick=tick, sim_now=sim_now, rng_seed=seed,
+            ),
         )
 
         agent_ids = tuple(r["id"] for r in await pool.fetch("SELECT id FROM agents ORDER BY id"))
@@ -212,7 +230,7 @@ async def _run(args: argparse.Namespace) -> int:
 
         # ---- 波次 2a：tick 收尾驱动（需求衰减/聚合 flush/每日兜底反思） ------------------
         last_decay: dict[str, dt.datetime] = {}
-        residence = ResidenceEngine(pool, world_cfg)  # T-LOD-04：校外 NPC 驻留规则（零 LLM；M1 无校外 NPC 在册为空跑）
+        # residence 已在上方构造（T-ADJ-03 复用；T-LOD-04 校外 NPC 驻留规则，零 LLM）
 
         async def after_tick(tick: int, sim_now: dt.datetime) -> None:
             # T-LOD-04：驻留规则每 tick 评估（不占认知循环；移位落 agent.move trigger='system'）
