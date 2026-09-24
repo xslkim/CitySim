@@ -38,6 +38,7 @@ agents:
     goals_initial:
       - { goal_id: G-LOVE-03, text: 找机会和周叙单独吃一顿饭 }
       - { goal_id: G-WORK-02, text: 本季度绩效拿 A，证明画画不是不务正业 }
+      - { goal_id: G-HID-01, text: 网文马甲这周捂严实，尤其别让周叙察觉半分 }
     relations_initial:
       - { target: A02, type: 暗恋, affinity: 35, tension: 10, note: 不敢表露 }
       - { target: A06, type: 债主, affinity: -5, tension: 30, note: 韩彻欠 4000，剩 9 天到期 }
@@ -79,6 +80,7 @@ agents:
     goals_initial:
       - { goal_id: G-LOVE-01, text: 找个不刻意的理由约苏蔓下楼喝咖啡 }
       - { goal_id: G-WORK-01, text: 把赵启带成能独立值班的工程师 }
+      - { goal_id: G-MON-01, text: 本周结余守住五百块，告白基金一分不动 }
     relations_initial:
       - { target: A03, type: 暗恋, affinity: 30, tension: 12, note: 同楼两年，不敢开口 }
       - { target: A07, type: 师徒, affinity: 45, tension: 5, note: 带他入行，望他独当一面 }
@@ -120,6 +122,7 @@ agents:
     goals_initial:
       - { goal_id: G-LIFE-02, text: 这个月存下三千块，谁也别想动 }
       - { goal_id: G-WORK-03, text: 把周五的活动上线做成部门样板 }
+      - { goal_id: G-EMO-01, text: 找叶蓁把分手那点事彻底聊透一次 }
     relations_initial:
       - { target: A04, type: 前任, affinity: -10, tension: 35, note: 他提的分手，未完结 }
       - { target: A05, type: 闺蜜, affinity: 55, tension: 0, note: 无话不谈 }
@@ -160,6 +163,8 @@ agents:
       - { age: 27, event: 向苏蔓提出分手, impact: 至今说不清后悔不后悔 }
     goals_initial:
       - { goal_id: G-WORK-04, text: 拿下新版本视觉主案，堵住"匠气"的评价 }
+      - { goal_id: G-SOC-03, text: 找个由头和苏蔓正常说上一句话 }
+      - { goal_id: G-GRW-02, text: 每晚写几行字，把分手那件事想清楚 }
     relations_initial:
       - { target: A03, type: 前任, affinity: -8, tension: 30, note: 我提的分手，愧疚 }
     needs_offset: { mood: -5 }
@@ -200,6 +205,7 @@ agents:
     goals_initial:
       - { goal_id: G-WORK-05, text: 独立负责一次完整 campaign }
       - { goal_id: G-LIFE-01, text: 每周健身 3 次，把体能练回来 }
+      - { goal_id: G-SOC-02, text: 攒一局 503、504 加对门的火锅局 }
     relations_initial:
       - { target: A03, type: 闺蜜, affinity: 55, tension: 0, note: 楼上楼下随叫随到 }
     needs_offset: { }
@@ -240,6 +246,7 @@ agents:
     goals_initial:
       - { goal_id: G-MON-01, text: 年内把欠林晚的 4000 还上，别再拖 }
       - { goal_id: G-WORK-06, text: 晋升答辩压过赵启，拿到这个名额 }
+      - { goal_id: G-LIFE-03, text: 自己带饭一周，把外卖钱省下来还债 }
     relations_initial:
       - { target: A07, type: 职场对手, affinity: -15, tension: 40, note: 同赛道只能上一个 }
       - { target: A01, type: 欠款, affinity: 5, tension: 25, note: 欠她 4000，剩 9 天，脸上挂不住 }
@@ -281,6 +288,7 @@ agents:
     goals_initial:
       - { goal_id: G-WORK-06, text: 晋升答辩压过韩彻，拿到这个名额 }
       - { goal_id: G-MON-02, text: 年底首付存到八万 }
+      - { goal_id: G-GRW-03, text: 值班告警那套流程，再找叙哥过一遍 }
     relations_initial:
       - { target: A02, type: 师徒, affinity: 40, tension: 5, note: 叙哥领进门 }
       - { target: A06, type: 职场对手, affinity: -12, tension: 38, note: 晋升名额只有一个 }
@@ -322,6 +330,7 @@ agents:
     goals_initial:
       - { goal_id: G-WORK-07, text: 转正前独立跟完一个需求 }
       - { goal_id: G-SOC-01, text: 一个月内记住全楼邻居的名字 }
+      - { goal_id: G-LIFE-04, text: 把 404 收拾出住家的样子，添一盆绿植 }
     relations_initial:
       - { target: A02, type: 暗恋, affinity: 25, tension: 8, note: 入职第一天他帮我搬箱子 }
     needs_offset: { social: 5 }

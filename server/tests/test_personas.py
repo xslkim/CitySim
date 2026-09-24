@@ -12,6 +12,7 @@ import itertools
 import subprocess
 from pathlib import Path
 
+import pytest
 import yaml
 
 SERVER_ROOT = Path(__file__).resolve().parents[1]
@@ -207,20 +208,27 @@ def test_p40_count_and_ids() -> None:
 
 
 def test_p40_a01_a08_verbatim() -> None:
-    """A01~A08 与 8 人版（agents.yaml 首次入库提交）逐条相等（01 文档 T-CFG-06 验收 2）。"""
-    created = subprocess.run(
-        ["git", "log", "--diff-filter=A", "--format=%H", "--", "server/config/agents.yaml"],
-        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
-    ).stdout.strip().splitlines()[-1]
+    """A01~A08 与 M0 冻结版逐条相等（01 文档 T-CFG-06 验收 2；T-DB-04 增项口径）。
+
+    基线 = `schema-v1` tag（M0 冻结点，T-DB-06/09 E9）：T-DB-04 按明星层 3 条/人（01 §3.3）
+    补齐 A01~A08 goals_initial，原"首次入库提交"基线随之失效；冻结后 40 人文件前 8 人
+    任何漂移即红（01 文档 §6 D15）。tag 未打前 skip（同 test_embed_config_matches_ddl_vector_dim 惯例）。
+    """
+    tag = subprocess.run(
+        ["git", "rev-parse", "--verify", "-q", "refs/tags/schema-v1"],
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    )
+    if tag.returncode != 0:
+        pytest.skip("schema-v1 tag 未打（M0 出口 E9），A01~A08 冻结对拍随 tag 自动激活")
     old = subprocess.run(
-        ["git", "show", f"{created}:server/config/agents.yaml"],
+        ["git", "show", "schema-v1:server/config/agents.yaml"],
         cwd=REPO_ROOT, capture_output=True, text=True, check=True,
     ).stdout
     old8 = {a["agent_id"]: a for a in yaml.safe_load(old)["agents"]}
     cur8 = {a["agent_id"]: a for a in _agents() if a["agent_id"] in P8_IDS}
     assert set(old8) == set(P8_IDS)
     for aid in P8_IDS:
-        assert cur8[aid] == old8[aid], f"{aid} 与 8 人版不一致"
+        assert cur8[aid] == old8[aid], f"{aid} 与 M0 冻结版不一致"
 
 
 def test_p40_gender_balanced() -> None:
