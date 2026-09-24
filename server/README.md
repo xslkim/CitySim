@@ -19,6 +19,25 @@ uv run python scripts/gen_event_types.py        # 派生注册表下游镜像（
 uv run python scripts/gen_event_types.py --check # 漂移检查（纯消费方 04 T-WA-10）
 ```
 
+## 内核主循环（M1：04 §2.2 装配；唯一裁决协程写库）
+
+```bash
+cd server
+uv run python -m worldsim.main --sim-hours 1     # 试跑模式：推进 1 模拟小时后优雅停机（退出码 0）
+uv run python -m worldsim.main                   # 持续模式：按变速表 paced 跑至 SIGINT/SIGTERM
+uv run python -m worldsim.main --sim-hours 2 --ratio 6   # 试跑 + 覆盖压缩比
+```
+
+- 装配：连接池 → `TimeEngine`(clock.anchor 锚点，seed 占位首启重锚) → `AdjudicationQueue` →
+  `LLMGateway`（M1 注入 `MockProvider`，`default_provider='mock'`）→ `Pipeline`（六步骨架，
+  think/move 轻动作闭环）→ `asyncio.TaskGroup`（clock.run / adjudication_loop 唯一写协程 / watch）。
+- 试跑模式（`--sim-hours`）：unthrottled 尽快递 tick（仍 sim 网格锚定、逐 tick 串行落库），
+  不做段切换与 batch 段自动进入；持续模式全量生效（段切换/batch 段/SIGHUP 热更）。
+- env：`WSIM_PG_DSN`（必填；根 `.env` 兜底加载，仅补缺 WSIM_*）/ `WSIM_SPEED_TABLE` /
+  `WSIM_MODELS_CONFIG` / `WSIM_WORLD_CONFIG` / `WSIM_REPLAY_MODE`（=replay 时本入口拒跑，退出码 2）。
+- rng_seed = 本 tick 序号（events.rng_seed 规则骰子口径）；同 rng_seed 重跑同批 tick 产出逐字节一致
+  （mock 确定性回归见 `tests/adjudicator/test_pipeline.py::test_pipeline_injected_mock_deterministic`）。
+
 ## 数据库（M0b：Schema v1 已冻结，tag `schema-v1`）
 
 ```bash

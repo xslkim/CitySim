@@ -44,7 +44,8 @@ def _rng_for(task_type: str, seed: int | None, prompt_text: str) -> random.Rando
 
 
 def _prompt_text(messages: list[Message]) -> str:
-    return "\n".join(f"{m.get('role', '')}:{m.get('content', '')}" for m in messages)
+    # 注意：OBS_JSON 契约行必须保持行首锚定，本函数不得给 content 加任何行前缀
+    return "\n".join(m.get("content", "") for m in messages)
 
 
 def _parse_obs(prompt_text: str) -> dict[str, Any]:

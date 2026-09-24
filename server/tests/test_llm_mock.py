@@ -96,3 +96,15 @@ async def test_mock_embed_unit_vector_dim() -> None:
     for vec in result.vectors:
         assert len(vec) == 1024
         assert math.isclose(sum(v * v for v in vec), 1.0, rel_tol=1e-9)
+
+
+async def test_mock_move_uses_obs_exits() -> None:
+    """回归：OBS_JSON 行锚定解析必须生效——跨多 seed 既有 think 也有 move，move 目标取自 exits。"""
+    mock = MockProvider()
+    seen: set[str] = set()
+    for seed in range(40):
+        out = json.loads((await mock.chat("star_decision", _MESSAGES, seed=seed)).text)
+        seen.add(out["action"]["type"])
+        if out["action"]["type"] == "move":
+            assert out["action"]["args"]["to"] in ["apt.lobby", "apt.roof"]
+    assert seen == {"think", "move"}, "OBS 解析失效会导致永不 move（_prompt_text 不得加行前缀）"
