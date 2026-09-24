@@ -51,7 +51,7 @@ from .relations.goals import GoalEngine, load_goals
 from .relations.needs import NeedsEngine, load_needs_config
 from .relations.relations import RelationEngine, load_relations_config
 from .scheduler.lod import LodScheduler
-from .scheduler.rotation import EventDrivenLOD
+from .scheduler.rotation import EventDrivenLOD, StarRotation
 from .time_engine.batch_hooks import register_batch_hook
 from .time_engine.clock import LOCAL_TZ, TimeEngine
 from .time_engine.speed_table import SpeedTableReloader, load as load_speed_table
@@ -245,6 +245,19 @@ async def _run(args: argparse.Namespace) -> int:
                                 rng_seed=ctx.clock.current_tick)
 
         register_batch_hook("kernel.calendar", kernel_calendar_hook)
+
+        # T-LOD-03：基尼驱动明星轮换（路径一，每模拟日 1 次，迟滞）；挂 batch 段回调注册表（唯一挂载点）
+        star_rotation = StarRotation(
+            pool, gateway,
+            thresholds_rotation=models_cfg.get("thresholds", {}).get("rotation", {}),
+            thresholds_lod=models_cfg.get("thresholds", {}).get("lod", {}),
+            reflector=reflector, event_lod=lod_events,
+        )
+
+        async def kernel_rotation_hook(ctx: Any) -> None:
+            await star_rotation.rotation_tick(tick=ctx.clock.current_tick, sim_now=ctx.clock.now_sim())
+
+        register_batch_hook("kernel.rotation", kernel_rotation_hook)
 
         async def _watch(t: asyncio.Task) -> None:
             try:
