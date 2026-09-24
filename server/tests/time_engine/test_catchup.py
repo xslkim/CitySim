@@ -157,12 +157,12 @@ async def test_pause_queue_behavior(test_db_dsn: str) -> None:
     try:
         while len(ticks) < 2:
             await asyncio.sleep(0.01)
-        count_before_pause = len(ticks)
         await eng.pause("db_down")
+        count_at_pause = len(ticks)  # pause() 返回后不得再排程新 tick（04 §3.2 step1）
         await asyncio.sleep(0.2)
         wall.advance(minutes=30)
         await asyncio.sleep(0.2)
-        assert len(ticks) == count_before_pause, "暂停期间不得排程新 tick（未发起的取消）"
+        assert len(ticks) == count_at_pause, "暂停期间不得排程新 tick（未发起的取消）"
         # 队列内已完成 LLM 调用正常落库（04 §3.2 step1）：以一条结果写入模拟在飞完成
         seq = await eng._pool.fetchval(
             "INSERT INTO events (tick, sim_time, type, source, trigger, visibility, payload)"
@@ -172,9 +172,9 @@ async def test_pause_queue_behavior(test_db_dsn: str) -> None:
         )
         assert seq > 0
         await eng.resume("db_recovered")
-        while len(ticks) <= count_before_pause:
+        while len(ticks) <= count_at_pause:
             await asyncio.sleep(0.01)
-        assert len(ticks) > count_before_pause, "恢复后 tick 续跑"
+        assert len(ticks) > count_at_pause, "恢复后 tick 续跑"
     finally:
         stop.set()
         await run_task
