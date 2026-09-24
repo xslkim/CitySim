@@ -1,0 +1,80 @@
+# relations.yaml —— 关系变化矩阵/自然回归/意图冷却/意愿分数值镜像（数字唯一持有方 = 01 §3.2/§3.4/§3.5 对应节，勿改数字，修订先回改 01）
+# 载体登记：00 §2 配置清单未列本文件（波次 2a 新增，02 文档偏差表 D13 登记）
+# 关系为有序对 (A→B)：affinity ∈ [-100,100]，tension ∈ [0,100]；matrix 为单向变化量，对称动作双方同时结算（01 §3.2）
+
+matrix:                          # 01 §3.2 变化矩阵逐行（tier = P0/P1/P2 档；P0 行 M1 全实现，P1/P2 同构预留）
+  chat_enjoyable:     { delta_affinity: 3,  delta_tension: -1,  tier: P0 }   # chat 愉快（双方结构化自评均 ≥7/10，01 §7）
+  chat_flat:          { delta_affinity: 1,  delta_tension: 0,   tier: P0 }   # chat 平淡
+  deep_chat:          { delta_affinity: 6,  delta_tension: -2,  tier: P1 }   # 深聊（话题为秘密/创伤/梦想；需 affinity≥20 解锁）
+  argue:              { delta_affinity: -4, delta_tension: 8,   tier: P0 }
+  argue_insulted:     { delta_affinity: -6, delta_tension: 10,  tier: P0 }   # argue 中被侮辱（N 高者判定）
+  gossip_bond:        { delta_affinity: 2,  delta_tension: 0,   tier: P0 }   # gossip 共同议论 C（听者对说者）
+  gossip_reached:     { delta_affinity: -6, delta_tension: 6,   tier: P1 }   # gossip 传回当事人 C（C→说者）
+  invite_accepted:    { delta_affinity: 4,  delta_tension: -2,  tier: P0, scope: both }
+  invite_refused:     { delta_affinity: -3, delta_tension: 2,   tier: P0, scope: a_to_b, polite_factor: 0.5 }  # 仅 A→B；礼貌拒绝减半
+  refuse:             { delta_affinity: -4, delta_tension: 3,   tier: P1, polite_factor: 0.5 }
+  appointment_good:   { delta_affinity: 5,  delta_tension: -3,  tier: P0, scope: both }   # 赴约且体验好
+  stood_up:           { delta_affinity: -8, delta_tension: 5,   tier: P0 }   # 爽约：被放方对放方
+  gift:               { tier: P1, tiers: [{ delta_affinity: 3, delta_tension: -1 }, { delta_affinity: 6, delta_tension: -2 }, { delta_affinity: 10, delta_tension: -3 }], crush_bonus_affinity: 2 }  # 88/288/588 档；288 档以上若 A→B 有暗恋标签额外 +2
+  help:               { delta_affinity: 6,  delta_tension: -4,  tier: P1 }   # 雪中送炭（对方需求驱动区）
+  lend_repaid_ontime: { delta_affinity: 8,  delta_tension: -5,  tier: P1 }   # 借钱被借方按期归还（14 模拟日内全额结清）
+  lend_overdue_daily: { delta_affinity: -2, delta_tension: 2,   tier: P1 }   # 借钱逾期未还（每模拟日）
+  confess_accepted:   { delta_affinity: 15, delta_tension: -10, tier: P2, scope: both, label_added: 恋人 }
+  confess_rejected:   { delta_affinity: -5, delta_tension: 10,  tier: P2 }
+  apologize_accepted: { delta_affinity: 4,  delta_tension: -6,  tier: P1 }
+  apologize_rejected: { delta_affinity: -2, delta_tension: 3,   tier: P1 }
+  blame_shift:        { delta_affinity: -8, delta_tension: 8,   tier: P2 }   # 工作甩锅/抢功
+  perf_low_rated:     { delta_affinity: -5, delta_tension: 5,   tier: P2 }   # 绩效被其初评打低分（对经理）
+  a_level_ally:       { delta_affinity: 5,  delta_tension: -3,  tier: P2 }   # 共同经历 A 级事件（同阵营）
+  a_level_rival:      { delta_affinity: -3, delta_tension: 5,   tier: P2 }   # 共同经历 A 级事件（对立阵营）
+
+regression:                      # 自然回归（每周结算一次，01 §3.2 末段）
+  affinity_rate: 0.05            # affinity 向 0 回归 5%
+  tension_min_rate: 0.05         # tension 周回归率 = max(5%, tension×10%)（存量非线性，评审 P1-9）
+  tension_scale: 0.10
+
+chat:
+  same_pair_daily_halving_from: 3    # 每日同一对衰减：当日第 3 次起减半（01 §3.2 chat 行）
+
+cooldown_hours:                  # 意图冷却时长表（01 §3.4 逐行；单位 = 模拟小时）
+  invite_refused: 24             # invite 被拒
+  invite_stood_up: 48            # invite 被爽约（再次邀约同一人）
+  chat_perfunctory: 6            # chat 被敷衍（自评 ≤3，01 §7）
+  argue_reapproach: 8            # argue 后主动再找同一人
+  gossip_same_target: 48         # gossip 同一目标对象
+  confess_rejected: 168          # confess 被拒 = 7 天
+  borrow_refused: 72             # borrow_money 被拒
+  apologize_refused: 24          # apologize 被拒
+  give_gift_same_target: 72      # give_gift 同一人（防刷礼物）
+  raise_rejected: 720            # 谈薪/晋升诉求被驳回 = 30 天（对齐月度绩效节奏）
+
+argue_damping:                   # argue 阻尼二道（01 §3.4 表下注，P1 档；常时生效，与冷却并行）
+  tension_threshold: 70          # tension ≥70 时
+  weight_factor: 0.5             # 对该对 argue 意图权重 ×0.5
+
+refuse_streak:                   # 连续被同一人 refuse 的意图权重减半（01 §4.1 refuse 段，防热脸贴冷屁股死循环）
+  count: 3
+  weight_factor: 0.5
+  actions: [invite, chat]
+
+grudge:                          # 迁怒（01 §3.3 迁怒行）：挫败值 ≥30 时对最大 blocker 的 argue/gossip 意图权重 ×3，持续 48 模拟小时
+  argue_gossip_weight_factor: 3
+  duration_hours: 48
+
+willingness:                     # 意愿分公式（01 §3.5 唯一持有方；供 prompt 注入与观测，不做判定——系统不硬改判）
+  base: 0.50
+  affinity_coef: 0.25            # ×(affinity/100)
+  tension_coef: -0.20            # ×(tension/100)
+  social_coef: 0.15              # ×(B 的社交需求/100)
+  mood_coef: 0.10                # ×(B 情绪/100)
+  persona:                       # 人格修正（高档阈 ≥70，01 §3.1 Big Five 档位口径）
+    high_threshold: 70
+    agreeableness_high: 0.05
+    extraversion_high: 0.05
+    neuroticism_high: -0.05
+  occasion:                      # 场合修正
+    weekend_or_holiday: 0.10
+    workday_late_night: -0.10
+    late_night: ["22:00", "24:00"]   # "深夜"设计未给区间；工程默认 22:00~24:00（02 文档偏差表 D15 登记）
+  activity_match: 0.10           # 活动偏好匹配 ±0.10
+  clamp: [0, 100]                # 意愿分 = clamp(W_raw × 100, 0, 100)（评审 P2-11）
