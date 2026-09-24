@@ -1,0 +1,88 @@
+# 事件类型注册表 —— 唯一手维护源（00 §1 A11 单源生成链）
+# 本文件由 docs/design/06-契约登记表.md §1.2 逐行导出，勿手改；变更先回登 06（06 §4.4 契约变更流程），再改本文件并重跑：
+#   cd server && uv run python scripts/gen_event_types.py        # 派生 payload_whitelist.yaml / economy 审计清单 / obs 白名单种子
+# 下游镜像一律由生成器派生，禁止任何第二份手维护镜像。
+# 键标注口径（06 §1.2）：public = 同步放行；conditional = 仅 visibility='public' 事件放行（text_display 等展示文本键）；
+# 通用保底恒 internal（text_raw、prompt 片段、检索上下文、内部评分中间量）不再逐行列出；未登记键一律剥除（默认剥除原则）。
+
+meta:
+  domains: [time, agent, dialogue, social, world, economy, director, system, state, relation]  # 06 §1.1 封闭域清单（新增域须修订 06）
+  triggers: [autonomous, world, director, gift, vote, system]                                  # 06 §1.1 六枚举（gift/vote 阶段 1 不用）
+
+types:
+  # —— time 域（internal 事件：结构化 payload 照常出站，不携带展示文本）——
+  - { type: time.paused,           source: system, trigger: [system], audit_domain: null, payload_keys: { public: [reason, at_sim],          conditional: [] } }
+  - { type: time.resumed,          source: system, trigger: [system], audit_domain: null, payload_keys: { public: [reason, at_sim],          conditional: [] } }
+  - { type: time.catchup.start,    source: system, trigger: [system], audit_domain: null, payload_keys: { public: [mode, from_sim, to_sim],  conditional: [] } }
+  - { type: time.catchup.end,      source: system, trigger: [system], audit_domain: null, payload_keys: { public: [mode, from_sim, to_sim],  conditional: [] } }
+  - { type: time.batch_advanced,   source: system, trigger: [system], audit_domain: null, payload_keys: { public: [sim_hours],               conditional: [] } }
+  - { type: time.day_summary,      source: system, trigger: [system], audit_domain: null, payload_keys: { public: [day],                     conditional: [] } }
+    # time.day_summary 生产方 = world_agent 日历日界钩子（日界翻转恰一条，06 §1.2 注记）
+
+  # —— agent 域 ——
+  - { type: agent.move,            source: agent,  trigger: [autonomous], audit_domain: consistency, payload_keys: { public: [from, to, sim_cost_min], conditional: [] } }  # consistency：不在两地审计
+  - { type: agent.work,            source: agent,  trigger: [autonomous], audit_domain: null, payload_keys: { public: [task_id, sim_cost_min], conditional: [] } }
+  - { type: agent.rest,            source: agent,  trigger: [autonomous], audit_domain: null, payload_keys: { public: [mode],                conditional: [] } }  # mode: nap/sleep
+  - { type: agent.eat,             source: agent,  trigger: [autonomous], audit_domain: economy, payload_keys: { public: [venue, with, amount_cents], conditional: [] } }
+  - { type: agent.shop,            source: agent,  trigger: [autonomous], audit_domain: economy, payload_keys: { public: [store, item_category, amount_cents], conditional: [] } }
+  - { type: agent.trade_stock,     source: agent,  trigger: [autonomous], audit_domain: economy, payload_keys: { public: [symbol, side, price, amount_cents], conditional: [] } }
+  - { type: agent.think,           source: agent,  trigger: [autonomous], audit_domain: null, payload_keys: { public: [topic_hint],          conditional: [] } }
+  - { type: agent.promoted,        source: system, trigger: [system], audit_domain: lod, payload_keys: { public: [from_tier, to_tier, reason, caused_by], conditional: [] } }  # internal：score 分解、gini（评分中间量保底剥除）
+  - { type: agent.demoted,         source: system, trigger: [system], audit_domain: lod, payload_keys: { public: [from_tier, to_tier, reason, caused_by], conditional: [] } }
+  - { type: agent.reflection,      source: agent,  trigger: [autonomous], audit_domain: null, payload_keys: { public: [], conditional: [text_display] } }  # display-only 事件（06 §1.2 N-P1-2 裁决）：白名单仅 text_display 条件放行；反思原文只走 memory_projection
+
+  # —— state / relation 域（internal 事件，不渲染，仅投影/调试态）——
+  - { type: state.needs_delta,     source: system, trigger: [autonomous, system], audit_domain: consistency, payload_keys: { public: [changes], conditional: [] } }  # changes[]:{agent_id,need,delta,new_value,cause}，每 tick 合并（04 §6.5）
+  - { type: relation.changed,      source: system, trigger: [autonomous, system], audit_domain: consistency, payload_keys: { public: [changes], conditional: [] } }  # changes[]:{a_id,b_id,delta_affinity,delta_tension,labels_added?,labels_removed?,cause}
+
+  # —— dialogue 域 ——
+  - { type: dialogue.chat,         source: agent,  trigger: [autonomous], audit_domain: consistency, payload_keys: { public: [participants, mode, topic_ids, lines, witnesses], conditional: [text_display] } }  # consistency：双人记忆同源；lines[] 含 at_offset_s
+  - { type: dialogue.argue,        source: agent,  trigger: [autonomous], audit_domain: consistency, payload_keys: { public: [participants, reason_hint, lines, witnesses], conditional: [] } }
+  - { type: dialogue.gossip,       source: agent,  trigger: [autonomous], audit_domain: consistency, payload_keys: { public: [teller, listener, about, cites, lines], conditional: [text_display] } }  # distortion 键废弃（06 §1.2）
+  - { type: dialogue.confess,      source: agent,  trigger: [autonomous], audit_domain: consistency, payload_keys: { public: [participants, result, lines], conditional: [text_display] } }  # result: accepted/rejected
+  - { type: dialogue.apologize,    source: agent,  trigger: [autonomous], audit_domain: consistency, payload_keys: { public: [participants, for_event_ref, result, lines], conditional: [text_display] } }  # for_event_ref = 裸 seq 数字字符串
+
+  # —— social 域 ——
+  - { type: social.send_message,   source: agent,  trigger: [autonomous], audit_domain: null, payload_keys: { public: [from, to, content_hint], conditional: [text_display] } }
+  - { type: social.invite,         source: agent,  trigger: [autonomous], audit_domain: consistency, payload_keys: { public: [from, to, activity, time, location], conditional: [] } }
+  - { type: social.invite.counter, source: agent,  trigger: [autonomous], audit_domain: consistency, payload_keys: { public: [from, to, round, new_time], conditional: [] } }  # round: 1/2（01 §5.2 改期独立事件）
+  - { type: social.refuse,         source: agent,  trigger: [autonomous], audit_domain: consistency, payload_keys: { public: [from, to, request_ref, politeness], conditional: [] } }  # request_ref = 裸 seq 数字字符串；politeness: 0/1
+  - { type: social.give_gift,      source: agent,  trigger: [autonomous], audit_domain: economy, payload_keys: { public: [from, to, tier, amount_cents], conditional: [] } }  # tier: 1/2/3
+  - { type: social.help,           source: agent,  trigger: [autonomous], audit_domain: null, payload_keys: { public: [from, to, matter],    conditional: [] } }
+  - { type: social.borrow_money,   source: agent,  trigger: [autonomous], audit_domain: economy, payload_keys: { public: [from, to, amount_cents, result], conditional: [] } }
+  - { type: social.repay_money,    source: agent,  trigger: [autonomous], audit_domain: economy, payload_keys: { public: [from, to, amount_cents, debt_ref], conditional: [] } }  # 还款期限 14 模拟日由 01 持有
+  - { type: social.appointment.created, source: system, trigger: [system], audit_domain: consistency, payload_keys: { public: [participants, activity, at_sim], conditional: [] } }
+  - { type: social.appointment.remind,  source: system, trigger: [system], audit_domain: consistency, payload_keys: { public: [participants, activity, at_sim], conditional: [] } }
+  - { type: social.appointment.stood_up, source: system, trigger: [system], audit_domain: consistency, payload_keys: { public: [participants, activity, at_sim], conditional: [] } }
+
+  # —— world 域 ——
+  - { type: world.announce,        source: world,  trigger: [world, director], audit_domain: null, payload_keys: { public: [title, body, scope, stock_shock], conditional: [text_display] } }  # scope: company/floor/all
+  - { type: world.holiday,         source: world,  trigger: [world], audit_domain: null, payload_keys: { public: [name, days, special_rules], conditional: [] } }
+  - { type: world.team_building,   source: world,  trigger: [world, director], audit_domain: economy, audit_condition: "收费时", payload_keys: { public: [dept, activity, amount_cents], conditional: [] } }  # 06 原文 dept/all：dept 键取部门或 all
+  - { type: world.promotion_window, source: world, trigger: [world], audit_domain: null, payload_keys: { public: [dept, slots, candidates], conditional: [] } }
+  - { type: world.perf_review,     source: world,  trigger: [world], audit_domain: economy, audit_condition: "含 delta_salary 时（实际入账经 economy.payroll 结算）", payload_keys: { public: [agent_id, manager_id, grade, delta_salary], conditional: [] } }  # grade: S/A/B/C；delta_salary = BIGINT 分、月薪差额绝对值
+  - { type: world.overtime,        source: world,  trigger: [world], audit_domain: null, payload_keys: { public: [dept, reason, participants], conditional: [text_display] } }  # 每部门每周 1~2 次，排期 18:30~21:00（01 §6.1）
+  - { type: world.company_crisis,  source: world,  trigger: [world, director], audit_domain: null, payload_keys: { public: [scope, severity], conditional: [] } }
+  - { type: world.layoff_rumor,    source: world,  trigger: [world], audit_domain: null, payload_keys: { public: [drop_pct, scope], conditional: [text_display] } }  # 规则触发：星澜科技单日跌 >3% → 次日 9:30（阈值 01 §6.1 持有；不占干预率）
+  - { type: world.disturb.illness,  source: world, trigger: [world, director], audit_domain: economy, audit_condition: "仅 lucky 含金额时", payload_keys: { public: [agent_id, severity, days], conditional: [] } }   # payload 按 01 §6.1 模板
+  - { type: world.disturb.weather,  source: world, trigger: [world, director], audit_domain: economy, audit_condition: "仅 lucky 含金额时", payload_keys: { public: [kind, effect], conditional: [] } }
+  - { type: world.disturb.complaint, source: world, trigger: [world, director], audit_domain: economy, audit_condition: "仅 lucky 含金额时", payload_keys: { public: [floor, issue], conditional: [] } }
+  - { type: world.disturb.lucky,    source: world, trigger: [world, director], audit_domain: economy, audit_condition: "仅 lucky 含金额时（amount_cents 必有）", payload_keys: { public: [agent_id, kind, amount_cents], conditional: [] } }
+
+  # —— economy 域 ——
+  - { type: economy.payroll,       source: world,  trigger: [world], audit_domain: economy, payload_keys: { public: [agent_id, amount_cents, month], conditional: [text_display] } }
+  - { type: economy.bill.rent,     source: world,  trigger: [world], audit_domain: economy, payload_keys: { public: [agent_id, amount_cents, due], conditional: [] } }
+  - { type: economy.bill.utility,  source: world,  trigger: [world], audit_domain: economy, payload_keys: { public: [agent_id, amount_cents, due], conditional: [] } }
+  - { type: economy.bill.rent.overdue, source: world, trigger: [world], audit_domain: economy, payload_keys: { public: [agent_id, amount_cents, overdue_cents, period], conditional: [] } }  # 实扣至余额归 0，差额挂账
+  - { type: economy.bill.utility.overdue, source: world, trigger: [world], audit_domain: economy, payload_keys: { public: [agent_id, amount_cents, overdue_cents, period], conditional: [] } }  # 镜像 rent 欠租链
+  - { type: economy.bill.rent.notice, source: world, trigger: [world], audit_domain: economy, payload_keys: { public: [agent_id, overdue_cents, period], conditional: [] } }  # 房东约谈通知；欠租金额快照，本事件无新结算（随欠租链路审计）
+  - { type: economy.stock.tick,    source: world,  trigger: [world], audit_domain: economy, payload_keys: { public: [symbol, open, close, r, seed], conditional: [text_display] } }  # 无 amount_cents，不进余额守恒求和
+  - { type: economy.settle,        source: [world, system], trigger: [world, system], audit_domain: economy, payload_keys: { public: [agent_id, amount_cents, reason], conditional: [] } }  # 兜底结算类型，仅无法归类时使用
+
+  # —— director 域 ——
+  - { type: director.intervene,    source: director, trigger: [director], audit_domain: intervention, payload_keys: { public: [level, arc_id, reason], conditional: [text_display] } }  # level: L0/L1/L2（L3 永禁）
+  - { type: director.grade_revise, source: director, trigger: [director], audit_domain: intervention, payload_keys: { public: [target_seq, new_grade, reason], conditional: [] } }  # target_seq = 被改判事件 seq；new_grade: A/B/C（编剧动作落干预审计，量极小）
+
+  # —— system 域（internal 事件，调试态）——
+  - { type: system.llm.failover,   source: system, trigger: [system], audit_domain: null, payload_keys: { public: [task_type, from_provider, to_provider, reason], conditional: [] } }
+  - { type: system.llm.throttle,   source: system, trigger: [system], audit_domain: null, payload_keys: { public: [level, ratio], conditional: [] } }  # level: alarm/throttle/recover

@@ -1,0 +1,31 @@
+# 生成物勿手改（由 scripts/gen_event_types.py 从 config/event_types.yaml 派生，00 §1 A11 单源生成链）
+# economy 审计类型清单（04 §10.1 ① 余额守恒 :economy_types 数据源，08 审计消费；由 06 §1.2 economy 标记生成，禁 LIKE 'economy.%' 前缀对账，00 §4 红线 6）
+economy_types:
+  - agent.eat
+  - agent.shop
+  - agent.trade_stock
+  - social.give_gift
+  - social.borrow_money
+  - social.repay_money
+  - world.team_building
+  - world.perf_review
+  - world.disturb.illness
+  - world.disturb.weather
+  - world.disturb.complaint
+  - world.disturb.lucky
+  - economy.payroll
+  - economy.bill.rent
+  - economy.bill.utility
+  - economy.bill.rent.overdue
+  - economy.bill.utility.overdue
+  - economy.bill.rent.notice
+  - economy.stock.tick
+  - economy.settle
+# 条件 economy 标记（06 §1.2 注记照抄）：仅满足条件的事件行计入审计
+conditional:
+  world.team_building: 收费时
+  world.perf_review: 含 delta_salary 时（实际入账经 economy.payroll 结算）
+  world.disturb.illness: 仅 lucky 含金额时
+  world.disturb.weather: 仅 lucky 含金额时
+  world.disturb.complaint: 仅 lucky 含金额时
+  world.disturb.lucky: 仅 lucky 含金额时（amount_cents 必有）

@@ -1,0 +1,61 @@
+# 生成物勿手改（由 scripts/gen_event_types.py 从 config/event_types.yaml 派生，00 §1 A11 单源生成链）
+# sync 键白名单（07 T-SYN-01 消费）：public = 同步放行；conditional = 仅 visibility='public' 事件放行；未登记键一律剥除
+types:
+  time.paused: { public: [reason, at_sim], conditional: [] }
+  time.resumed: { public: [reason, at_sim], conditional: [] }
+  time.catchup.start: { public: [mode, from_sim, to_sim], conditional: [] }
+  time.catchup.end: { public: [mode, from_sim, to_sim], conditional: [] }
+  time.batch_advanced: { public: [sim_hours], conditional: [] }
+  time.day_summary: { public: [day], conditional: [] }
+  agent.move: { public: [from, to, sim_cost_min], conditional: [] }
+  agent.work: { public: [task_id, sim_cost_min], conditional: [] }
+  agent.rest: { public: [mode], conditional: [] }
+  agent.eat: { public: [venue, with, amount_cents], conditional: [] }
+  agent.shop: { public: [store, item_category, amount_cents], conditional: [] }
+  agent.trade_stock: { public: [symbol, side, price, amount_cents], conditional: [] }
+  agent.think: { public: [topic_hint], conditional: [] }
+  agent.promoted: { public: [from_tier, to_tier, reason, caused_by], conditional: [] }
+  agent.demoted: { public: [from_tier, to_tier, reason, caused_by], conditional: [] }
+  agent.reflection: { public: [], conditional: [text_display] }
+  state.needs_delta: { public: [changes], conditional: [] }
+  relation.changed: { public: [changes], conditional: [] }
+  dialogue.chat: { public: [participants, mode, topic_ids, lines, witnesses], conditional: [text_display] }
+  dialogue.argue: { public: [participants, reason_hint, lines, witnesses], conditional: [] }
+  dialogue.gossip: { public: [teller, listener, about, cites, lines], conditional: [text_display] }
+  dialogue.confess: { public: [participants, result, lines], conditional: [text_display] }
+  dialogue.apologize: { public: [participants, for_event_ref, result, lines], conditional: [text_display] }
+  social.send_message: { public: [from, to, content_hint], conditional: [text_display] }
+  social.invite: { public: [from, to, activity, time, location], conditional: [] }
+  social.invite.counter: { public: [from, to, round, new_time], conditional: [] }
+  social.refuse: { public: [from, to, request_ref, politeness], conditional: [] }
+  social.give_gift: { public: [from, to, tier, amount_cents], conditional: [] }
+  social.help: { public: [from, to, matter], conditional: [] }
+  social.borrow_money: { public: [from, to, amount_cents, result], conditional: [] }
+  social.repay_money: { public: [from, to, amount_cents, debt_ref], conditional: [] }
+  social.appointment.created: { public: [participants, activity, at_sim], conditional: [] }
+  social.appointment.remind: { public: [participants, activity, at_sim], conditional: [] }
+  social.appointment.stood_up: { public: [participants, activity, at_sim], conditional: [] }
+  world.announce: { public: [title, body, scope, stock_shock], conditional: [text_display] }
+  world.holiday: { public: [name, days, special_rules], conditional: [] }
+  world.team_building: { public: [dept, activity, amount_cents], conditional: [] }
+  world.promotion_window: { public: [dept, slots, candidates], conditional: [] }
+  world.perf_review: { public: [agent_id, manager_id, grade, delta_salary], conditional: [] }
+  world.overtime: { public: [dept, reason, participants], conditional: [text_display] }
+  world.company_crisis: { public: [scope, severity], conditional: [] }
+  world.layoff_rumor: { public: [drop_pct, scope], conditional: [text_display] }
+  world.disturb.illness: { public: [agent_id, severity, days], conditional: [] }
+  world.disturb.weather: { public: [kind, effect], conditional: [] }
+  world.disturb.complaint: { public: [floor, issue], conditional: [] }
+  world.disturb.lucky: { public: [agent_id, kind, amount_cents], conditional: [] }
+  economy.payroll: { public: [agent_id, amount_cents, month], conditional: [text_display] }
+  economy.bill.rent: { public: [agent_id, amount_cents, due], conditional: [] }
+  economy.bill.utility: { public: [agent_id, amount_cents, due], conditional: [] }
+  economy.bill.rent.overdue: { public: [agent_id, amount_cents, overdue_cents, period], conditional: [] }
+  economy.bill.utility.overdue: { public: [agent_id, amount_cents, overdue_cents, period], conditional: [] }
+  economy.bill.rent.notice: { public: [agent_id, overdue_cents, period], conditional: [] }
+  economy.stock.tick: { public: [symbol, open, close, r, seed], conditional: [text_display] }
+  economy.settle: { public: [agent_id, amount_cents, reason], conditional: [] }
+  director.intervene: { public: [level, arc_id, reason], conditional: [text_display] }
+  director.grade_revise: { public: [target_seq, new_grade, reason], conditional: [] }
+  system.llm.failover: { public: [task_type, from_provider, to_provider, reason], conditional: [] }
+  system.llm.throttle: { public: [level, ratio], conditional: [] }
