@@ -50,6 +50,7 @@ from .relations.cooldown import CooldownEngine
 from .relations.goals import GoalEngine, load_goals
 from .relations.needs import NeedsEngine, load_needs_config
 from .relations.relations import RelationEngine, load_relations_config
+from .scheduler.lod import LodScheduler
 from .time_engine.batch_hooks import register_batch_hook
 from .time_engine.clock import LOCAL_TZ, TimeEngine
 from .time_engine.speed_table import SpeedTableReloader, load as load_speed_table
@@ -253,6 +254,7 @@ async def _run(args: argparse.Namespace) -> int:
                     stop=stop, notify=notify, drained=drained,
                     agent_ids=agent_ids, batch_summarize=batch_summarize,
                     after_tick=after_tick,
+                    lod=LodScheduler(pool),  # T-LOD-01：next_due 时钟兜底排程（三层分发接口就位）
                 )
             )
             tg.create_task(hygiene.hygiene_loop(clock=clock, stop=stop))  # T-MEM-03 日界归档（04 §2.2）

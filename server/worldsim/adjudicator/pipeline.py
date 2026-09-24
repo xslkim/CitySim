@@ -405,6 +405,7 @@ async def adjudication_loop(
     batch_summarize: Callable[[str, float], Awaitable[None]] | None = None,
     director_preempt: Callable[[], Awaitable[None]] | None = None,
     after_tick: Callable[[int, dt.datetime], Awaitable[None]] | None = None,
+    lod: Any = None,
 ) -> None:
     """唯一裁决协程：消费队列、驱动六步管道、串行落库（04 §2.2，00 §4 红线 10）。
 
@@ -413,6 +414,8 @@ async def adjudication_loop(
     - 世界事件：`enter_batch` → 驱动 T-TIME-03 batch_advance（编剧插队接口留位）。
     - `after_tick(tick, sim_now)`：每裁决点收尾挂点（T-REL-01 需求衰减 / 04 §6.5 聚合事件 flush /
       T-MEM-02 每日兜底反思，波次 2a 接线）；sim_now 取 `clock.now_sim()`（batch 后为补进后的当前模拟时刻）。
+    - `lod`：T-LOD-01 时钟兜底排程器（`collect_due` 写回 `agents.next_due_sim`）；注入后取代
+      `STAR_EVERY_N_TICKS` 最小兜底块（缺省保留旧行为，供既有测试）。
     - rng_seed = 本 tick 序号（04 §5.2 events.rng_seed 规则骰子口径，可复现）。
     """
     while not stop.is_set():
@@ -449,11 +452,16 @@ async def adjudication_loop(
                     agents_due.append(it.agent_id)
             elif it.kind == CLOCK_TICK:
                 clock_seen = True
-        if clock_seen and tick % STAR_EVERY_N_TICKS == 0:
-            rows = await pool.fetch("SELECT id FROM agents WHERE cognition_tier='star' ORDER BY id")
-            for r in rows:
-                if r["id"] not in agents_due:
-                    agents_due.append(r["id"])
+        if clock_seen:
+            if lod is not None:
+                for aid in await lod.collect_due(tick=tick, sim_now=clock.sim_of_tick(tick)):
+                    if aid not in agents_due:
+                        agents_due.append(aid)
+            elif tick % STAR_EVERY_N_TICKS == 0:
+                rows = await pool.fetch("SELECT id FROM agents WHERE cognition_tier='star' ORDER BY id")
+                for r in rows:
+                    if r["id"] not in agents_due:
+                        agents_due.append(r["id"])
         if agents_due:
             sim_now = clock.sim_of_tick(tick)
             await pipeline.run_tick(tick=tick, sim_now=sim_now, agent_ids=agents_due, rng_seed=tick)
