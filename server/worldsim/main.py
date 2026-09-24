@@ -40,8 +40,17 @@ import yaml
 from . import logconf
 from .adjudicator.pipeline import Pipeline, adjudication_loop
 from .adjudicator.queue import AdjudicationQueue
+from .adjudicator.state_events import StateAggregator
 from .llm_gateway import LLMGateway
 from .llm_gateway.providers.mock import MockProvider
+from .memory.hygiene import MemoryHygiene
+from .memory.reflect import Reflector
+from .memory.retrieval import make_retrieve_hook
+from .relations.cooldown import CooldownEngine
+from .relations.goals import GoalEngine, load_goals
+from .relations.needs import NeedsEngine, load_needs_config
+from .relations.relations import RelationEngine, load_relations_config
+from .time_engine.batch_hooks import register_batch_hook
 from .time_engine.clock import LOCAL_TZ, TimeEngine
 from .time_engine.speed_table import SpeedTableReloader, load as load_speed_table
 
@@ -116,8 +125,32 @@ async def _run(args: argparse.Namespace) -> int:
 
         models_cfg = _load_yaml(args.models_config, "WSIM_MODELS_CONFIG", "models.yaml")
         world_cfg = _load_yaml(args.world_config, "WSIM_WORLD_CONFIG", "world.yaml")
+        needs_cfg = load_needs_config(str(SERVER_ROOT / "config" / "needs.yaml"))
+        relations_cfg = load_relations_config(str(SERVER_ROOT / "config" / "relations.yaml"))
+        goals_cfg = load_goals(str(SERVER_ROOT / "config" / "goals.yaml"))
         gateway = LLMGateway(pool, models_cfg, providers={"mock": MockProvider()}, default_provider="mock")
-        pipeline = Pipeline(pool, gateway, world_cfg)
+        # 波次 2a 接线：聚合器（04 §6.5）/ 检索（T-MEM-01）/ 反思（T-MEM-02）/ 治理（T-MEM-03）/
+        # 需求衰减（T-REL-01）/ 关系（T-REL-02）/ 目标（T-REL-03）/ 冷却（T-REL-04）
+        agg = StateAggregator(pool)
+        reflector = Reflector(
+            pool, gateway,
+            threshold=int(models_cfg.get("thresholds", {}).get("reflection", {}).get("importance_acc", 20)),
+            tick_of=clock.tick_of,
+        )
+        needs_engine = NeedsEngine(needs_cfg)
+        relation_engine = RelationEngine(pool, relations_cfg)
+        cooldown_engine = CooldownEngine(pool, relations_cfg)
+        goal_engine = GoalEngine(
+            pool, goals_cfg, cooldown=cooldown_engine, relations=relation_engine,
+            reflect_fn=lambda aid, content, importance: reflector.write_generated_reflection(
+                aid, content, importance=importance,
+            ),
+        )
+        pipeline = Pipeline(
+            pool, gateway, world_cfg,
+            retrieve=make_retrieve_hook(pool, gateway, models_cfg),
+            reflect=reflector.hook,
+        )
 
         agent_ids = tuple(r["id"] for r in await pool.fetch("SELECT id FROM agents ORDER BY id"))
         log.info("世界装载：%d agents（%s）", len(agent_ids), "、".join(agent_ids))
@@ -160,6 +193,41 @@ async def _run(args: argparse.Namespace) -> int:
             target_sim.isoformat() if target_sim else "∞",
         )
 
+        # ---- 波次 2a：tick 收尾驱动（需求衰减/聚合 flush/每日兜底反思） ------------------
+        last_decay: dict[str, dt.datetime] = {}
+
+        async def after_tick(tick: int, sim_now: dt.datetime) -> None:
+            # T-REL-01：全员六需求被动衰减（只读 sim_time；cause = 本裁决点前最后一事件 seq，工程口径 D22）
+            cause = str(await pool.fetchval("SELECT coalesce(max(seq), 0) FROM events"))
+            for aid in agent_ids:
+                last = last_decay.get(aid, sim_start)
+                if sim_now > last:
+                    await needs_engine.settle_decay(agg, agent_id=aid, from_sim=last, to_sim=sim_now, cause=cause)
+                    last_decay[aid] = sim_now
+            # 04 §6.5：本 tick 聚合状态事件合并落库（≤2 条）
+            await agg.flush(tick=tick, sim_now=sim_now, trigger="system", rng_seed=tick)
+            # T-MEM-02：每模拟日 23:00 批量兜底反思（按 agent 日幂等）
+            await reflector.run_due_daily_fallbacks(agent_ids, sim_now, rng_seed=tick)
+
+        # ---- 波次 2a：batch 段钩子（唯一挂载点，02 T-TIME-03） --------------------------
+        hygiene = MemoryHygiene(pool, gateway)
+        hygiene.register_batch_hook()  # T-MEM-03 摘要合并（每模拟日）
+
+        async def kernel_calendar_hook(ctx: Any) -> None:
+            """日界/周界作业：目标周刷新+关系周回归（周一界）、挫败值日恢复（日界）。"""
+            now = ctx.clock.now_sim()
+            before = now - dt.timedelta(hours=ctx.sim_hours)
+            cause = str(await pool.fetchval("SELECT coalesce(max(seq), 0) FROM events"))
+            if now.date() != before.date():
+                await goal_engine.daily_recovery()
+            if goal_engine.week_of(now) != goal_engine.week_of(before):
+                await goal_engine.refresh_weekly(agg, sim_now=now, cause=cause)
+                await relation_engine.weekly_regression(agg, cause=cause)
+                await agg.flush(tick=ctx.clock.current_tick, sim_now=now, trigger="system",
+                                rng_seed=ctx.clock.current_tick)
+
+        register_batch_hook("kernel.calendar", kernel_calendar_hook)
+
         async def _watch(t: asyncio.Task) -> None:
             try:
                 await t
@@ -184,10 +252,12 @@ async def _run(args: argparse.Namespace) -> int:
                     pool, queue, gateway, clock, pipeline,
                     stop=stop, notify=notify, drained=drained,
                     agent_ids=agent_ids, batch_summarize=batch_summarize,
+                    after_tick=after_tick,
                 )
             )
+            tg.create_task(hygiene.hygiene_loop(clock=clock, stop=stop))  # T-MEM-03 日界归档（04 §2.2）
             tg.create_task(_watch(clock_task))
-            # sync/audit/hygiene/rotation 协程挂接点（M6/M3/T-MEM-03/T-LOD-03 接，04 §2.2 伪码行）
+            # sync/audit/rotation 协程挂接点（M6/M3/T-LOD-03 接，04 §2.2 伪码行）
 
         sim_end = clock.now_sim()
         new_events = await pool.fetchval("SELECT count(*) FROM events WHERE seq > $1", baseline_events)

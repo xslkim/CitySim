@@ -404,12 +404,15 @@ async def adjudication_loop(
     agent_ids: tuple[str, ...] = (),
     batch_summarize: Callable[[str, float], Awaitable[None]] | None = None,
     director_preempt: Callable[[], Awaitable[None]] | None = None,
+    after_tick: Callable[[int, dt.datetime], Awaitable[None]] | None = None,
 ) -> None:
     """唯一裁决协程：消费队列、驱动六步管道、串行落库（04 §2.2，00 §4 红线 10）。
 
     - 时钟兜底：star 每 3 tick 全员排程（M1 最小兜底；T-LOD-01 接管 next_due 排程）。
     - 交互唤醒：入队即在本裁决点处理（唤醒去重已在队列侧完成）。
     - 世界事件：`enter_batch` → 驱动 T-TIME-03 batch_advance（编剧插队接口留位）。
+    - `after_tick(tick, sim_now)`：每裁决点收尾挂点（T-REL-01 需求衰减 / 04 §6.5 聚合事件 flush /
+      T-MEM-02 每日兜底反思，波次 2a 接线）；sim_now 取 `clock.now_sim()`（batch 后为补进后的当前模拟时刻）。
     - rng_seed = 本 tick 序号（04 §5.2 events.rng_seed 规则骰子口径，可复现）。
     """
     while not stop.is_set():
@@ -454,6 +457,8 @@ async def adjudication_loop(
         if agents_due:
             sim_now = clock.sim_of_tick(tick)
             await pipeline.run_tick(tick=tick, sim_now=sim_now, agent_ids=agents_due, rng_seed=tick)
+        if after_tick is not None and not clock.batch_mode:
+            await after_tick(tick, clock.now_sim())
         if drained is not None:
             drained.set()
     log.info("adjudication_loop 退出（stop）")

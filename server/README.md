@@ -17,7 +17,27 @@ uv sync                              # 安装依赖（含 dev 组）
 uv run pytest                        # 全量测试（importmode=importlib）
 uv run python scripts/gen_event_types.py        # 派生注册表下游镜像（T-CFG-05）
 uv run python scripts/gen_event_types.py --check # 漂移检查（纯消费方 04 T-WA-10）
+uv run python scripts/invite_stats.py           # 邀约接受率统计（01 §3.5 / 02 D6 口径）
 ```
+
+## 配置文件（config/）
+
+M0 族（speed_table/models/agents/world/event_types/payload_whitelist/health_thresholds）之外，
+波次 2a 新增（02 文档偏差表 D13 登记）：`needs.yaml`（01 §3.1 六需求衰减/满足镜像）、
+`relations.yaml`（01 §3.2 关系矩阵 + 自然回归 / §3.4 意图冷却 / §3.5 willingness 镜像）、
+`goals.yaml`（01 §3.3 周目标库 36 条，已入 00 §2 清单）、`topics.yaml`（01 §7 话题库 60 条）。
+另：`ddl/memories_update_grant.sql` 为 T-MEM-03 归档治理按列授权 `UPDATE (archived)`（已灌主库）。
+
+## 波次 2a 已接线的内核件（M1 记忆+关系线）
+
+- 管道挂接：`Pipeline(retrieve=make_retrieve_hook(...), reflect=reflector.hook)`（step2/step6）。
+- `adjudication_loop(after_tick=...)`：每裁决点跑全员需求衰减（T-REL-01）→ 聚合事件 flush
+  （`state.needs_delta`/`relation.changed` 每 tick ≤2 条，04 §6.5）→ 23:00 每日兜底反思（T-MEM-02）。
+- batch 段钩子（唯一挂载点 T-TIME-03）：`memory.merge`（T-MEM-03 摘要合并）、
+  `kernel.calendar`（周界：目标刷新 T-REL-03 + 关系周回归 T-REL-02；日界：挫败值日恢复）。
+- `hygiene_loop` 协程入 TaskGroup（日界归档，04 §2.2）。
+- 邀约/话题（T-REL-05/06）交付为引擎 + 函数接口（`worldsim/invite/`、`worldsim/relations/topics.py`），
+  管道动作侧接线归波次 2b（T-ADJ-03/04）。
 
 ## 内核主循环（M1：04 §2.2 装配；唯一裁决协程写库）
 
