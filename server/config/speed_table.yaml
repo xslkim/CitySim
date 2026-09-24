@@ -1,0 +1,10 @@
+# 时段变速表（04 §3.1 部署镜像，数值逐字一致，勿改数字；变更先回改 04 §3.1）
+# schema 冻结为两段式（segments / constraints），热更在段边界生效（04 §12.4）
+segments:                    # 按真实本地时间覆盖全天 24h，不允许空洞
+  - { start: "00:30", end: "08:00", mode: batch, sim_hours_per_run: 8 }   # 凌晨批量粗粒度
+  - { start: "08:00", end: "18:00", mode: continuous, ratio: 3.0 }        # 白天 2~4× 区间内取 3
+  - { start: "18:00", end: "24:00", mode: continuous, ratio: 1.0 }        # 黄金档 ≈1:1
+  - { start: "00:00", end: "00:30", mode: continuous, ratio: 2.0 }        # 深夜缓冲
+constraints:
+  min_sim_days_per_real_week: 8        # 源方案 §4.1 底线，加载时校验
+  max_catchup_ratio: 6.0               # 追平模式上限
