@@ -110,6 +110,19 @@ SQL
   log "init complete"
 }
 
+prepare_db() { # 建扩展 + partman 非 superuser 授权（pg_partman 运行要件，01 文档 §6 D17）
+  psql -h /tmp -d "$DB_NAME" -v ON_ERROR_STOP=1 \
+    -c 'CREATE SCHEMA IF NOT EXISTS partman' \
+    -c 'CREATE EXTENSION IF NOT EXISTS vector' \
+    -c 'CREATE EXTENSION IF NOT EXISTS pg_partman SCHEMA partman' >/dev/null
+  # pg_partman 函数 SECURITY INVOKER：DDL 以 worldsim 执行（T-DB-01 验收 1），需 schema/函数/表权限
+  psql -h /tmp -d "$DB_NAME" -v ON_ERROR_STOP=1 \
+    -c "GRANT CREATE, USAGE ON SCHEMA partman TO $APP_ROLE" \
+    -c "GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA partman TO $APP_ROLE" \
+    -c "GRANT EXECUTE ON ALL PROCEDURES IN SCHEMA partman TO $APP_ROLE" \
+    -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA partman TO $APP_ROLE" >/dev/null
+}
+
 create_db() { # 建库 + 扩展（init 与 reset 共用）
   local db_exists
   db_exists="$(psql -h /tmp -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'")"
@@ -119,10 +132,7 @@ create_db() { # 建库 + 扩展（init 与 reset 共用）
     createdb -h /tmp -O "$APP_ROLE" "$DB_NAME"
     log "database $DB_NAME created（owner=$APP_ROLE；不建副本库，§2 defer T-SYN-06）"
   fi
-  psql -h /tmp -d "$DB_NAME" -v ON_ERROR_STOP=1 \
-    -c 'CREATE SCHEMA IF NOT EXISTS partman' \
-    -c 'CREATE EXTENSION IF NOT EXISTS vector' \
-    -c 'CREATE EXTENSION IF NOT EXISTS pg_partman SCHEMA partman' >/dev/null
+  prepare_db
   psql -h /tmp -d "$DB_NAME" -tAc "SELECT extname || ' ' || extversion FROM pg_extension WHERE extname IN ('vector','pg_partman') ORDER BY 1" \
     | while IFS= read -r line; do log "extension: $line"; done
 }
@@ -133,11 +143,8 @@ do_reset() { # reset = drop + create database worldsim（供测试反复跑 DDL�
   log "database $DB_NAME dropped"
   createdb -h /tmp -O "$APP_ROLE" "$DB_NAME"
   log "database $DB_NAME created（owner=$APP_ROLE）"
-  psql -h /tmp -d "$DB_NAME" -v ON_ERROR_STOP=1 \
-    -c 'CREATE SCHEMA IF NOT EXISTS partman' \
-    -c 'CREATE EXTENSION IF NOT EXISTS vector' \
-    -c 'CREATE EXTENSION IF NOT EXISTS pg_partman SCHEMA partman' >/dev/null
-  log "extensions ready（vector / pg_partman）"
+  prepare_db
+  log "extensions ready（vector / pg_partman；partman 权限已授 $APP_ROLE）"
 }
 
 case "${1:-}" in
