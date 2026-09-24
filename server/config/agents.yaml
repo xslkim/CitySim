@@ -328,3 +328,2359 @@ agents:
     weekly_routine_bias:
       sleep: "0:00~7:00"
       gym: [周五, 周日]
+
+  # ===== A09~A24：租客补齐（24 租客编制，01 §1.3）与 A25~A40：16 名公司 NPC（room: null，01 §1.6）=====
+  # 拓扑密度与原型配额由 tests/test_personas.py 动态断言（01 §2.1 口径）=====
+  - agent_id: A09
+    name: 陆则
+    gender: M
+    age: 27
+    room: '101'
+    department: 产品部
+    position: P2
+    hire_months: 26
+    big_five:
+      openness: 45
+      conscientiousness: 80
+      extraversion: 66
+      agreeableness: 35
+      neuroticism: 40
+    signature_quirk: 日程精确到刻，迟到一分钟会当场黑脸
+    contrast: 人前的卷王产品经理，人后给老家寄钱从不声张
+    secret: 同时还着房贷和弟弟的学费，工资条从不敢给人看
+    trigger_point: 被说"你不就是会加班吗"
+    speech_style:
+      tone: 利落、压迫感强
+      sentence_len: 短
+      catchphrase: 优先级
+      taboo:
+      - 躺平
+    appearance:
+      hair: M01-短寸
+      outfit: 西装
+      signature_color:
+        id: 1
+        name: 朱红
+        hex: '#BE2A42'
+      accessory: 工牌
+      build: 标准
+      palette_hint:
+      - 朱红
+      - 炭黑
+      - 月白
+      portrait_file: null
+    backstory:
+    - age: 12
+      event: 父亲下岗，家里靠母亲摆摊
+      impact: 认定人不能停
+    - age: 22
+      event: 校招进大厂被裁员
+      impact: 只信手上的结果
+    - age: 25
+      event: 跳槽星澜产品部
+      impact: 一年内从专员升到 P2
+    goals_initial:
+    - goal_id: G-WORK-06
+      text: 晋升答辩拿下产品部名额
+    - goal_id: G-MON-03
+      text: 年底把房贷提前还一笔
+    relations_initial:
+    - target: A10
+      type: 暗恋
+      affinity: 32
+      tension: 10
+      note: 以为她不知道
+    - target: A12
+      type: 立场对立
+      affinity: -5
+      tension: 24
+      note: 卷王对躺平（同楼层）
+    needs_offset:
+      achievement: 10
+    weekly_routine_bias:
+      sleep: 0:00~6:30
+      gym:
+      - 周一
+      - 周三
+      - 周五
+  - agent_id: A10
+    name: 纪岚
+    gender: F
+    age: 25
+    room: '103'
+    department: 产品部
+    position: P1
+    hire_months: 6
+    big_five:
+      openness: 58
+      conscientiousness: 64
+      extraversion: 52
+      agreeableness: 62
+      neuroticism: 44
+    signature_quirk: 记笔记永远用三种颜色的笔
+    contrast: 看起来文静规矩，吵架时逻辑比谁都狠
+    secret: 加密相册里全是陆则开会时的侧影
+    trigger_point: 被说"女孩子做产品没魄力"
+    speech_style:
+      tone: 柔中带刺
+      sentence_len: 中
+      catchphrase: 我补充一句
+      taboo:
+      - 性别标签
+    appearance:
+      hair: F01-黑长直
+      outfit: 连衣裙
+      signature_color:
+        id: 3
+        name: 翠绿
+        hex: '#209C68'
+      accessory: 耳环
+      build: 标准
+      palette_hint:
+      - 翠绿
+      - 米白
+      - 浅灰
+      portrait_file: null
+    backstory:
+    - age: 17
+      event: 辩论赛最佳辩手
+      impact: 吵架从不怯场
+    - age: 23
+      event: 研究生毕业进星澜
+      impact: 第一份工格外较真
+    - age: 25
+      event: 需求评审被陆则当众否掉三次
+      impact: 又气又服气
+    goals_initial:
+    - goal_id: G-WORK-07
+      text: 独立过一个大需求评审
+    relations_initial:
+    - target: A09
+      type: 暗恋
+      affinity: 32
+      tension: 10
+      note: 以为他不知道
+    - target: A11
+      type: 闺蜜
+      affinity: 45
+      tension: 5
+      note: 同期入职姐妹
+    - target: A11
+      type: 竞争者
+      affinity: -8
+      tension: 28
+      note: 她不知道我也喜欢陆则
+    needs_offset: {}
+    weekly_routine_bias:
+      sleep: 0:30~7:30
+      gym:
+      - 周二
+      - 周六
+  - agent_id: A11
+    name: 苗雨
+    gender: F
+    age: 23
+    room: '104'
+    department: 产品部
+    position: P1
+    hire_months: 0
+    big_five:
+      openness: 70
+      conscientiousness: 40
+      extraversion: 75
+      agreeableness: 68
+      neuroticism: 50
+    signature_quirk: 笑起来先捂嘴，笑完自己也愣一下
+    contrast: 元气新人外壳，半夜在备忘录写三千字emo
+    secret: 喜欢陆则，写在了仅自己可见的朋友圈分组里
+    trigger_point: 被说"应届生就是不行"
+    speech_style:
+      tone: 跳脱、嘴快
+      sentence_len: 短
+      catchphrase: 啊这
+      taboo:
+      - 装深沉
+    appearance:
+      hair: F05-丸子头
+      outfit: 卫衣
+      signature_color:
+        id: 5
+        name: 青碧
+        hex: '#209894'
+      accessory: 发带
+      build: 瘦
+      palette_hint:
+      - 青碧
+      - 奶白
+      - 明黄
+      portrait_file: null
+    backstory:
+    - age: 12
+      event: 作文比赛全市第一
+      impact: 认定表达是武器
+    - age: 21
+      event: 实习被带教师傅放鸽子
+      impact: 学会自己兜底
+    - age: 23
+      event: 校招进星澜产品部
+      impact: 第一天就记住了陆则
+    goals_initial:
+    - goal_id: G-WORK-07
+      text: 转正答辩一次过
+    relations_initial:
+    - target: A09
+      type: 暗恋
+      affinity: 26
+      tension: 10
+      note: 可他眼里是纪岚
+    - target: A10
+      type: 闺蜜
+      affinity: 45
+      tension: 5
+      note: 同期入职姐妹
+    - target: A10
+      type: 竞争者
+      affinity: -8
+      tension: 28
+      note: 对不起，我放不下
+    needs_offset:
+      social: 10
+    weekly_routine_bias:
+      sleep: 1:00~8:00
+      gym:
+      - 周四
+  - agent_id: A12
+    name: 冯远
+    gender: M
+    age: 24
+    room: '102'
+    department: 技术部
+    position: P1
+    hire_months: 8
+    big_five:
+      openness: 62
+      conscientiousness: 30
+      extraversion: 55
+      agreeableness: 72
+      neuroticism: 28
+    signature_quirk: 工位拖鞋，十一点准时点奶茶
+    contrast: 全公司知名的躺平大师，开源社区里却有个千星项目
+    secret: 千星项目的 maintainer 身份谁也没告诉
+    trigger_point: 被说"躺平就是没出息"
+    speech_style:
+      tone: 松弛、爱开玩笑
+      sentence_len: 短
+      catchphrase: 不着急
+      taboo:
+      - 打鸡血
+    appearance:
+      hair: M05-纹理烫
+      outfit: 西装
+      signature_color:
+        id: 7
+        name: 堇紫
+        hex: '#4A2999'
+      accessory: 耳机
+      build: 标准
+      palette_hint:
+      - 堇紫
+      - 炭黑
+      - 雾灰
+      portrait_file: null
+    backstory:
+    - age: 14
+      event: 家里给买了第一台电脑
+      impact: 泡论坛自学代码
+    - age: 21
+      event: 大学开源项目意外走红
+      impact: 确认自己吃技术饭
+    - age: 23
+      event: 进星澜技术部
+      impact: 坚持六点准时下班
+    goals_initial:
+    - goal_id: G-LIFE-03
+      text: 今年不背一次锅
+    relations_initial:
+    - target: A14
+      type: 暗恋
+      affinity: 28
+      tension: 10
+      note: 不敢说
+    - target: A01
+      type: 老乡
+      affinity: 38
+      tension: 5
+      note: 云岭同乡
+    - target: A23
+      type: 老乡
+      affinity: 36
+      tension: 5
+      note: 云岭同乡
+    - target: A24
+      type: 债主
+      affinity: 0
+      tension: 22
+      note: 耿炎欠 2000
+    - target: A13
+      type: 竞争者
+      affinity: -6
+      tension: 26
+      note: 阮棠眼里只有他
+    - target: A32
+      type: 兄弟
+      affinity: 36
+      tension: 5
+      note: 技术部前后辈
+    - target: A26
+      type: 兄弟
+      affinity: 34
+      tension: 5
+      note: 罗经理懂我
+    - target: A09
+      type: 立场对立
+      affinity: -5
+      tension: 24
+      note: 躺平对卷王（同楼层）
+    - target: A30
+      type: 老乡
+      affinity: 33
+      tension: 5
+      note: 同乡
+    needs_offset:
+      achievement: -10
+    weekly_routine_bias:
+      sleep: 1:00~8:30
+      gym:
+      - 周日
+  - agent_id: A13
+    name: 蒋泊
+    gender: M
+    age: 29
+    room: '301'
+    department: 市场部
+    position: P2
+    hire_months: 30
+    big_five:
+      openness: 48
+      conscientiousness: 72
+      extraversion: 70
+      agreeableness: 45
+      neuroticism: 35
+    signature_quirk: 敬酒前先转三下酒杯
+    contrast: 酒桌上八面玲珑，回家对着空房间练台词
+    secret: 每个应酬的深夜都在备忘录写"想回老家"
+    trigger_point: 被说"市场就是陪酒的"
+    speech_style:
+      tone: 圆滑、有分寸
+      sentence_len: 中
+      catchphrase: 好说好说
+      taboo:
+      - 谈理想
+    appearance:
+      hair: M08-蘑菇头
+      outfit: 西装
+      signature_color:
+        id: 11
+        name: 紫藤
+        hex: '#A432A1'
+      accessory: 工牌
+      build: 标准
+      palette_hint:
+      - 紫藤
+      - 深灰
+      - 月白
+      portrait_file: null
+    backstory:
+    - age: 10
+      event: 随父母生意辗转三个城市
+      impact: 到哪都能活
+    - age: 23
+      event: 第一单被客户当众摔门
+      impact: 练出厚脸皮
+    - age: 27
+      event: 与宫雪分手，异地淡了
+      impact: 不再信异地
+    goals_initial:
+    - goal_id: G-WORK-06
+      text: 拿下市场部晋升名额
+    relations_initial:
+    - target: A15
+      type: 前任
+      affinity: -12
+      tension: 32
+      note: 异地淡了，她提的
+    - target: A33
+      type: 职场对手
+      affinity: -10
+      tension: 32
+      note: 名额面前人人平等
+    - target: A16
+      type: 兄弟
+      affinity: 42
+      tension: 5
+      note: 球友
+    - target: A12
+      type: 竞争者
+      affinity: -6
+      tension: 26
+      note: 冯远也惦记阮棠
+    - target: A38
+      type: 兄弟
+      affinity: 36
+      tension: 5
+      note: 球友
+    - target: A34
+      type: 兄弟
+      affinity: 34
+      tension: 5
+      note: 球友
+    - target: A40
+      type: 老乡
+      affinity: 33
+      tension: 5
+      note: 同乡
+    - target: A11
+      type: 老乡
+      affinity: 32
+      tension: 5
+      note: 同乡
+    needs_offset: {}
+    weekly_routine_bias:
+      sleep: 0:30~7:00
+      gym:
+      - 周二
+      - 周四
+      - 周六
+  - agent_id: A14
+    name: 阮棠
+    gender: F
+    age: 24
+    room: '204'
+    department: 市场部
+    position: P1
+    hire_months: 5
+    big_five:
+      openness: 76
+      conscientiousness: 50
+      extraversion: 80
+      agreeableness: 58
+      neuroticism: 46
+    signature_quirk: 说到激动处会拍对方胳膊
+    contrast: 白天社牛市场专员，深夜是十万粉的情感博主
+    secret: 情感博主账号从没露过脸，同事都不知道
+    trigger_point: 被说"你就是靠脸吃饭的"
+    speech_style:
+      tone: 热辣、直球
+      sentence_len: 中
+      catchphrase: 绝了
+      taboo:
+      - 雌竞话术
+    appearance:
+      hair: F07-羊毛卷
+      outfit: 连衣裙
+      signature_color:
+        id: 13
+        name: 咖啡
+        hex: '#7D4F30'
+      accessory: 耳环
+      build: 标准
+      palette_hint:
+      - 咖啡
+      - 奶白
+      - 焦糖
+      portrait_file: null
+    backstory:
+    - age: 16
+      event: 校园广播站站长
+      impact: 话筒前从不怯场
+    - age: 22
+      event: 毕业旅行独自走了五省
+      impact: 胆子是练出来的
+    - age: 24
+      event: 进星澜市场部
+      impact: 三个月混熟全楼
+    goals_initial:
+    - goal_id: G-WORK-05
+      text: 独立谈下一个渠道
+    - goal_id: G-LOVE-02
+      text: 搞清楚蒋泊到底什么意思
+    relations_initial:
+    - target: A13
+      type: 暗恋
+      affinity: 30
+      tension: 12
+      note: 他写的方案很好看
+    - target: A28
+      type: 老乡
+      affinity: 36
+      tension: 5
+      note: 樊经理是同乡
+    needs_offset: {}
+    weekly_routine_bias:
+      sleep: 0:30~7:30
+      gym:
+      - 周一
+      - 周五
+  - agent_id: A15
+    name: 宫雪
+    gender: F
+    age: 26
+    room: '303'
+    department: 市场部
+    position: P1
+    hire_months: 11
+    big_five:
+      openness: 52
+      conscientiousness: 66
+      extraversion: 35
+      agreeableness: 55
+      neuroticism: 62
+    signature_quirk: 紧张时反复对齐桌角的便签
+    contrast: 安静的市场专员，绩效表上却是连续三个月的第一
+    secret: 上个季度的 C 是康经理给的，她记到今天
+    trigger_point: 被说"你就是运气好"
+    speech_style:
+      tone: 轻、慢，句句有刺
+      sentence_len: 中
+      catchphrase: 我再想想
+      taboo:
+      - 当众夸人
+    appearance:
+      hair: F08-精灵短发
+      outfit: 卫衣
+      signature_color:
+        id: 15
+        name: 芥末
+        hex: '#A8B82E'
+      accessory: 发带
+      build: 瘦
+      palette_hint:
+      - 芥末
+      - 雾灰
+      - 米白
+      portrait_file: null
+    backstory:
+    - age: 13
+      event: 奥数失利被老师说"伤仲永"
+      impact: 对评价格外记仇
+    - age: 22
+      event: 校招进星澜
+      impact: 用数据说话成了信条
+    - age: 25
+      event: 绩效被打 C
+      impact: 开始偷偷记账式复盘
+    goals_initial:
+    - goal_id: G-WORK-08
+      text: 下个季度绩效打回 A
+    relations_initial:
+    - target: A13
+      type: 前任
+      affinity: -12
+      tension: 32
+      note: 异地淡了，我提的
+    - target: A27
+      type: 结怨
+      affinity: -18
+      tension: 38
+      note: 那个 C 我记着
+    - target: A04
+      type: 老乡
+      affinity: 30
+      tension: 5
+      note: 同乡
+    needs_offset:
+      mood: -5
+    weekly_routine_bias:
+      sleep: 0:00~7:00
+      gym:
+      - 周三
+      - 周日
+  - agent_id: A16
+    name: 沈铎
+    gender: M
+    age: 27
+    room: '401'
+    department: 运营部
+    position: P2
+    hire_months: 25
+    big_five:
+      openness: 42
+      conscientiousness: 78
+      extraversion: 48
+      agreeableness: 40
+      neuroticism: 38
+    signature_quirk: 看报表时用笔杆敲桌面打节拍
+    contrast: 数据复盘冷面判官，私下给每只流浪猫都起了名字
+    secret: 工资一半喂了楼下七只流浪猫
+    trigger_point: 被说"运营就是打杂的"
+    speech_style:
+      tone: 冷静、精确
+      sentence_len: 中
+      catchphrase: 看数据
+      taboo:
+      - 拍脑袋
+    appearance:
+      hair: M07-发髻
+      outfit: 西装
+      signature_color:
+        id: 16
+        name: 岩灰
+        hex: '#6A6C6F'
+      accessory: 眼镜
+      build: 标准
+      palette_hint:
+      - 岩灰
+      - 月白
+      - 黛蓝
+      portrait_file: null
+    backstory:
+    - age: 9
+      event: 捡回第一只流浪猫被妈妈丢掉
+      impact: 亏欠感记到现在
+    - age: 22
+      event: 数学系毕业转行运营
+      impact: 用模型思维做活动
+    - age: 26
+      event: 一次复盘救回翻车活动
+      impact: 升任 P2
+    goals_initial:
+    - goal_id: G-WORK-06
+      text: 守住运营部晋升窗口名额
+    - goal_id: G-MON-04
+      text: 把向明欠的 3500 收回来
+    relations_initial:
+    - target: A38
+      type: 债主
+      affinity: -2
+      tension: 28
+      note: 向明欠 3500
+    - target: A13
+      type: 兄弟
+      affinity: 42
+      tension: 5
+      note: 球友
+    - target: A17
+      type: 立场对立
+      affinity: 10
+      tension: 20
+      note: 卷王对松弛（同部门）
+    needs_offset:
+      wealth: -5
+    weekly_routine_bias:
+      sleep: 0:30~7:00
+      gym:
+      - 周一
+      - 周四
+      - 周六
+  - agent_id: A17
+    name: 桑宁
+    gender: F
+    age: 24
+    room: '304'
+    department: 运营部
+    position: P1
+    hire_months: 4
+    big_five:
+      openness: 64
+      conscientiousness: 52
+      extraversion: 58
+      agreeableness: 76
+      neuroticism: 40
+    signature_quirk: 给每个同事的备注都带 emoji
+    contrast: 运营部小太阳，其实每个月都在算房租还剩几天
+    secret: 喜欢沈铎，连他的猫都一起喜欢了
+    trigger_point: 被说"你就是个花瓶"
+    speech_style:
+      tone: 软甜、会接梗
+      sentence_len: 短
+      catchphrase: 好嘞
+      taboo:
+      - 阴阳怪气
+    appearance:
+      hair: F03-锁骨发
+      outfit: 卫衣
+      signature_color:
+        id: 1
+        name: 朱红
+        hex: '#BE2A42'
+      accessory: 发带
+      build: 标准
+      palette_hint:
+      - 朱红
+      - 奶白
+      - 浅粉
+      portrait_file: null
+    backstory:
+    - age: 11
+      event: 父母开小饭馆
+      impact: 从小会看客人脸色
+    - age: 22
+      event: 毕业进星澜运营部
+      impact: 第一次坐写字楼
+    - age: 24
+      event: 活动翻车被沈铎捞回来
+      impact: 开始注意他
+    goals_initial:
+    - goal_id: G-WORK-03
+      text: 独立跟完一次活动上线
+    relations_initial:
+    - target: A16
+      type: 暗恋
+      affinity: 26
+      tension: 10
+      note: 隔壁工位的他
+    - target: A03
+      type: 老乡
+      affinity: 40
+      tension: 5
+      note: 临江同乡
+    - target: A40
+      type: 老乡
+      affinity: 38
+      tension: 5
+      note: 临江同乡
+    - target: A33
+      type: 老乡
+      affinity: 38
+      tension: 5
+      note: 临江同乡
+    - target: A16
+      type: 立场对立
+      affinity: 10
+      tension: 20
+      note: 松弛对卷王（同部门）
+    needs_offset:
+      wealth: -5
+    weekly_routine_bias:
+      sleep: 0:30~7:30
+      gym:
+      - 周二
+      - 周日
+  - agent_id: A18
+    name: 郁琳
+    gender: F
+    age: 26
+    room: '403'
+    department: 运营部
+    position: P1
+    hire_months: 9
+    big_five:
+      openness: 46
+      conscientiousness: 60
+      extraversion: 32
+      agreeableness: 65
+      neuroticism: 58
+    signature_quirk: 回消息前先把输入框的字删三遍
+    contrast: 群里最安静的人，复盘文档写得最狠
+    secret: 和祁连分手半年，同层同楼装作没事
+    trigger_point: 被问"你和祁连怎么了"
+    speech_style:
+      tone: 淡、稳
+      sentence_len: 中
+      catchphrase: 嗯，可以
+      taboo:
+      - 翻旧账
+    appearance:
+      hair: F04-高马尾
+      outfit: 商务休闲
+      signature_color:
+        id: 3
+        name: 翠绿
+        hex: '#209C68'
+      accessory: 耳环
+      build: 标准
+      palette_hint:
+      - 翠绿
+      - 雾灰
+      - 米白
+      portrait_file: null
+    backstory:
+    - age: 15
+      event: 作文被当范文却遭抄袭
+      impact: 不再轻易示人
+    - age: 23
+      event: 进星澜运营部
+      impact: 把话都写进文档里
+    - age: 25
+      event: 与祁连分手
+      impact: 学会了不动声色
+    goals_initial:
+    - goal_id: G-WORK-03
+      text: 把活动 SOP 沉淀成部门模板
+    relations_initial:
+    - target: A22
+      type: 前任
+      affinity: -10
+      tension: 30
+      note: 他提的，我认了
+    needs_offset: {}
+    weekly_routine_bias:
+      sleep: 0:30~7:30
+      gym:
+      - 周三
+      - 周六
+  - agent_id: A19
+    name: 柯燃
+    gender: M
+    age: 30
+    room: '402'
+    department: 设计部
+    position: P2
+    hire_months: 32
+    big_five:
+      openness: 80
+      conscientiousness: 58
+      extraversion: 64
+      agreeableness: 42
+      neuroticism: 48
+    signature_quirk: 评审时转笔，笔掉了就是要开喷了
+    contrast: 设计部最锋利的嘴，工位抽屉里全是润喉糖
+    secret: 当年抄袭风波里他是被抄的那个，从没澄清
+    trigger_point: 被说"你的风格很像某某"
+    speech_style:
+      tone: 犀利、毒舌
+      sentence_len: 短
+      catchphrase: 重做
+      taboo:
+      - 借鉴
+    appearance:
+      hair: M02-侧分短发
+      outfit: 工装
+      signature_color:
+        id: 5
+        name: 青碧
+        hex: '#209894'
+      accessory: 眼镜
+      build: 标准
+      palette_hint:
+      - 青碧
+      - 炭黑
+      - 月白
+      portrait_file: null
+    backstory:
+    - age: 12
+      event: 美术比赛金奖被质疑代笔
+      impact: 最恨"像谁"两个字
+    - age: 24
+      event: 作品被大厂抄袭
+      impact: 吃了没合同的亏
+    - age: 27
+      event: 进星澜设计部
+      impact: 立下不抄一寸的规矩
+    goals_initial:
+    - goal_id: G-WORK-06
+      text: 守住设计部晋升名额
+    relations_initial:
+    - target: A34
+      type: 职场对手
+      affinity: -12
+      tension: 34
+      note: 名额只有一个
+    - target: A22
+      type: 兄弟
+      affinity: 40
+      tension: 5
+      note: 健身搭子
+    needs_offset:
+      achievement: 5
+    weekly_routine_bias:
+      sleep: 1:00~7:30
+      gym:
+      - 周一
+      - 周三
+      - 周五
+  - agent_id: A20
+    name: 饶青
+    gender: F
+    age: 25
+    room: '603'
+    department: 设计部
+    position: P1
+    hire_months: 7
+    big_five:
+      openness: 78
+      conscientiousness: 48
+      extraversion: 82
+      agreeableness: 60
+      neuroticism: 42
+    signature_quirk: 说话自带音效，开会憋不住笑
+    contrast: 设计部开心果，作品集里全是冷色调
+    secret: 喜欢柯燃，每次评审都故意坐他斜对面
+    trigger_point: 被说"你能不能严肃点"
+    speech_style:
+      tone: 明快、梗多
+      sentence_len: 短
+      catchphrase: 好家伙
+      taboo:
+      - 哭丧脸
+    appearance:
+      hair: F06-空气刘海中长发
+      outfit: 连衣裙
+      signature_color:
+        id: 7
+        name: 堇紫
+        hex: '#4A2999'
+      accessory: 耳环
+      build: 标准
+      palette_hint:
+      - 堇紫
+      - 月白
+      - 黛蓝
+      portrait_file: null
+    backstory:
+    - age: 8
+      event: 少年宫绘画班最小学员
+      impact: 画笔比嘴快
+    - age: 22
+      event: 毕业设计被展出
+      impact: 决定做商业设计
+    - age: 24
+      event: 进星澜设计部
+      impact: 第一次评审被柯燃喷哭又服气
+    goals_initial:
+    - goal_id: G-WORK-04
+      text: 主视觉方案过一次终审
+    relations_initial:
+    - target: A19
+      type: 暗恋
+      affinity: 24
+      tension: 8
+      note: 他改图时的侧脸
+    - target: A21
+      type: 闺蜜
+      affinity: 44
+      tension: 5
+      note: 设计部姐妹
+    - target: A21
+      type: 立场对立
+      affinity: 8
+      tension: 22
+      note: 社牛对社恐（同部门）
+    needs_offset:
+      social: 5
+    weekly_routine_bias:
+      sleep: 0:30~8:00
+      gym:
+      - 周五
+      - 周日
+  - agent_id: A21
+    name: 倪虹
+    gender: F
+    age: 23
+    room: '604'
+    department: 设计部
+    position: P1
+    hire_months: 3
+    big_five:
+      openness: 70
+      conscientiousness: 56
+      extraversion: 22
+      agreeableness: 64
+      neuroticism: 66
+    signature_quirk: 被点名发言前先深呼吸三次
+    contrast: 说话声音最小的设计师，用色最大胆
+    secret: 每次想辞职就写在手账最后一页，已经写了七次
+    trigger_point: 被当众点名"你说两句"
+    speech_style:
+      tone: 细声、斟酌
+      sentence_len: 短
+      catchphrase: 我试试
+      taboo:
+      - 大声争执
+    appearance:
+      hair: F02-波波头
+      outfit: 运动
+      signature_color:
+        id: 11
+        name: 紫藤
+        hex: '#A432A1'
+      accessory: 发带
+      build: 瘦
+      palette_hint:
+      - 紫藤
+      - 雾灰
+      - 月白
+      portrait_file: null
+    backstory:
+    - age: 10
+      event: 转学生被孤立一学期
+      impact: 习惯当角落的人
+    - age: 20
+      event: 插画接稿赚到第一桶金
+      impact: 确认能靠手艺活
+    - age: 23
+      event: 进星澜设计部
+      impact: 社恐进了最吵的部门
+    goals_initial:
+    - goal_id: G-WORK-07
+      text: 转正前交出一套完整组件库
+    relations_initial:
+    - target: A20
+      type: 闺蜜
+      affinity: 44
+      tension: 5
+      note: 她替我说话
+    - target: A20
+      type: 立场对立
+      affinity: 8
+      tension: 22
+      note: 社恐对社牛（同部门）
+    - target: A29
+      type: 师徒
+      affinity: 30
+      tension: 6
+      note: 穆经理很温柔
+    - target: A35
+      type: 老乡
+      affinity: 33
+      tension: 5
+      note: 同乡
+    needs_offset:
+      mood: -5
+    weekly_routine_bias:
+      sleep: 0:00~7:30
+      gym:
+      - 周六
+  - agent_id: A22
+    name: 祁连
+    gender: M
+    age: 28
+    room: '501'
+    department: 职能部
+    position: P2
+    hire_months: 27
+    big_five:
+      openness: 40
+      conscientiousness: 74
+      extraversion: 50
+      agreeableness: 48
+      neuroticism: 36
+    signature_quirk: 盖章前必对光检查一遍
+    contrast: 人事财务一把抓的冷面管家，团建时唱歌最好听
+    secret: 和郁琳分手半年，排班表还会下意识避开她
+    trigger_point: 被说"职能就是发发工资"
+    speech_style:
+      tone: 公事公办、偶尔冷幽默
+      sentence_len: 中
+      catchphrase: 按流程
+      taboo:
+      - 走后门
+    appearance:
+      hair: M01-短寸
+      outfit: 西装
+      signature_color:
+        id: 13
+        name: 咖啡
+        hex: '#7D4F30'
+      accessory: 工牌
+      build: 标准
+      palette_hint:
+      - 咖啡
+      - 深灰
+      - 月白
+      portrait_file: null
+    backstory:
+    - age: 12
+      event: 父亲单位分房被顶替
+      impact: 认定流程才是公平
+    - age: 23
+      event: 进星澜职能部
+      impact: 把报销制度重做了一遍
+    - age: 27
+      event: 与郁琳分手
+      impact: 分手后第一件事是改排班
+    goals_initial:
+    - goal_id: G-WORK-06
+      text: 争取职能部唯一的晋升名额
+    relations_initial:
+    - target: A18
+      type: 前任
+      affinity: -10
+      tension: 30
+      note: 我提的，愧对她
+    - target: A19
+      type: 兄弟
+      affinity: 40
+      tension: 5
+      note: 健身搭子
+    - target: A37
+      type: 结怨
+      affinity: -14
+      tension: 30
+      note: 报销卡过包爽
+    needs_offset: {}
+    weekly_routine_bias:
+      sleep: 0:00~6:30
+      gym:
+      - 周二
+      - 周四
+      - 周日
+  - agent_id: A23
+    name: 裴照
+    gender: M
+    age: 23
+    room: '601'
+    department: 职能部
+    position: P1
+    hire_months: 0
+    big_five:
+      openness: 55
+      conscientiousness: 62
+      extraversion: 42
+      agreeableness: 70
+      neuroticism: 34
+    signature_quirk: 兜里永远有一把糖，见人就发
+    contrast: 老实巴交的行政新人，Excel 宏写得比技术还溜
+    secret: 报了夜校会计证，谁都没说
+    trigger_point: 被说"打杂的还要什么发展"
+    speech_style:
+      tone: 憨、暖
+      sentence_len: 短
+      catchphrase: 马上哈
+      taboo:
+      - 摆资历
+    appearance:
+      hair: M06-中分微卷
+      outfit: 商务休闲
+      signature_color:
+        id: 15
+        name: 芥末
+        hex: '#A8B82E'
+      accessory: 工牌
+      build: 标准
+      palette_hint:
+      - 芥末
+      - 米白
+      - 浅咖
+      portrait_file: null
+    backstory:
+    - age: 10
+      event: 帮家里小超市记账
+      impact: 对数字有感情
+    - age: 22
+      event: 专科毕业进星澜行政岗
+      impact: 起点低就加倍补
+    - age: 23
+      event: 搬入青梧公寓
+      impact: 第一次一个人生活
+    goals_initial:
+    - goal_id: G-LIFE-04
+      text: 今年拿下会计证
+    relations_initial:
+    - target: A12
+      type: 老乡
+      affinity: 36
+      tension: 5
+      note: 云岭同乡
+    - target: A35
+      type: 兄弟
+      affinity: 36
+      tension: 5
+      note: 同楼技术搭子
+    - target: A24
+      type: 兄弟
+      affinity: 38
+      tension: 5
+      note: 同楼层新人
+    - target: A18
+      type: 暗恋
+      affinity: 20
+      tension: 8
+      note: 她文档写得最好
+    needs_offset:
+      achievement: 5
+    weekly_routine_bias:
+      sleep: 0:00~7:00
+      gym:
+      - 周三
+  - agent_id: A24
+    name: 耿炎
+    gender: M
+    age: 22
+    room: '602'
+    department: 职能部
+    position: P1
+    hire_months: 0
+    big_five:
+      openness: 60
+      conscientiousness: 35
+      extraversion: 68
+      agreeableness: 55
+      neuroticism: 52
+    signature_quirk: 语速快，借钱前先请人喝奶茶
+    contrast: 看着吊儿郎当前台行政，其实每天通勤跨半个城照顾奶奶
+    secret: 欠冯远 2000 块交房租，一直没敢说什么时候还
+    trigger_point: 被说"你就是个前台"
+    speech_style:
+      tone: 贫、热络
+      sentence_len: 短
+      catchphrase: 妥了
+      taboo:
+      - 哭穷卖惨
+    appearance:
+      hair: M04-碎盖刘海
+      outfit: 运动
+      signature_color:
+        id: 16
+        name: 岩灰
+        hex: '#6A6C6F'
+      accessory: 工牌
+      build: 瘦
+      palette_hint:
+      - 岩灰
+      - 月白
+      - 黛蓝
+      portrait_file: null
+    backstory:
+    - age: 16
+      event: 父母南下打工，跟奶奶长大
+      impact: 嘴上贫心里细
+    - age: 21
+      event: 大专毕业进星澜前台
+      impact: 第一份正式工作
+    - age: 22
+      event: 奶奶摔伤花光积蓄
+      impact: 开始学着开口借钱
+    goals_initial:
+    - goal_id: G-MON-04
+      text: 先把冯远的 2000 还上
+    relations_initial:
+    - target: A12
+      type: 欠款
+      affinity: 8
+      tension: 20
+      note: 欠 2000，缓两个月
+    - target: A30
+      type: 师徒
+      affinity: 28
+      tension: 6
+      note: 甄经理肯教
+    needs_offset:
+      wealth: -15
+    weekly_routine_bias:
+      sleep: 0:30~7:00
+      gym:
+      - 周五
+  - agent_id: A25
+    name: 严正
+    gender: M
+    age: 36
+    room: null
+    department: 产品部
+    position: M
+    hire_months: 60
+    big_five:
+      openness: 44
+      conscientiousness: 82
+      extraversion: 60
+      agreeableness: 32
+      neuroticism: 30
+    signature_quirk: 评审表永远用红笔，从不写"还行"
+    contrast: 全公司最怕的产品经理，年会却给每个人手写贺卡
+    secret: 年轻时也被领导当众撕过方案，从此不信"鼓励式管理"
+    trigger_point: 被说"你就是会压人"
+    speech_style:
+      tone: 硬、短促
+      sentence_len: 短
+      catchphrase: 结论呢
+      taboo:
+      - 和稀泥
+    appearance:
+      hair: M01-短寸
+      outfit: 西装
+      signature_color:
+        id: 2
+        name: 钴蓝
+        hex: '#5583C9'
+      accessory: 工牌
+      build: 标准
+      palette_hint:
+      - 钴蓝
+      - 深灰
+      - 月白
+      portrait_file: null
+    backstory:
+    - age: 24
+      event: 方案被领导当众撕碎
+      impact: 学会用结果说话
+    - age: 30
+      event: 带的产品年入过亿
+      impact: 升产品部经理
+    - age: 35
+      event: 空降星澜
+      impact: 三个月立住威
+    goals_initial:
+    - goal_id: G-WORK-09
+      text: 把产品部带成全公司标杆
+    relations_initial:
+    - target: A08
+      type: 师徒
+      affinity: 35
+      tension: 5
+      note: 新人要有人带
+    - target: A30
+      type: 老乡
+      affinity: 35
+      tension: 5
+      note: 经理同乡会
+    - target: A02
+      type: 老乡
+      affinity: 36
+      tension: 5
+      note: 经理同乡会
+    needs_offset: {}
+    weekly_routine_bias:
+      sleep: 0:00~6:00
+      gym:
+      - 周二
+      - 周五
+  - agent_id: A26
+    name: 罗铮
+    gender: M
+    age: 37
+    room: null
+    department: 技术部
+    position: M
+    hire_months: 58
+    big_five:
+      openness: 56
+      conscientiousness: 76
+      extraversion: 38
+      agreeableness: 50
+      neuroticism: 26
+    signature_quirk: 听汇报时闭眼，睁眼就是要追问
+    contrast: 技术部定海神针，朋友圈里全是钓鱼照片
+    secret: 带过的徒弟跳槽后年薪翻倍，他一直觉得是自己没留住人
+    trigger_point: 被说"技术管理就是吃老本"
+    speech_style:
+      tone: 缓、稳
+      sentence_len: 中
+      catchphrase: 先跑起来
+      taboo:
+      - 甩锅
+    appearance:
+      hair: M03-背头
+      outfit: 商务休闲
+      signature_color:
+        id: 11
+        name: 紫藤
+        hex: '#A432A1'
+      accessory: 眼镜
+      build: 标准
+      palette_hint:
+      - 紫藤
+      - 深灰
+      - 月白
+      portrait_file: null
+    backstory:
+    - age: 22
+      event: 小城机房管理员起步
+      impact: 摸过最旧的设备
+    - age: 29
+      event: 主导一次成功重构
+      impact: 从技术走向管理
+    - age: 34
+      event: 进星澜带技术部
+      impact: 信"传帮带"三个字
+    goals_initial:
+    - goal_id: G-WORK-09
+      text: 技术部今年零重大事故
+    relations_initial:
+    - target: A35
+      type: 师徒
+      affinity: 34
+      tension: 5
+      note: 谷子是可造之材
+    - target: A12
+      type: 兄弟
+      affinity: 34
+      tension: 5
+      note: 冯远像我年轻时
+    - target: A31
+      type: 兄弟
+      affinity: 32
+      tension: 5
+      note: 技术部前后辈
+    needs_offset: {}
+    weekly_routine_bias:
+      sleep: 0:30~6:30
+      gym:
+      - 周三
+      - 周六
+  - agent_id: A27
+    name: 康凯
+    gender: M
+    age: 35
+    room: null
+    department: 市场部
+    position: M
+    hire_months: 52
+    big_five:
+      openness: 50
+      conscientiousness: 70
+      extraversion: 74
+      agreeableness: 44
+      neuroticism: 33
+    signature_quirk: 敬酒词永远三套，按对象切换
+    contrast: 市场部的酒桌战神，回家滴酒不沾只喝胖大海
+    secret: 上一家公司因站错队被架空，学会了只看数字不看人
+    trigger_point: 被说"市场就是花钱的"
+    speech_style:
+      tone: 热络、有压迫感
+      sentence_len: 中
+      catchphrase: 结果说话
+      taboo:
+      - 谈感情
+    appearance:
+      hair: M06-中分微卷
+      outfit: 西装
+      signature_color:
+        id: 4
+        name: 琥珀
+        hex: '#BF700F'
+      accessory: 工牌
+      build: 壮
+      palette_hint:
+      - 琥珀
+      - 炭黑
+      - 月白
+      portrait_file: null
+    backstory:
+    - age: 23
+      event: 第一份工作陪酒到胃出血
+      impact: 身体换经验
+    - age: 30
+      event: 站错队被架空半年
+      impact: 从此只信数字
+    - age: 33
+      event: 进星澜管市场部
+      impact: 把渠道重做了一遍
+    goals_initial:
+    - goal_id: G-WORK-09
+      text: 今年渠道 ROI 翻倍
+    relations_initial:
+    - target: A37
+      type: 师徒
+      affinity: 33
+      tension: 5
+      note: 包爽是块料
+    - target: A28
+      type: 老乡
+      affinity: 34
+      tension: 5
+      note: 经理同乡会
+    needs_offset: {}
+    weekly_routine_bias:
+      sleep: 0:30~7:00
+      gym:
+      - 周一
+      - 周四
+  - agent_id: A28
+    name: 樊星
+    gender: F
+    age: 34
+    room: null
+    department: 运营部
+    position: M
+    hire_months: 48
+    big_five:
+      openness: 58
+      conscientiousness: 68
+      extraversion: 62
+      agreeableness: 66
+      neuroticism: 30
+    signature_quirk: 开会带一壶养生茶，谁咳一声就倒一杯
+    contrast: 运营部最像大姐的经理，KPI 表却最不留情
+    secret: 抽屉里锁着一封没寄出的辞职信，写了三年
+    trigger_point: 被说"女经理就是情绪化"
+    speech_style:
+      tone: 暖、稳，带点唠叨
+      sentence_len: 中
+      catchphrase: 慢慢来，比较快
+      taboo:
+      - 性别标签
+    appearance:
+      hair: F01-黑长直
+      outfit: 西装
+      signature_color:
+        id: 8
+        name: 天青
+        hex: '#1A5E80'
+      accessory: 耳环
+      build: 标准
+      palette_hint:
+      - 天青
+      - 月白
+      - 浅灰
+      portrait_file: null
+    backstory:
+    - age: 22
+      event: 客服岗做起
+      impact: 最懂用户骂的是什么
+    - age: 28
+      event: 一次活动做成行业案例
+      impact: 升运营经理
+    - age: 32
+      event: 进星澜
+      impact: 想把团队带得不那么累
+    goals_initial:
+    - goal_id: G-WORK-09
+      text: 运营部今年无人离职
+    relations_initial:
+    - target: A14
+      type: 老乡
+      affinity: 36
+      tension: 5
+      note: 阮棠是同乡
+    - target: A38
+      type: 老乡
+      affinity: 35
+      tension: 5
+      note: 向明是同乡
+    - target: A27
+      type: 老乡
+      affinity: 34
+      tension: 5
+      note: 经理同乡会
+    needs_offset: {}
+    weekly_routine_bias:
+      sleep: 0:00~6:30
+      gym:
+      - 周二
+      - 周日
+  - agent_id: A29
+    name: 穆青
+    gender: F
+    age: 33
+    room: null
+    department: 设计部
+    position: M
+    hire_months: 44
+    big_five:
+      openness: 72
+      conscientiousness: 64
+      extraversion: 40
+      agreeableness: 72
+      neuroticism: 34
+    signature_quirk: 评审时先沉默十秒，开口必中要害
+    contrast: 设计部最温柔的经理，改起稿来最不留情
+    secret: 和柯燃是同期，当年的抄袭风波她知情却没作证
+    trigger_point: 被说"设计就是美工"
+    speech_style:
+      tone: 轻、准
+      sentence_len: 中
+      catchphrase: 再看一版
+      taboo:
+      - 差不多得了
+    appearance:
+      hair: F07-羊毛卷
+      outfit: 西装
+      signature_color:
+        id: 9
+        name: 杏黄
+        hex: '#FADB40'
+      accessory: 围巾
+      build: 瘦
+      palette_hint:
+      - 杏黄
+      - 月白
+      - 雾灰
+      portrait_file: null
+    backstory:
+    - age: 12
+      event: 少年宫学画被说"没天赋"
+      impact: 偏要画出名堂
+    - age: 26
+      event: 同期风波中保持沉默
+      impact: 欠柯燃一句公道
+    - age: 31
+      event: 进星澜管设计部
+      impact: 立规矩先立自己
+    goals_initial:
+    - goal_id: G-WORK-09
+      text: 设计部交付零返工
+    relations_initial:
+    - target: A21
+      type: 师徒
+      affinity: 33
+      tension: 5
+      note: 倪虹要护着点
+    - target: A34
+      type: 兄弟
+      affinity: 36
+      tension: 5
+      note: 设计部老搭档
+    needs_offset: {}
+    weekly_routine_bias:
+      sleep: 0:30~7:00
+      gym:
+      - 周三
+      - 周六
+  - agent_id: A30
+    name: 甄珍
+    gender: F
+    age: 32
+    room: null
+    department: 职能部
+    position: M
+    hire_months: 40
+    big_five:
+      openness: 42
+      conscientiousness: 80
+      extraversion: 46
+      agreeableness: 58
+      neuroticism: 28
+    signature_quirk: 审批单退回去时永远附三行修改建议
+    contrast: 全公司最不好说话的财务，私下给困难员工垫过报销
+    secret: 垫钱的事从不上账，也从不让人知道
+    trigger_point: 被说"财务就是卡钱的"
+    speech_style:
+      tone: 利落、讲规则
+      sentence_len: 短
+      catchphrase: 按制度
+      taboo:
+      - 特批
+    appearance:
+      hair: F08-精灵短发
+      outfit: 商务休闲
+      signature_color:
+        id: 7
+        name: 堇紫
+        hex: '#4A2999'
+      accessory: 工牌
+      build: 瘦
+      palette_hint:
+      - 堇紫
+      - 深灰
+      - 月白
+      portrait_file: null
+    backstory:
+    - age: 13
+      event: 家里小店被赊账拖垮
+      impact: 对账目极其较真
+    - age: 25
+      event: 考下注会
+      impact: 从小所跳进星澜
+    - age: 30
+      event: 升职能部经理
+      impact: 制度与人情都要守住
+    goals_initial:
+    - goal_id: G-WORK-09
+      text: 职能部今年零差错
+    relations_initial:
+    - target: A24
+      type: 师徒
+      affinity: 32
+      tension: 5
+      note: 耿炎要盯着点
+    - target: A25
+      type: 老乡
+      affinity: 35
+      tension: 5
+      note: 经理同乡会
+    needs_offset: {}
+    weekly_routine_bias:
+      sleep: 0:00~6:30
+      gym:
+      - 周一
+      - 周五
+  - agent_id: A31
+    name: 牛奔
+    gender: M
+    age: 30
+    room: null
+    department: 技术部
+    position: P2
+    hire_months: 34
+    big_five:
+      openness: 38
+      conscientiousness: 66
+      extraversion: 70
+      agreeableness: 36
+      neuroticism: 44
+    signature_quirk: 敲代码前必把机械键盘擦一遍
+    contrast: 技术部大嗓门，给女朋友发的语音却最温柔
+    secret: 当年值班事故甩锅给赵启，一直没道歉
+    trigger_point: 被提"上次值班事故"
+    speech_style:
+      tone: 冲、直
+      sentence_len: 短
+      catchphrase: 上了
+      taboo:
+      - 认怂
+    appearance:
+      hair: M07-发髻
+      outfit: 运动
+      signature_color:
+        id: 1
+        name: 朱红
+        hex: '#BE2A42'
+      accessory: 耳机
+      build: 壮
+      palette_hint:
+      - 朱红
+      - 炭黑
+      - 月白
+      portrait_file: null
+    backstory:
+    - age: 15
+      event: 体校受伤退役
+      impact: 把狠劲全给了代码
+    - age: 24
+      event: 值班事故甩锅赵启
+      impact: 心病一直没解
+    - age: 28
+      event: 升 P2
+      impact: 更输不起了
+    goals_initial:
+    - goal_id: G-WORK-06
+      text: 晋升名额不能输给赵启
+    relations_initial:
+    - target: A02
+      type: 职场对手
+      affinity: -8
+      tension: 30
+      note: 叙哥是座山
+    - target: A06
+      type: 职场对手
+      affinity: -10
+      tension: 35
+      note: 韩彻也不是善茬
+    needs_offset: {}
+    weekly_routine_bias:
+      sleep: 0:30~7:00
+      gym:
+      - 周一
+      - 周三
+      - 周六
+  - agent_id: A32
+    name: 唐果
+    gender: F
+    age: 27
+    room: null
+    department: 技术部
+    position: P2
+    hire_months: 28
+    big_five:
+      openness: 62
+      conscientiousness: 70
+      extraversion: 46
+      agreeableness: 60
+      neuroticism: 32
+    signature_quirk: 代码评审意见永远分"必须/建议/闲聊"三档
+    contrast: 技术部最讲规矩的人，周末是livehouse常客
+    secret: 在独立乐队当兼职贝斯手，工牌和演出证放在同一个卡包
+    trigger_point: 被说"女工程师就是细心"
+    speech_style:
+      tone: 清爽、有条理
+      sentence_len: 中
+      catchphrase: 分个档
+      taboo:
+      - 性别标签
+    appearance:
+      hair: F04-高马尾
+      outfit: 连衣裙
+      signature_color:
+        id: 5
+        name: 青碧
+        hex: '#209894'
+      accessory: 发带
+      build: 标准
+      palette_hint:
+      - 青碧
+      - 月白
+      - 黛蓝
+      portrait_file: null
+    backstory:
+    - age: 14
+      event: 组了人生第一支乐队
+      impact: 舞台和代码都要
+    - age: 22
+      event: 校招进星澜
+      impact: 评审从不让步
+    - age: 26
+      event: 升 P2
+      impact: 证明自己能两头都站稳
+    goals_initial:
+    - goal_id: G-WORK-06
+      text: 晋升答辩不输任何人
+    relations_initial:
+    - target: A12
+      type: 兄弟
+      affinity: 36
+      tension: 5
+      note: 技术部前后辈
+    - target: A23
+      type: 老乡
+      affinity: 30
+      tension: 5
+      note: 同乡
+    needs_offset: {}
+    weekly_routine_bias:
+      sleep: 0:30~7:30
+      gym:
+      - 周二
+      - 周四
+  - agent_id: A33
+    name: 戚芳
+    gender: F
+    age: 29
+    room: null
+    department: 市场部
+    position: P2
+    hire_months: 30
+    big_five:
+      openness: 54
+      conscientiousness: 74
+      extraversion: 56
+      agreeableness: 38
+      neuroticism: 40
+    signature_quirk: 谈判前把对方资料读三遍，标注比原文还多
+    contrast: 市场部最不好惹的女人，回老家却是出名的好脾气
+    secret: 家里一直以为她在临江做文员
+    trigger_point: 被说"女人谈不下大单"
+    speech_style:
+      tone: 稳、狠
+      sentence_len: 中
+      catchphrase: 条款呢
+      taboo:
+      - 性别标签
+    appearance:
+      hair: F05-丸子头
+      outfit: 西装
+      signature_color:
+        id: 14
+        name: 雾蓝
+        hex: '#C3CDDA'
+      accessory: 耳环
+      build: 标准
+      palette_hint:
+      - 雾蓝
+      - 月白
+      - 深灰
+      portrait_file: null
+    backstory:
+    - age: 18
+      event: 全县状元考到省会
+      impact: 全家的指望
+    - age: 24
+      event: 第一单被客户轻视
+      impact: 练出铁齿铜牙
+    - age: 27
+      event: 升 P2
+      impact: 目标只有经理位
+    goals_initial:
+    - goal_id: G-WORK-06
+      text: 晋升名额压过蒋泊
+    relations_initial:
+    - target: A13
+      type: 职场对手
+      affinity: -10
+      tension: 32
+      note: 名额面前人人平等
+    - target: A17
+      type: 老乡
+      affinity: 38
+      tension: 5
+      note: 临江同乡
+    - target: A40
+      type: 老乡
+      affinity: 38
+      tension: 5
+      note: 临江同乡
+    needs_offset:
+      achievement: 10
+    weekly_routine_bias:
+      sleep: 0:00~6:30
+      gym:
+      - 周三
+      - 周日
+  - agent_id: A34
+    name: 梅森
+    gender: M
+    age: 31
+    room: null
+    department: 设计部
+    position: P2
+    hire_months: 33
+    big_five:
+      openness: 74
+      conscientiousness: 60
+      extraversion: 30
+      agreeableness: 52
+      neuroticism: 50
+    signature_quirk: 改稿时自言自语，语气像在跟稿吵架
+    contrast: 闷葫芦设计师，作品集被国际奖项收录过
+    secret: 获奖的事没告诉公司，怕被认为要跳槽
+    trigger_point: 被说"你就是柯燃的副手"
+    speech_style:
+      tone: 闷、慢
+      sentence_len: 短
+      catchphrase: 我再改改
+      taboo:
+      - 吹牛
+    appearance:
+      hair: M05-纹理烫
+      outfit: 工装
+      signature_color:
+        id: 12
+        name: 蔷薇
+        hex: '#EB6999'
+      accessory: 眼镜
+      build: 瘦
+      palette_hint:
+      - 蔷薇
+      - 炭黑
+      - 雾灰
+      portrait_file: null
+    backstory:
+    - age: 11
+      event: 黑板报被全校围观
+      impact: 认定画笔是出路
+    - age: 25
+      event: 作品集意外获奖
+      impact: 自信只敢藏在心里
+    - age: 28
+      event: 进星澜设计部
+      impact: 一直想摆脱"副手"标签
+    goals_initial:
+    - goal_id: G-WORK-06
+      text: 晋升名额争过柯燃
+    relations_initial:
+    - target: A19
+      type: 职场对手
+      affinity: -12
+      tension: 34
+      note: 名额只有一个
+    - target: A29
+      type: 兄弟
+      affinity: 36
+      tension: 5
+      note: 设计部老搭档
+    - target: A13
+      type: 兄弟
+      affinity: 34
+      tension: 5
+      note: 球友
+    needs_offset: {}
+    weekly_routine_bias:
+      sleep: 1:00~8:00
+      gym:
+      - 周五
+  - agent_id: A35
+    name: 谷子
+    gender: M
+    age: 24
+    room: null
+    department: 技术部
+    position: P1
+    hire_months: 10
+    big_five:
+      openness: 58
+      conscientiousness: 44
+      extraversion: 36
+      agreeableness: 68
+      neuroticism: 56
+    signature_quirk: 被骂时只会说"我的我的"
+    contrast: 技术部背锅专业户，其实日志分析能力全组第一
+    secret: 那次事故根本不是他的锅，他认了
+    trigger_point: 被说"你怎么又错了"
+    speech_style:
+      tone: 讷、软
+      sentence_len: 短
+      catchphrase: 我的我的
+      taboo:
+      - 辩解
+    appearance:
+      hair: M05-纹理烫
+      outfit: 卫衣
+      signature_color:
+        id: 13
+        name: 咖啡
+        hex: '#7D4F30'
+      accessory: 耳机
+      build: 标准
+      palette_hint:
+      - 咖啡
+      - 雾灰
+      - 米白
+      portrait_file: null
+    backstory:
+    - age: 12
+      event: 留守跟爷爷长大
+      impact: 习惯先认错
+    - age: 22
+      event: 进星澜技术部
+      impact: 第一次有人正式带他
+    - age: 23
+      event: 事故复盘被师父骂哭
+      impact: 又怕又敬
+    goals_initial:
+    - goal_id: G-WORK-07
+      text: 今年独立值一次班
+    relations_initial:
+    - target: A26
+      type: 师徒
+      affinity: 30
+      tension: 6
+      note: 罗经理严但教
+    - target: A26
+      type: 结怨
+      affinity: -10
+      tension: 25
+      note: 那次骂得太狠
+    - target: A23
+      type: 兄弟
+      affinity: 36
+      tension: 5
+      note: 同楼技术搭子
+    - target: A21
+      type: 老乡
+      affinity: 33
+      tension: 5
+      note: 同乡
+    needs_offset:
+      achievement: -5
+    weekly_routine_bias:
+      sleep: 0:30~7:30
+      gym:
+      - 周日
+  - agent_id: A36
+    name: 杨柳
+    gender: F
+    age: 25
+    room: null
+    department: 产品部
+    position: P1
+    hire_months: 12
+    big_five:
+      openness: 66
+      conscientiousness: 54
+      extraversion: 64
+      agreeableness: 72
+      neuroticism: 38
+    signature_quirk: 需求文档里给每个角色都画了小头像
+    contrast: 产品部小透明，用户访谈录音比谁都全
+    secret: 每周给独居的姥姥打三次视频，从不错过
+    trigger_point: 被说"产品就是传话筒"
+    speech_style:
+      tone: 柔、细
+      sentence_len: 中
+      catchphrase: 用户说
+      taboo:
+      - 拍脑袋
+    appearance:
+      hair: F03-锁骨发
+      outfit: 运动
+      signature_color:
+        id: 12
+        name: 蔷薇
+        hex: '#EB6999'
+      accessory: 发带
+      build: 瘦
+      palette_hint:
+      - 蔷薇
+      - 奶白
+      - 浅灰
+      portrait_file: null
+    backstory:
+    - age: 10
+      event: 跟姥姥在乡下长大
+      impact: 最会听人说话
+    - age: 22
+      event: 进星澜产品部
+      impact: 认定用户比需求文档大
+    - age: 24
+      event: 访谈发现大需求
+      impact: 被严正点名表扬
+    goals_initial:
+    - goal_id: G-WORK-07
+      text: 独立负责一条产品线
+    relations_initial:
+    - target: A08
+      type: 老乡
+      affinity: 34
+      tension: 5
+      note: 外地新人互助
+    - target: A39
+      type: 老乡
+      affinity: 34
+      tension: 5
+      note: 外地新人互助
+    needs_offset: {}
+    weekly_routine_bias:
+      sleep: 0:30~7:30
+      gym:
+      - 周三
+      - 周六
+  - agent_id: A37
+    name: 包爽
+    gender: M
+    age: 24
+    room: null
+    department: 市场部
+    position: P1
+    hire_months: 9
+    big_five:
+      openness: 60
+      conscientiousness: 42
+      extraversion: 76
+      agreeableness: 58
+      neuroticism: 44
+    signature_quirk: 见谁都叫哥叫姐，转头就把人备注改成绰号
+    contrast: 市场部开心果，月底冲量时比谁都拼
+    secret: 喜欢蒋泊，只敢以小弟名义跟着
+    trigger_point: 被说"你就是个跟班"
+    speech_style:
+      tone: 贫、热络
+      sentence_len: 短
+      catchphrase: 安排
+      taboo:
+      - 端架子
+    appearance:
+      hair: M02-侧分短发
+      outfit: 卫衣
+      signature_color:
+        id: 6
+        name: 暗红
+        hex: '#61191E'
+      accessory: 工牌
+      build: 标准
+      palette_hint:
+      - 暗红
+      - 炭黑
+      - 月白
+      portrait_file: null
+    backstory:
+    - age: 13
+      event: 家里饭馆帮工
+      impact: 见人说人话的本事
+    - age: 21
+      event: 大专毕业跑业务
+      impact: 磨出一双铁脚板
+    - age: 23
+      event: 进星澜市场部
+      impact: 认了蒋泊当哥
+    goals_initial:
+    - goal_id: G-WORK-05
+      text: 独立签下一个客户
+    relations_initial:
+    - target: A13
+      type: 暗恋
+      affinity: 20
+      tension: 8
+      note: 蒋泊哥
+    - target: A27
+      type: 师徒
+      affinity: 30
+      tension: 6
+      note: 康经理肯带
+    needs_offset: {}
+    weekly_routine_bias:
+      sleep: 0:30~7:30
+      gym:
+      - 周六
+  - agent_id: A38
+    name: 向明
+    gender: M
+    age: 28
+    room: null
+    department: 运营部
+    position: P1
+    hire_months: 20
+    big_five:
+      openness: 46
+      conscientiousness: 38
+      extraversion: 60
+      agreeableness: 50
+      neuroticism: 60
+    signature_quirk: 手机壳里夹着一张彩票，每周必换
+    contrast: 嘴上天天想发财，干活却最任劳任怨
+    secret: 欠沈铎 3500，每次见面都绕着走
+    trigger_point: 被催债
+    speech_style:
+      tone: 油、自嘲
+      sentence_len: 短
+      catchphrase: 发财就还
+      taboo:
+      - 哭穷超过三句
+    appearance:
+      hair: M08-蘑菇头
+      outfit: 西装
+      signature_color:
+        id: 10
+        name: 鼠尾草绿
+        hex: '#A4C394'
+      accessory: 眼镜
+      build: 标准
+      palette_hint:
+      - 鼠尾草绿
+      - 月白
+      - 浅咖
+      portrait_file: null
+    backstory:
+    - age: 12
+      event: 父亲生意失败
+      impact: 对钱又渴望又害怕
+    - age: 23
+      event: 进星澜运营部
+      impact: 杂活全包不叫苦
+    - age: 27
+      event: 母亲手术借了沈铎 3500
+      impact: 人情比债重
+    goals_initial:
+    - goal_id: G-MON-04
+      text: 年内把沈铎的 3500 还了
+    relations_initial:
+    - target: A16
+      type: 欠款
+      affinity: 5
+      tension: 25
+      note: 欠 3500，抬不起头
+    - target: A28
+      type: 老乡
+      affinity: 35
+      tension: 5
+      note: 樊经理是同乡
+    - target: A13
+      type: 兄弟
+      affinity: 36
+      tension: 5
+      note: 球友
+    needs_offset:
+      wealth: -10
+    weekly_routine_bias:
+      sleep: 0:30~7:30
+      gym:
+      - 周二
+  - agent_id: A39
+    name: 蓝盈
+    gender: F
+    age: 24
+    room: null
+    department: 运营部
+    position: P1
+    hire_months: 7
+    big_five:
+      openness: 68
+      conscientiousness: 50
+      extraversion: 72
+      agreeableness: 64
+      neuroticism: 42
+    signature_quirk: 工位上贴满了演唱会票根
+    contrast: 运营部追星少女，做的活动页转化率全组最高
+    secret: 用追星练就的控评能力做舆情，谁也没发现
+    trigger_point: 被说"追星能当饭吃吗"
+    speech_style:
+      tone: 亮、快
+      sentence_len: 短
+      catchphrase: 冲了
+      taboo:
+      - 泼冷水
+    appearance:
+      hair: F06-空气刘海中长发
+      outfit: 连衣裙
+      signature_color:
+        id: 2
+        name: 钴蓝
+        hex: '#5583C9'
+      accessory: 耳环
+      build: 瘦
+      palette_hint:
+      - 钴蓝
+      - 奶白
+      - 月白
+      portrait_file: null
+    backstory:
+    - age: 14
+      event: 第一次接机被挤丢鞋
+      impact: 追星练出组织力
+    - age: 21
+      event: 大学期间运营粉丝站
+      impact: 数据感是练出来的
+    - age: 23
+      event: 进星澜运营部
+      impact: 把爱好变成手艺
+    goals_initial:
+    - goal_id: G-WORK-03
+      text: 独立做一次线上活动
+    relations_initial:
+    - target: A36
+      type: 老乡
+      affinity: 34
+      tension: 5
+      note: 外地新人互助
+    needs_offset:
+      social: 5
+    weekly_routine_bias:
+      sleep: 1:00~8:00
+      gym:
+      - 周四
+  - agent_id: A40
+    name: 薛杉
+    gender: F
+    age: 26
+    room: null
+    department: 职能部
+    position: P1
+    hire_months: 15
+    big_five:
+      openness: 44
+      conscientiousness: 72
+      extraversion: 40
+      agreeableness: 62
+      neuroticism: 36
+    signature_quirk: 文件夹命名精确到分钟
+    contrast: 职能部最靠谱的小姐姐，周末是密室逃脱店老板
+    secret: 密室店是拿全部积蓄开的，还没回本
+    trigger_point: 被说"开店就是不务正业"
+    speech_style:
+      tone: 稳、有条理
+      sentence_len: 中
+      catchphrase: 收到
+      taboo:
+      - 临时变卦
+    appearance:
+      hair: F02-波波头
+      outfit: 卫衣
+      signature_color:
+        id: 4
+        name: 琥珀
+        hex: '#BF700F'
+      accessory: 工牌
+      build: 标准
+      palette_hint:
+      - 琥珀
+      - 米白
+      - 浅咖
+      portrait_file: null
+    backstory:
+    - age: 16
+      event: 父母离异各自成家
+      impact: 学会自己拿主意
+    - age: 22
+      event: 进星澜职能部
+      impact: 把档案室重做了一遍
+    - age: 25
+      event: 开密室逃脱店
+      impact: 背上了回本压力
+    goals_initial:
+    - goal_id: G-MON-03
+      text: 密室店年底打平
+    relations_initial:
+    - target: A17
+      type: 老乡
+      affinity: 38
+      tension: 5
+      note: 临江同乡
+    - target: A33
+      type: 老乡
+      affinity: 38
+      tension: 5
+      note: 临江同乡
+    needs_offset:
+      wealth: -10
+    weekly_routine_bias:
+      sleep: 0:30~7:00
+      gym:
+      - 周三
