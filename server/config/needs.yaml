@@ -1,0 +1,49 @@
+# needs.yaml —— 六需求衰减率/满足量/驱动区阈（01 §3.1 数值镜像；数字唯一持有方 = 01 §3.1，勿改数字，修订先回改 01）
+# 速率锚定模拟小时/模拟日，与现实压缩比无关（01 §3 章首；00 §4 红线 11）
+# 载体登记：00 §2 配置清单未列本文件（波次 2a 新增，02 文档偏差表 D13 登记）
+
+value_range: [0, 100]          # 需求值域（01 §3.1）
+initial_range: [60, 80]        # 初始区间（01 §3.1；seed 已落地，仅备查）
+
+thresholds:
+  drive_zone_below: 25         # 低于 25 进入"驱动区"（决策 prompt 显著加权）
+  forced_below: 10             # 低于 10 强制行为（01 §3.1：如饥饿 <10 必须优先 eat）
+
+decay_per_sim_hour:            # 衰减率表（01 §3.1 逐行照抄；负值 = 衰减）
+  hunger:                      # 饥饿
+    awake: -4.0
+    sleeping: -1.0
+  energy:                      # 精力（醒时衰减；工作时段额外；睡眠经 rest 动作恢复 +9.0/h，见 satisfy）
+    awake: -3.0
+    working_extra: -1.0
+    sleeping: 0.0
+  mood:                        # 情绪（无事件时）
+    base: -1.0
+  social:                      # 社交
+    base: -1.2
+  achievement:                 # 成就（仅工作日白天生效）
+    workday_daytime: -0.8
+  wealth:                      # 财富不衰减，由结算事件驱动（01 §1.5 映射公式镜像在 world.yaml wealth_need_mapping）
+    base: 0.0
+
+satisfy:                       # 主要满足动作与满足量（01 §3.1 满足量列；±20% Big Five 修正为 P1，M1 中性 1.0）
+  hunger:      { cook: 35, bento: 25, canteen: 30, restaurant: 40 }       # 自炊/便当/快餐/正餐
+  energy:      { sleep_per_hour: 9.0, coffee: 8, nap_30min: 10 }
+  mood:        { chat_enjoyable_min: 10, chat_enjoyable_max: 18, entertainment: 12 }   # 负事件见 01 §3.2
+  social:      { chat: 15, deep_chat: 25, group: 20 }
+  achievement: { task_done: 12, praised: 15, promoted: 30, criticized: -12 }
+  wealth:      { salary: 25, bill_min: -8, bill_max: -12, stock_divisor: 500, stock_cap: 10 }
+
+schedule:                      # 睡眠/工作时段判定（01 §1.4 作息日历 + 01 §5.1 睡眠行 0:30~6:30）
+  sleep: ["00:30", "06:30"]                    # 睡眠窗（跨零点）
+  work: { start: "09:00", end: "18:00", weekdays: [0, 1, 2, 3, 4] }   # 周一至周五（工作日工作时段）
+  achievement_daytime: ["09:00", "18:00"]      # 成就衰减"仅工作日白天"（同工作时段口径）
+
+state_rule:                    # 04 §6.2 通用校验状态行 + 01 §3.1 强制行为（方向：低值 = 匮乏，评审二轮 P2-3 修正后口径）
+  energy_forced_rest_below: 10         # 精力 <10 强制 rest
+  hunger_forced_eat_below: 10          # 饥饿 <10 强制 eat
+  hunger_downweight_below: 15          # 饥饿 <15 时非进食动作降权（04 §6.2 状态行）
+  non_eat_downweight_factor: 0.5       # 降权倍率（设计未给值；工程默认 ×0.5，02 文档偏差表 D14 登记）
+
+big_five:                      # 修正系数表为 P1（W4 前校准）；M1 仅实现接口与中性档 1.0（02 文档 D9，系数表读取路径预留）
+  modifier: neutral_1_0
