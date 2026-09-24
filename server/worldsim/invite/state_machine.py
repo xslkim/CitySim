@@ -98,6 +98,7 @@ class InviteMachine:
         cooldown: CooldownEngine,
         relations: RelationEngine,
         tick_of: Any = None,
+        grader: Any = None,
     ) -> None:
         self._pool = pool
         self._gw = gateway
@@ -106,6 +107,7 @@ class InviteMachine:
         self._cooldown = cooldown
         self._relations = relations
         self._tick_of = tick_of or (lambda _sim: 0)
+        self._grader = grader  # T-ADJ-07：grade 初值唯一实现挂接（None = 不打分）
 
     # ---- 可达性六种情形（01 §5.1 逐行；睡眠/对话中优先于位置判定） ----------------------
 
@@ -536,12 +538,18 @@ class InviteMachine:
         self, type_: str, tick: int, sim_now: dt.datetime, source: str, trigger: str,
         actors: list[str], rng_seed: int, payload: dict[str, Any],
     ) -> int:
+        ui: dict[str, Any] | None = None
+        if self._grader is not None:
+            ui = {"grade": await self._grader.grade(
+                type_=type_, actors=actors, payload=payload, sim_now=sim_now, followups=True,
+            )}  # T-ADJ-07（04 §6.6；邀约链事件恒有后续——送达/约定/提醒，R4 命中）
         return await self._pool.fetchval(
             """
-            INSERT INTO events (tick, sim_time, type, source, trigger, actors, rng_seed, visibility, payload)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, 'public', $8::jsonb)
+            INSERT INTO events (tick, sim_time, type, source, trigger, actors, rng_seed, visibility, payload, ui)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, 'public', $8::jsonb, $9::jsonb)
             RETURNING seq
             """,
             tick, sim_now, type_, source, trigger, actors, rng_seed,
             json.dumps(payload, ensure_ascii=False),
+            json.dumps(ui, ensure_ascii=False) if ui else None,
         )

@@ -39,6 +39,7 @@ import yaml
 
 from . import logconf
 from .adjudicator.dialogue import DialogueEngine
+from .adjudicator.grade import Grader
 from .adjudicator.pipeline import Pipeline, adjudication_loop
 from .adjudicator.queue import AdjudicationQueue
 from .adjudicator.state_events import StateAggregator
@@ -168,9 +169,11 @@ async def _run(args: argparse.Namespace) -> int:
 
         # T-ADJ-03：19 动作校验器 + step5 结算总线（含 debts 写入/核销；通用规则表五条）
         residence = ResidenceEngine(pool, world_cfg)
+        grader = Grader(pool)  # T-ADJ-07：grade 初值唯一实现（全库只此一处写 ui.grade 初值）
         invite_machine = InviteMachine(
             pool, gateway, relations_cfg,
             agg=agg, cooldown=cooldown_engine, relations=relation_engine, tick_of=clock.tick_of,
+            grader=grader,
         )
         # T-ADJ-04：对话整段生成引擎（话题注入 T-REL-06 + 降速读取点 ThrottleState seam）
         topic_system = TopicSystem(
@@ -181,6 +184,7 @@ async def _run(args: argparse.Namespace) -> int:
             pool, gateway, topics=topic_system, relations=relation_engine, cooldown=cooldown_engine,
             needs_engine=needs_engine, agg=agg,
             default_daily_cap=int(models_cfg.get("thresholds", {}).get("dialogue", {}).get("daily_cap", 42)),
+            grader=grader,
         )
         action_validator = ActionValidator(
             pool, world=world_cfg, needs_engine=needs_engine, cooldown=cooldown_engine,
@@ -188,6 +192,7 @@ async def _run(args: argparse.Namespace) -> int:
             invite=invite_machine, residence=residence,
             wakeup=lambda t, aid: queue.put_wakeup(t, aid, reason="interaction"),
             dialogue_settle=dialogue_engine.settle_chat,
+            grader=grader,
         )
         pipeline = Pipeline(
             pool, gateway, world_cfg,

@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
+import subprocess
+from pathlib import Path
 
 import asyncpg
 import pytest
@@ -20,19 +23,41 @@ pytestmark = pytest.mark.asyncio
 
 T0 = dt.datetime(2026, 10, 12, 19, 0, 0, tzinfo=LOCAL_TZ)  # 周一 19:00 黄金档
 IDS = [f"A{20 + i:02d}" for i in range(19)]  # A20~A38 共 19 名合成 agent
+DB_NAME = "worldsim_promotion_test"
+
+PG_BIN = os.path.expanduser("~/pgsql/bin")
+SOCKET_DIR = "/tmp"
+DDL_DIR = Path(__file__).resolve().parents[2] / "ddl"
 
 _NEEDS = json.dumps({"energy": 70, "hunger": 70, "mood": 70, "social": 70, "wealth": 70, "achievement": 70})
 
 
+def _psql(sql: str, db: str = "postgres") -> None:
+    subprocess.run(
+        [os.path.join(PG_BIN, "psql"), "-h", SOCKET_DIR, "-d", db, "-v", "ON_ERROR_STOP=1", "-c", sql],
+        check=True, capture_output=True, text=True,
+    )
+
+
 @pytest_asyncio.fixture
-async def pool(test_db_dsn: str):
-    p = await asyncpg.create_pool(test_db_dsn, min_size=1, max_size=4)
+async def pool():
+    """私有 scratch 库（events append-only 不可清库；与共享库其他用例的同名 agent 事件隔离）。"""
+    _psql(f"DROP DATABASE IF EXISTS {DB_NAME} WITH (FORCE)")
+    _psql(f"CREATE DATABASE {DB_NAME}")
+    _psql("CREATE SCHEMA IF NOT EXISTS partman", db=DB_NAME)
+    _psql("CREATE EXTENSION IF NOT EXISTS vector", db=DB_NAME)
+    _psql("CREATE EXTENSION IF NOT EXISTS pg_partman SCHEMA partman", db=DB_NAME)
+    subprocess.run(
+        [os.path.join(PG_BIN, "psql"), "-h", SOCKET_DIR, "-d", DB_NAME, "-v", "ON_ERROR_STOP=1",
+         "-f", str(DDL_DIR / "schema_v1.sql")],
+        check=True, capture_output=True, text=True,
+    )
+    p = await asyncpg.create_pool(f"postgresql:///{DB_NAME}?host={SOCKET_DIR}", min_size=1, max_size=4)
     for aid in IDS:
         await p.execute(
             """
             INSERT INTO agents (id, name, gender, age, cognition_tier, persona, needs, balance_cents, position)
             VALUES ($1, $2, 'F', 25, 'background', '{}'::jsonb, $3::jsonb, 0, 'apt.lobby')
-            ON CONFLICT (id) DO UPDATE SET cognition_tier='background'
             """,
             aid, f"测试{aid}", _NEEDS,
         )
@@ -40,11 +65,7 @@ async def pool(test_db_dsn: str):
         yield p
     finally:
         await p.close()
-        conn = await asyncpg.connect(test_db_dsn)
-        try:
-            await conn.execute("DELETE FROM agents WHERE id = ANY($1)", IDS)
-        finally:
-            await conn.close()
+        _psql(f"DROP DATABASE IF EXISTS {DB_NAME} WITH (FORCE)")
 
 
 async def _insert_chat(pool, *, tick: int, sim_now: dt.datetime, a: str, b: str, visibility: str = "public") -> int:

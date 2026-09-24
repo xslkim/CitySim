@@ -32,6 +32,7 @@ from ..relations.cooldown import CooldownEngine
 from ..relations.needs import NeedsEngine
 from ..relations.relations import RelationEngine
 from ..relations.topics import TopicSystem, Topic
+from .grade import MOOD_HIT_MIN
 from .state_events import StateAggregator
 
 log = logging.getLogger(__name__)
@@ -140,6 +141,8 @@ class DialogueEngine:
         a_enjoy = float(self_eval.get("a_enjoy", 5))
         b_enjoy = float(self_eval.get("b_enjoy", 5))
         band = RelationEngine.chat_band(a_enjoy, b_enjoy)  # 愉快/平淡/敷衍（01 §7）
+        # 情绪满足量先算（grade R3 信号预申报与实际施加同一数据源，D30）
+        mood_gain = random.Random(f"dlg-mood:{rng_seed}:{a_id}:{b_id}:{tick}").uniform(*MOOD_ENJOYABLE_RANGE)
         text_display = f"{names[a_id]}和{names[b_id]}在{obs.position}聊起「{topic_titles}」"
         ui = None
         payload: dict[str, Any] = {
@@ -147,8 +150,12 @@ class DialogueEngine:
             "lines": lines, "witnesses": witnesses, "text_display": text_display,
         }
         if self._grader is not None:
-            ui = {"grade": await self._grader.grade(type_="dialogue.chat", actors=[a_id, b_id],
-                                                    payload=payload, sim_now=sim_now)}
+            ui = {"grade": await self._grader.grade(
+                type_="dialogue.chat", actors=[a_id, b_id], payload=payload, sim_now=sim_now,
+                rel_hit=False,  # chat 矩阵 ±3/±1（04 §6.6 R2 阈 |Δaffinity|≥5 不达）
+                mood_hit=(band == "enjoyable" and mood_gain >= MOOD_HIT_MIN),
+                followups=True,  # 敷衍 → 冷却 / 对象唤醒入队（04 §6.6 R4）
+            )}
         seq = await self._pool.fetchval(
             """
             INSERT INTO events (tick, sim_time, type, source, trigger, location_id, actors, rng_seed, visibility, payload, ui)
@@ -166,14 +173,12 @@ class DialogueEngine:
         if band == "perfunctory":
             await self._cooldown.write_cooldown(agent_id=a_id, trigger_kind="chat_perfunctory",
                                                 target=b_id, sim_now=sim_now)
-        # 需求结算：社交 +15/深聊 +25（01 §4）；愉快情绪 +10~18（01 §3.1，rng 区间内取数）
+        # 需求结算：社交 +15/深聊 +25（01 §4）；愉快情绪 +10~18（01 §3.1，落库前已取定，D30）
         social_gain = self._needs.satisfy_amount("social", "deep_chat" if mode == "deep" else "chat")
-        mood_rng = random.Random(f"dlg-mood:{rng_seed}:{seq}")
         for x in (a_id, b_id):
             await self._agg.apply_needs_delta(agent_id=x, need="social", delta=social_gain, cause=cause)
             if band == "enjoyable":
-                await self._agg.apply_needs_delta(agent_id=x, need="mood",
-                                                  delta=mood_rng.uniform(*MOOD_ENJOYABLE_RANGE), cause=cause)
+                await self._agg.apply_needs_delta(agent_id=x, need="mood", delta=mood_gain, cause=cause)
         # 记忆写入（04 §6.3 单源双方投影 + 目击投影）
         await store.write_event_memories(
             self._pool, self._gw, event_seq=seq, sim_time=sim_now,

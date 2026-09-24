@@ -388,9 +388,9 @@ class ActionValidator:
         self._busy[obs.agent_id] = sim_now + dt.timedelta(minutes=cost)
         handler = getattr(self, f"_settle_{action}")
         seqs: list[int] = await handler(obs, args, tick=tick, sim_now=sim_now, rng_seed=rng_seed, cost=cost, decision=d)
-        # 交互唤醒：有对象的动作 → 对象收 wakeup 下一裁决点处理（04 §2.2）
+        # 交互唤醒：有对象的动作 → 对象收 wakeup 下一裁决点处理（04 §2.2；send_message 不唤醒，01 §4）
         target = args.get(_TARGET_KEY.get(action, ""))
-        if isinstance(target, str) and self._wakeup is not None and seqs:
+        if isinstance(target, str) and self._wakeup is not None and seqs and action != "send_message":
             self._wakeup(tick + 1, target)
         return seqs
 
@@ -515,15 +515,16 @@ class ActionValidator:
         prices = self._gift_prices()
         amount = prices[tier - 1]
         await self._charge(obs.agent_id, -amount)
-        seq = await self._insert(obs, tick=tick, sim_now=sim_now, type_="social.give_gift",
-                                 actors=[obs.agent_id, target], location_id=obs.position,
-                                 visibility="public", rng_seed=rng_seed,
-                                 payload={"from": obs.agent_id, "to": target, "tier": tier, "amount_cents": -amount})
-        cause = store.caused_by(seq)
         gift_row = self._relations.matrix_row("gift")
         deltas = gift_row["tiers"][tier - 1]
         labels = await self._labels(obs.agent_id, target)
         bonus = int(gift_row.get("crush_bonus_affinity", 0)) if tier >= 2 and GIFT_CRUSH_LABEL in labels else 0
+        seq = await self._insert(obs, tick=tick, sim_now=sim_now, type_="social.give_gift",
+                                 actors=[obs.agent_id, target], location_id=obs.position,
+                                 visibility="public", rng_seed=rng_seed,
+                                 payload={"from": obs.agent_id, "to": target, "tier": tier, "amount_cents": -amount},
+                                 rel_hit=abs(int(deltas["delta_affinity"]) + bonus) >= 5, followups=True)
+        cause = store.caused_by(seq)
         await self._agg.apply_relation_delta(a_id=obs.agent_id, b_id=target,
                                              delta_affinity=int(deltas["delta_affinity"]) + bonus,
                                              delta_tension=int(deltas["delta_tension"]), cause=cause)
@@ -577,16 +578,18 @@ class ActionValidator:
     async def _settle_argue(self, obs, args, *, tick, sim_now, rng_seed, cost, decision) -> list[int]:
         target = args["target"]
         names = await self._names(obs.agent_id, target)
+        # argue 行结算（01 §3.2）；对方 N≥70 视为"被侮辱"档（工程默认，D27）
+        bf = (await self._persona(target)).get("big_five") or {}
+        kind = "argue_insulted" if float(bf.get("neuroticism", 0)) >= N_HIGH else "argue"
+        arg_row = self._relations.matrix_row(kind)
         seq = await self._insert(obs, tick=tick, sim_now=sim_now, type_="dialogue.argue",
                                  actors=[obs.agent_id, target], location_id=obs.position,
                                  visibility="public", rng_seed=rng_seed,
                                  payload={"participants": [obs.agent_id, target],
                                           "reason_hint": str(args.get("reason_hint") or decision.intent[:20]),
-                                          "lines": [], "witnesses": []})
+                                          "lines": [], "witnesses": []},
+                                 rel_hit=abs(int(arg_row["delta_affinity"])) >= 5, followups=True)
         cause = store.caused_by(seq)
-        # argue 行结算（01 §3.2）；对方 N≥70 视为"被侮辱"档（工程默认，D27）
-        bf = (await self._persona(target)).get("big_five") or {}
-        kind = "argue_insulted" if float(bf.get("neuroticism", 0)) >= N_HIGH else "argue"
         await self._relations.settle(self._agg, kind=kind, a_id=obs.agent_id, b_id=target, cause=cause)
         await self._relations.settle(self._agg, kind=kind, a_id=target, b_id=obs.agent_id, cause=cause)
         await self._cooldown.write_cooldown(agent_id=obs.agent_id, trigger_kind="argue_reapproach",
@@ -618,7 +621,8 @@ class ActionValidator:
                                  visibility="public", rng_seed=rng_seed,
                                  payload={"teller": obs.agent_id, "listener": listener, "about": about,
                                           "cites": cites, "lines": [], "text_display": text,
-                                          "caused_by": store.caused_by(cite_ids[0] and int(cite_ids[0]) or 0)})
+                                          "caused_by": store.caused_by(cite_ids[0] and int(cite_ids[0]) or 0)},
+                                 followups=True)
         # 失真骰结果仅内核侧留痕日志（fidelity/distortion 不进 payload、不出站，00 §4 红线 8）
         log.debug("gossip 失真链：hop=%d fidelity=%.2f tier=%s distortion=%s", hop, fidelity,
                   store.detail_tier(fidelity), distortion)
@@ -643,7 +647,8 @@ class ActionValidator:
                                  actors=[obs.agent_id, target], location_id=obs.position,
                                  visibility="public", rng_seed=rng_seed,
                                  payload={"participants": [obs.agent_id, target], "result": result,
-                                          "lines": [], "text_display": f"{names[obs.agent_id]}向{names[target]}表明了心意"})
+                                          "lines": [], "text_display": f"{names[obs.agent_id]}向{names[target]}表明了心意"},
+                                 rel_hit=True, followups=True)  # ±15/-5 与"恋人"标签（04 §6.6 R2）
         cause = store.caused_by(seq)
         kind = "confess_accepted" if result == "accepted" else "confess_rejected"
         scope = "both" if result == "accepted" else None
@@ -672,7 +677,8 @@ class ActionValidator:
                                  visibility="public", rng_seed=rng_seed,
                                  payload={"participants": [obs.agent_id, target], "for_event_ref": ref,
                                           "result": result,
-                                          "lines": [], "text_display": f"{names[obs.agent_id]}向{names[target]}道了歉"})
+                                          "lines": [], "text_display": f"{names[obs.agent_id]}向{names[target]}道了歉"},
+                                 followups=True)
         cause = store.caused_by(seq)
         kind = "apologize_accepted" if result == "accepted" else "apologize_rejected"
         await self._relations.settle(self._agg, kind=kind, a_id=obs.agent_id, b_id=target, cause=cause)
@@ -705,7 +711,8 @@ class ActionValidator:
                                  actors=[obs.agent_id, target], location_id=obs.position,
                                  visibility="public", rng_seed=rng_seed,
                                  payload={"from": obs.agent_id, "to": target,
-                                          "matter": str(args.get("matter") or decision.intent[:20])})
+                                          "matter": str(args.get("matter") or decision.intent[:20])},
+                                 rel_hit=True, followups=True)  # help +6（04 §6.6 R2）
         cause = store.caused_by(seq)
         await self._relations.settle(self._agg, kind="help", a_id=target, b_id=obs.agent_id, cause=cause)
         await self._agg.apply_needs_delta(agent_id=obs.agent_id, need="achievement",
@@ -726,7 +733,8 @@ class ActionValidator:
                                  actors=[obs.agent_id, target], location_id=obs.position,
                                  visibility="public", rng_seed=rng_seed,
                                  payload={"from": obs.agent_id, "to": target, "amount_cents": amount,
-                                          "result": result})
+                                          "result": result},
+                                 followups=True)
         cause = store.caused_by(seq)
         names = await self._names(obs.agent_id, target)
         if result == "accepted":
@@ -760,15 +768,17 @@ class ActionValidator:
         debt = await self.open_debt(self._pool, borrower_id=obs.agent_id, lender_id=target)
         assert debt is not None  # check 已保证
         repaid, cleared = await self.settle_repay(self._pool, debt_id=int(debt["id"]), amount_cents=amount)
+        on_time = cleared and sim_now <= debt["due_sim"]  # 按期全额结清 → lend_repaid_ontime（01 §3.2）
         await self._charge(obs.agent_id, -amount)
         await self._charge(target, amount)
         seq = await self._insert(obs, tick=tick, sim_now=sim_now, type_="social.repay_money",
                                  actors=[obs.agent_id, target], location_id=obs.position,
                                  visibility="public", rng_seed=rng_seed,
                                  payload={"from": obs.agent_id, "to": target, "amount_cents": -amount,
-                                          "debt_ref": str(debt["id"])})
+                                          "debt_ref": str(debt["id"])},
+                                 rel_hit=on_time, followups=True)  # 按期结清 +8（04 §6.6 R2）
         cause = store.caused_by(seq)
-        if cleared and sim_now <= debt["due_sim"]:
+        if on_time:
             # 按期全额结清（放款起 14 模拟日内）→ 借钱被借方 +8/-5（01 §3.2）
             await self._relations.settle(self._agg, kind="lend_repaid_ontime", a_id=target, b_id=obs.agent_id,
                                          cause=cause)
@@ -788,7 +798,8 @@ class ActionValidator:
                                  actors=[obs.agent_id, target], location_id=obs.position,
                                  visibility="public", rng_seed=rng_seed,
                                  payload={"from": obs.agent_id, "to": target,
-                                          "request_ref": str(args["request_ref"]), "politeness": politeness})
+                                          "request_ref": str(args["request_ref"]), "politeness": politeness},
+                                 followups=True)
         cause = store.caused_by(seq)
         row = self._relations.matrix_row("refuse")
         factor = float(row.get("polite_factor", 1.0)) if politeness else 1.0
@@ -850,12 +861,13 @@ class ActionValidator:
     # ==================================================================
 
     async def _insert(self, obs, *, tick, sim_now, type_, actors, location_id, visibility, rng_seed,
-                      payload) -> int:
+                      payload, rel_hit: bool = False, mood_hit: bool = False, followups: bool = False) -> int:
         ui: dict[str, Any] | None = None
         if self._grader is not None:
             ui = {"grade": await self._grader.grade(
                 type_=type_, actors=actors, payload=payload, sim_now=sim_now,
-            )}  # T-ADJ-07：grade 初值唯一实现，同事务随 INSERT 写入（04 §6.6）
+                rel_hit=rel_hit, mood_hit=mood_hit, followups=followups,
+            )}  # T-ADJ-07：grade 初值唯一实现，同事务随 INSERT 写入（04 §6.6；信号口径 D30）
         return await self._pool.fetchval(
             """
             INSERT INTO events (tick, sim_time, type, source, trigger, location_id, actors, rng_seed, visibility, payload, ui)
