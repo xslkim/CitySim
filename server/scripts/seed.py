@@ -204,14 +204,28 @@ def build_sql(ids: list[str]) -> str:
                 str(balance), _sql_str(_position_of(a)),
             ]) + ")"
         )
+        rel_merged: dict[str, dict] = {}
         for r in a.get("relations_initial", []):
             if r["target"] not in id_set:
                 continue  # 8 人小世界：越集关系不落库（seed_40 全集无裁减）
-            labels = "{" + r["type"] + "}"
+            # 同对多行 = 多原型标签叠加（01 §2.1/§6 D16-⑦）：labels 并集（首见序），
+            # affinity/tension 分量求和并 clamp 到值域，one_line 以 "；" 串联去重
+            m = rel_merged.setdefault(r["target"], {"labels": [], "affinity": 0, "tension": 0, "notes": []})
+            if r["type"] not in m["labels"]:
+                m["labels"].append(r["type"])
+            m["affinity"] += r["affinity"]
+            m["tension"] += r["tension"]
+            if r.get("note") and r["note"] not in m["notes"]:
+                m["notes"].append(r["note"])
+        for target in sorted(rel_merged):
+            m = rel_merged[target]
+            labels = "{" + ",".join(m["labels"]) + "}"
+            affinity = max(-100, min(100, m["affinity"]))
+            tension = max(0, min(100, m["tension"]))
             relation_rows.append(
                 "(" + ", ".join([
-                    _sql_str(aid), _sql_str(r["target"]), str(r["affinity"]), str(r["tension"]),
-                    _sql_str(labels) + "::text[]", _sql_str(r.get("note")),
+                    _sql_str(aid), _sql_str(target), str(affinity), str(tension),
+                    _sql_str(labels) + "::text[]", _sql_str("；".join(m["notes"]) if m["notes"] else None),
                 ]) + ")"
             )
         for g in a.get("goals_initial", []):
