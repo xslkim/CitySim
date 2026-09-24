@@ -1,0 +1,123 @@
+# world.yaml —— 世界静态参数（01 §1.2/§1.3/§1.5/§1.6 部署镜像；数字唯一持有方 = 01 对应节，勿改数字，修订先回改 01）
+# 节点 id 命名规则（工程默认，01 文档 §6 D7；与 03 §3.1 map_layout.json 前缀口径一致）：
+#   公寓房间   apt.L<楼层>.<房间号>          例：apt.L2.203
+#   公寓公共区 apt.{lobby|kitchen|gym|laundry|roof}
+#   公司节点   corp.{product|tech|market|ops|design|admin}（6 部门工位区）
+#              corp.meeting.{1|2} / corp.pantry / corp.elevator / corp.reception / corp.ceo
+#   校外抽象   home.<agent_id>（01 §1.6 设计定名；观察端聚合区块 = offsite.home，03 §3.1）
+#   外部场所   ext.<name>（例：ext.restaurant）
+# 金额一律 _cents 后缀、单位分（06 §1.3 口径延伸，§6 D7）：¥ ×100 = 分。
+# 段划界（评审裁定）：本文件只持 locations/company/stocks/economy 常量段；作息/节假日/触发规则段
+#   由 04 T-WA-01 向既有文件追加（不重建文件）；director.grade 阈值段归 04 T-DIR-04 追加。
+
+locations:
+  apartment:                                      # 01 §1.2 公寓
+    rooms:
+      id_pattern: "apt.L{floor}.{room_no}"
+      floors: [1, 2, 3, 4, 5, 6]                  # 6 层
+      rooms_per_floor: [1, 2, 3, 4]               # 每层 01~04 共 4 间
+      gender_rule:                                # 性别布局：每层 2 男 2 女
+        male_suffixes: [1, 2]                     # x01/x02 男性
+        female_suffixes: [3, 4]                   # x03/x04 女性
+    commons:                                      # 公共区 5 节点（开放时段 = 模拟时间，01 §1.2 表）
+      - { id: apt.lobby,   name: 大堂+快递柜+公告栏, floor: 1F, open: ["00:00", "24:00"] }                     # 全天
+      - { id: apt.kitchen, name: 公共厨房/餐厅,     floor: 2F, open: ["06:00", "23:00"] }
+      - { id: apt.gym,     name: 健身房,           floor: B1, open: ["06:30", "22:30"] }
+      - { id: apt.laundry, name: 洗衣房,           floor: B1, open: ["08:00", "23:00"] }
+      - { id: apt.roof,    name: 天台花园,         floor: 顶层, open: ["00:00", "24:00"], closed: ["00:30", "06:00"] }  # 凌晨门禁 0:30~6:00 关闭
+  office:                                         # 01 §1.3 公司内地点节点（同一写字楼同一层）
+    - { id: corp.product,   name: 产品部工位区, kind: dept_area }
+    - { id: corp.tech,      name: 技术部工位区, kind: dept_area }
+    - { id: corp.market,    name: 市场部工位区, kind: dept_area }
+    - { id: corp.ops,       name: 运营部工位区, kind: dept_area }
+    - { id: corp.design,    name: 设计部工位区, kind: dept_area }
+    - { id: corp.admin,     name: 职能部工位区, kind: dept_area }
+    - { id: corp.meeting.1, name: 会议室 1,     kind: meeting }
+    - { id: corp.meeting.2, name: 会议室 2,     kind: meeting }
+    - { id: corp.pantry,    name: 茶水间,        kind: common }
+    - { id: corp.elevator,  name: 电梯厅,        kind: common }
+    - { id: corp.reception, name: 前台,          kind: common }
+    - { id: corp.ceo,       name: 总经理室,      kind: event_source, enterable: false }   # 不可进入，仅事件源
+  offsite:                                        # 01 §1.6 校外抽象节点组（16 名公司 NPC）
+    id_pattern: "home.{agent_id}"
+    count: 16
+    tenant_enterable: false                       # 租客不可 move 进入
+    npc_move_minutes: [30, 45]                    # NPC 赴约移动折算 30~45min
+    dwell:                                        # 驻留时段（加班夜/团建/外出事件除外）
+      workday: "18:30~08:00(+1)"                  # 工作日 18:30~次日 8:00
+      weekend: all_day                            # 周末全天
+  external:                                       # 01 §1.6 外部场所（邀约约定地点限外部场所或公寓公共区）
+    - { id: ext.restaurant, name: 餐厅 }
+
+company:                                          # 01 §1.1/§1.3 星澜科技
+  name: 星澜科技
+  departments:                                    # 六部门编制表（01 §1.3 逐行照抄）
+    - { key: product, name: 产品部,              total: 6, managers: 1, npc_staff: 1, tenants: 4, business: 需求评审、版本排期 }
+    - { key: tech,    name: 技术部,              total: 9, managers: 1, npc_staff: 3, tenants: 5, business: 迭代开发、值班 oncall }
+    - { key: market,  name: 市场部,              total: 7, managers: 1, npc_staff: 2, tenants: 4, business: campaign、商务应酬 }
+    - { key: ops,     name: 运营部,              total: 7, managers: 1, npc_staff: 2, tenants: 4, business: 数据复盘、活动上线 }
+    - { key: design,  name: 设计部,              total: 6, managers: 1, npc_staff: 1, tenants: 4, business: 视觉/交互，与技术部日常扯皮 }
+    - { key: admin,   name: 职能部（人事/财务/行政）, total: 5, managers: 1, npc_staff: 1, tenants: 3, business: 考勤、报销、团建组织 }
+  ranks:                                          # 职级（01 §1.3 职级表）
+    M: 6                                          # 部门经理，全部 NPC
+    P2: 12                                        # 高级专员：租客 8 + NPC 4；入职 ≥2 年
+    P1: 22                                        # 专员：租客 16 + NPC 6；入职 <2 年
+
+stocks:                                           # 01 §1.5 股票系统（标的代号 = 工程默认，§6 D7）
+  symbols:
+    - { id: XLKJ, name: 星澜科技,   initial_price_cents: 1800 }   # ¥18.00（自家公司）
+    - { id: LJBK, name: 临江银行,   initial_price_cents: 950 }    # ¥9.50
+    - { id: YLNY, name: 云岭新能源, initial_price_cents: 4200 }   # ¥42.00
+  random_walk: { mu: 0.0004, sigma: 0.018 }       # 日收益率 r ~ N(μ, σ)，开盘一次骰子（rng_seed 入库）
+  fee: { rate: 0.0005, min_cents: 500 }           # 单笔手续费 0.05%、最低 ¥5
+  trading_hours: ["09:30", "15:00"]               # 交易时段（01 §4 trade_stock 行 / 04 §6.2）
+  rules: T+0 简化为当日即时成交；不设杠杆、不设做空
+
+economy:                                          # 01 §1.5 经济参数（金额一律 _cents、单位分）
+  salary:                                         # 工资三档（税后口径，每月 1 个模拟日发放直接入账）
+    M:  { min_cents: 2600000, max_cents: 3000000, dept_adjust_pct: 5 }   # M 经理 ¥26,000~30,000，按部门微调 ±5%
+    P2: { min_cents: 1500000, max_cents: 1900000 }                       # P2 高级 ¥15,000~19,000
+    P1: { min_cents: 850000,  max_cents: 1250000 }                       # P1 专员 ¥8,500~12,500
+    payday: 1
+  perf_review_raise_pct: { S: 8, A: 4, B: 0, C: 0 }   # 绩效涨薪档（world.perf_review 结算）；C 冻结，连续 2 个 C 进裁员候选池
+  rent:                                           # 房租按楼层三档
+    by_floor:
+      low:  { floors: [1, 2], amount_cents: 240000 }   # 1~2 层 ¥2,400
+      mid:  { floors: [3, 4], amount_cents: 280000 }   # 3~4 层 ¥2,800
+      high: { floors: [5, 6], amount_cents: 330000 }   # 5~6 层 ¥3,300
+    bill_day: 3                                        # 账单日每月 3 日
+  utility:                                        # 水电公摊 ¥180~260（随机游走 ±20%）
+    min_cents: 18000
+    max_cents: 26000
+    random_walk_pct: 20
+    bill_day: 10
+  commute: { amount_cents: 30000, bill_day: 1 }   # 通勤/通讯包 ¥300/月，每月 1 日随工资自动扣
+  overdue:                                        # 欠租/欠费结算规则（01 §1.5 硬规则）
+    compound_interest: false                      # 挂账不计复利（防死亡螺旋）
+    on_overdue: { mood_delta: -8, wealth_delta: -12 }        # 账单日余额不足扣至归 0、差额挂账（economy.bill.rent.overdue 联动）
+    during_overdue:
+      goal_weight_multiplier: { G-MON-04: 3 }                # 欠账期间"开口借钱"目标权重 ×3
+      consumption_downgrade: 只许自炊/便利店档（shop/礼物/餐厅正餐冻结）
+    next_period_unpaid: { mood_delta: -15, frustration_delta: 8 }   # economy.bill.rent.notice：情绪 -15、挫败值 +8（01 §3.3）
+    two_periods_unpaid: 强制搬迁至最低价位空房（若有）；无空房则触发退租危机编剧事件（L1，计入干预率）
+  prices:                                         # 物价表（单次消费，01 §1.5）
+    cook:        { amount_cents: 1500,  need: { hunger: 35 } }                          # 自炊一餐（厨房）¥15
+    bento:       { amount_cents: 2200,  need: { hunger: 25 } }                          # 便利店便当 ¥22
+    canteen:     { amount_cents: 3000,  need: { hunger: 30 } }                          # 食堂/快餐 ¥30
+    restaurant:  { amount_cents: 12000, need: { hunger: 40, mood: 8 }, per_person: true }     # 餐厅正餐（邀约标准档）¥120/人
+    coffee:      { amount_cents: 1800,  need: { energy: 8, mood: 3 } }                  # 咖啡/奶茶 ¥18
+    gym_session: { amount_cents: 800,   need: { energy: -5, mood: 6, achievement: 3 } }       # 健身月卡摊销 ¥8/次
+    gift:        { tiers_cents: [8800, 28800, 58800] }                                  # 礼物三档 ¥88/¥288/¥588（01 §4 give_gift）
+    movie:       { amount_cents: 8000,  need: { mood: 12, social: 10 }, per_person: true }    # 电影/演出票 ¥80/人
+  wealth_need_mapping:                            # 消费 → 财富需求映射（01 §1.5 通用公式）
+    expense: { divisor: 200, clamp_min: 1, clamp_max: 6, sign: -1 }   # 每笔消费 Δ = -clamp(金额/200, 1, 6)
+    income:  { divisor: 500, clamp_min: 1, clamp_max: 8, sign: 1 }    # 每笔非工资收入 Δ = +clamp(金额/500, 1, 8)
+    salary_credit: 25                             # 工资 +25
+    bill_range: [-8, -12]                         # 账单 -8~-12
+    stock: { divisor: 500, cap: 10 }              # 股票盈亏 ±(盈亏额/500) 封顶 ±10
+  initial_balance:                                # 初始余额分层（01 §1.5，与入住时长分层联动：1/3 老、1/2 普通、1/6 新）
+    tiers:
+      senior:  { min_cents: 800000,  max_cents: 3000000 }   # 老住户 ¥8,000~30,000（入住 >1 年）
+      regular: { min_cents: 400000,  max_cents: 1500000 }   # 普通 ¥4,000~15,000（3~12 月）
+      new:     { min_cents: 200000,  max_cents: 800000 }    # 新住户 ¥2,000~8,000（<1 月）
+    tenancy_rule: { senior_gt_months: 12, regular_gte_months: 3, new_lt_months: 1 }
