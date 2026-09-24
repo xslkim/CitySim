@@ -18,3 +18,26 @@ uv run pytest                        # 全量测试（importmode=importlib）
 uv run python scripts/gen_event_types.py        # 派生注册表下游镜像（T-CFG-05）
 uv run python scripts/gen_event_types.py --check # 漂移检查（纯消费方 04 T-WA-10）
 ```
+
+## 数据库（M0b：Schema v1 已冻结，tag `schema-v1`）
+
+```bash
+# 冷启动序列（09 §8 口径的 M0 段）
+server/scripts/db_init.sh reset
+psql "$WSIM_PG_DSN" -v ON_ERROR_STOP=1 -f server/ddl/schema_v1.sql    # 11 表 + append-only + 周分区
+psql "$WSIM_PG_DSN" -v ON_ERROR_STOP=1 -f server/ddl/obs_views_v1.sql # obs 白名单视图（M0 最小集）
+psql "$WSIM_PG_DSN" -v ON_ERROR_STOP=1 -f server/ddl/seed_8.sql       # 8 人小世界（seed_40.sql 供 M6）
+
+uv run python scripts/seed.py --ids A01..A08 --out ddl/seed_8.sql   # 确定性再生成（同输入同输出）
+uv run python scripts/seed.py --ids A01..A40 --out ddl/seed_40.sql
+bash server/scripts/schema_freeze_check.sh                          # 06 §4.5 差集检查（契约变更必跑）
+```
+
+- `ddl/schema_v1.sql`：04 §5.2 逐字口径（events append-only 触发器 + REVOKE 双保险；agents id
+  TEXT `'A01'~'A40'`；memories `vector(1024)` hnsw；不设事件类型 CHECK）；pg_partman 周分区
+  （premake=4，`partman.run_maintenance_proc()` 滚动建区，运维归 08）。
+- `ddl/obs_views_v1.sql`：obs schema + `obs.filter_payload()`（全项目唯一）+ `obs.events` /
+  `obs.memory_projection` 视图 + `obs.payload_key_whitelist`（种子为生成物，勿手改）；obs_ro 只读。
+- world_state 初始键：`clock.anchor`（2026-10-12 周一 00:00+08 冷启动占位，内核首启重锚）、
+  `economy.stocks`（3 标的初值）、`economy.salary`（每人月薪抽定，M3 payroll 读取）。
+- 测试库：pytest fixture 自动建/毁 `worldsim_test` / `worldsim_seed8` / `worldsim_seed40`（socket trust）。
