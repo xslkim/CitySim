@@ -1,0 +1,109 @@
+# goals.yaml —— 周目标库 36 条（01 §3.3 逐字镜像；数字唯一持有方 = 01 §3.3，勿改数字，修订先回改 01）
+# 载体定名 = 02 文档 T-REL-03 交付物（已入 00 §2 配置清单）
+# 权重 = 被抽中先验，按人格加权（整表 P1，W4 前校准）；check.tier: P0 = M1 可编程完成判定子集，P1 = 预留（02 文档 D9）
+
+meta:
+  count: 36
+  refresh: 每周日晚                  # 批量刷新时点（01 §3.3）
+  active_per_tier: { star: 3, secondary: 2, background: 1 }   # 每 Agent 活跃周目标数按层（01 §3.3）
+
+frustration_rules:                   # 受阻与挫败规则（01 §3.3 硬数字逐行）
+  block_increment: 1                 # 每次指向该目标的意图被拦截/拒绝/爽约，受阻计数 +1
+  frustration_trigger_blocks: 3      # 同一目标受阻 3 次 → 挫败事件（M1 口径：恰在第 3 次触发一次，D18）
+  frustration_mood_delta: -12        # 挫败事件：情绪 -12
+  frustration_gain: 10               # 挫败值 +10
+  weekly_fail_blocked_min: 2         # 周日晚结算未完成且受阻 ≥2 → 挫败值 +8
+  weekly_fail_blocked_gain: 8
+  weekly_fail_idle_gain: 4           # 未受阻（纯没做）→ +4
+  grudge_threshold: 30               # 迁怒：挫败值 ≥30 → 对最大 blocker affinity -6、tension +8，
+  grudge_affinity_delta: -6          #   且未来 48h 对其 argue/gossip 权重 ×3（权重倍乘经 T-REL-04 接口）
+  grudge_tension_delta: 8
+  replan_threshold: 50               # 换策略：挫败值 ≥50 → 目标降级改写 + 生成一次反思
+  abandon_threshold: 80              # 放弃：挫败值 ≥80 → 放弃目标 + 深度反思（重要性 ≥8）+ 挫败值清零至 20
+  abandon_reset_to: 20
+  abandon_reflection_importance: 8
+  daily_recovery: 4                  # 挫败值自然恢复每模拟日 -4
+  a_level_recovery: 10               # A 级正向事件额外 -10（M1 无 grade 初值打分，接口预留 T-ADJ-07）
+
+goals:                               # 36 条逐字按 01 §3.3 周目标库表
+  # —— 社交（4）——
+  - { id: G-SOC-01, category: 社交, text: 和 3 个不同邻居聊天, difficulty: 易, weight: 8, persona_bias: "E+",
+      check: { tier: P0, kind: event_count, event: dialogue.chat, count: 3, note: 3 场 chat } }
+  - { id: G-SOC-02, category: 社交, text: 组织一次 4 人以上饭局, difficulty: 中, weight: 4, persona_bias: "E++",
+      check: { tier: P1, kind: manual, note: 邀约成功且到场 ≥4 } }
+  - { id: G-SOC-03, category: 社交, text: 修复一段紧张关系, difficulty: 中, weight: 5, persona_bias: "A+",
+      check: { tier: P1, kind: manual, note: 任一 tension>40 边降 10 } }
+  - { id: G-SOC-04, category: 社交, text: 认识 1 名新同事深聊, difficulty: 易, weight: 6, persona_bias: "O+",
+      check: { tier: P0, kind: event_count, event: dialogue.chat, count: 1, payload_equals: { mode: deep }, note: 深聊 1 场 } }
+  # —— 恋爱（5）——
+  - { id: G-LOVE-01, category: 恋爱, text: 要到心仪对象联系方式外的独处, difficulty: 中, weight: 5, persona_bias: 有暗恋边,
+      check: { tier: P0, kind: event_count, event: social.appointment.created, count: 1, note: 单独邀约成功 } }
+  - { id: G-LOVE-02, category: 恋爱, text: 送一次礼物, difficulty: 易, weight: 4, persona_bias: "",
+      check: { tier: P0, kind: event_count, event: social.give_gift, count: 1, note: give_gift 成功 } }
+  - { id: G-LOVE-03, category: 恋爱, text: 和心仪对象单独吃饭, difficulty: 中, weight: 5, persona_bias: "",
+      check: { tier: P0, kind: event_count, event: social.appointment.created, count: 1, note: 双人饭局完成 } }
+  - { id: G-LOVE-04, category: 恋爱, text: 表白, difficulty: 难, weight: 2, persona_bias: "N 低 / E 高",
+      check: { tier: P0, kind: event_count, event: dialogue.confess, count: 1, note: confess 执行 } }
+  - { id: G-LOVE-05, category: 恋爱, text: 打听心仪对象近况, difficulty: 易, weight: 4, persona_bias: "N+",
+      check: { tier: P0, kind: event_count, event: dialogue.gossip, count: 2, note: gossip/共同好友 2 次 } }
+  # —— 事业（6）——
+  - { id: G-CAR-01, category: 事业, text: 本周任务零延期, difficulty: 中, weight: 7, persona_bias: "C+",
+      check: { tier: P1, kind: manual, note: 工作事件全按期 } }
+  - { id: G-CAR-02, category: 事业, text: 在会议上发言被采纳, difficulty: 中, weight: 5, persona_bias: "C+/E+",
+      check: { tier: P1, kind: manual, note: 会议事件正向结果 } }
+  - { id: G-CAR-03, category: 事业, text: 向经理汇报一次成果, difficulty: 易, weight: 5, persona_bias: "",
+      check: { tier: P1, kind: manual, note: 主动汇报事件 } }
+  - { id: G-CAR-04, category: 事业, text: 争取晋升提名, difficulty: 难, weight: 3, persona_bias: "C++",
+      check: { tier: P1, kind: manual, note: 进入晋升候选名单 } }
+  - { id: G-CAR-05, category: 事业, text: 学会/练习一项技能, difficulty: 中, weight: 4, persona_bias: "O+/C+",
+      check: { tier: P1, kind: manual, note: 3 次晚间学习事件 } }
+  - { id: G-CAR-06, category: 事业, text: 让对手出一次丑, difficulty: 难, weight: 2, persona_bias: A 低，有对手边,
+      check: { tier: P1, kind: manual, note: 对手负向工作事件 } }
+  # —— 财富（5）——
+  - { id: G-MON-01, category: 财富, text: 本周结余 ≥¥500, difficulty: 易, weight: 6, persona_bias: "C+",
+      check: { tier: P1, kind: manual, note: 周末结算 } }
+  - { id: G-MON-02, category: 财富, text: 股票盈利 ≥¥300, difficulty: 中, weight: 4, persona_bias: "O+",
+      check: { tier: P1, kind: manual, note: 持仓浮盈达标 } }
+  - { id: G-MON-03, category: 财富, text: 还清一笔欠款, difficulty: 中, weight: 按债务边, persona_bias: 有债主边,
+      check: { tier: P0, kind: debt_cleared, note: repay_money 全额结清一笔债务边 } }
+  - { id: G-MON-04, category: 财富, text: 开口借钱, difficulty: 中, weight: 2, persona_bias: 财富<30,
+      check: { tier: P0, kind: event_count, event: social.borrow_money, count: 1, note: borrow 执行（无论成败） } }
+  - { id: G-MON-05, category: 财富, text: 谈一次加薪, difficulty: 难, weight: 2, persona_bias: "C+/N 低",
+      check: { tier: P1, kind: manual, note: 与经理谈薪事件 } }
+  # —— 生活（5）——
+  - { id: G-LIFE-01, category: 生活, text: 健身 3 次, difficulty: 易, weight: 6, persona_bias: "C+",
+      check: { tier: P0, kind: event_count, event: agent.move, count: 3, payload_equals: { to: apt.gym }, note: 健身房 3 次 } }
+  - { id: G-LIFE-02, category: 生活, text: 12 点前睡满 5 天, difficulty: 中, weight: 5, persona_bias: "C+",
+      check: { tier: P1, kind: manual, note: 作息记录 } }
+  - { id: G-LIFE-03, category: 生活, text: 做 5 顿自炊, difficulty: 易, weight: 5, persona_bias: "",
+      check: { tier: P0, kind: event_count, event: agent.eat, count: 5, payload_equals: { venue: cook }, note: 厨房做饭 5 次 } }
+  - { id: G-LIFE-04, category: 生活, text: 整理/装饰房间, difficulty: 易, weight: 4, persona_bias: "A+",
+      check: { tier: P1, kind: manual, note: shop 家居 +房间事件 } }
+  - { id: G-LIFE-05, category: 生活, text: 周末出游一次, difficulty: 易, weight: 5, persona_bias: "E+/O+",
+      check: { tier: P1, kind: manual, note: 外部场所事件 } }
+  # —— 成长（4）——
+  - { id: G-GRW-01, category: 成长, text: 读完一本书, difficulty: 中, weight: 4, persona_bias: "O+",
+      check: { tier: P1, kind: manual, note: 3 次阅读事件 } }
+  - { id: G-GRW-02, category: 成长, text: 写日记/反思满 5 天, difficulty: 易, weight: 4, persona_bias: "N+/C+",
+      check: { tier: P0, kind: memory_count, memory_kind: reflection, count: 5, note: 反思条目数（M1 工程口径：累计条数，D18） } }
+  - { id: G-GRW-03, category: 成长, text: 向师徒关系的师傅请教, difficulty: 易, weight: 4, persona_bias: 有师徒边,
+      check: { tier: P1, kind: manual, note: help/请教事件 } }
+  - { id: G-GRW-04, category: 成长, text: 戒掉一个坏习惯, difficulty: 难, weight: 3, persona_bias: "C++",
+      check: { tier: P1, kind: manual, note: 连续 5 日未触发 } }
+  # —— 捣蛋（3）——
+  - { id: G-CHA-01, category: 捣蛋, text: 传播一条八卦, difficulty: 易, weight: 3, persona_bias: A 低,
+      check: { tier: P0, kind: event_count, event: dialogue.gossip, count: 1, note: gossip 成功 1 次 } }
+  - { id: G-CHA-02, category: 捣蛋, text: 当众顶撞经理, difficulty: 中, weight: 1, persona_bias: N 高 / A 低,
+      check: { tier: P1, kind: manual, note: argue(经理) } }
+  - { id: G-CHA-03, category: 捣蛋, text: 拆散一对暧昧, difficulty: 难, weight: 1, persona_bias: A 低，有情敌边,
+      check: { tier: P1, kind: manual, note: 目标对 affinity 降 10 } }
+  # —— 情感（3）——
+  - { id: G-EMO-01, category: 情感, text: 找人倾诉一次烦心事, difficulty: 易, weight: 6, persona_bias: "N+",
+      check: { tier: P0, kind: event_count, event: dialogue.chat, count: 1, payload_equals: { mode: deep }, note: 深聊（烦恼话题） } }
+  - { id: G-EMO-02, category: 情感, text: 独处恢复心情, difficulty: 易, weight: 4, persona_bias: E 低,
+      check: { tier: P1, kind: manual, note: 情绪回 70+ } }
+  - { id: G-EMO-03, category: 情感, text: 给老朋友（老乡）打电话, difficulty: 易, weight: 4, persona_bias: 有老乡组,
+      check: { tier: P1, kind: manual, note: send_message 老乡 } }
+  # —— 隐藏（1）——
+  - { id: G-HID-01, category: 隐藏, text: 守住秘密一周, difficulty: 中, weight: 4, persona_bias: 全员,
+      check: { tier: P1, kind: manual, note: 秘密未入他人记忆（02 文档 D9 不可编程子集） } }
