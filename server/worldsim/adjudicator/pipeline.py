@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
 from ..llm_gateway import LLMGateway
+from ..memory.store import insert_memory
 from ..time_engine.batch import batch_advance
 from ..time_engine.clock import TimeEngine
 from .queue import CLOCK_TICK, WAKEUP, WORLD_EVENT, AdjudicationQueue
@@ -380,16 +381,10 @@ class Pipeline:
         self, *, agent_id: str, sim_time: dt.datetime, kind: str, content: str,
         importance: int, source_event_seq: int | None, rng_seed: int,
     ) -> int:
-        """写记忆（含 mock embedding；content_display M1 直写不过安全管线，02 文档 D10）。"""
-        vec = await self._gw.embed([content], seed=rng_seed, agent_id=agent_id, sim_time=sim_time)
-        return await self._pool.fetchval(
-            """
-            INSERT INTO memories (agent_id, sim_time, kind, content, content_display, importance, embedding, source_event_seq)
-            VALUES ($1, $2, $3, $4, $4, $5, $6::vector, $7)
-            RETURNING id
-            """,
-            agent_id, sim_time, kind, content, importance,
-            "[" + ",".join(repr(v) for v in vec.vectors[0]) + "]", source_event_seq,
+        """写记忆（委托 memory/store.insert_memory 唯一写径；content_display M1 直写，02 文档 D10）。"""
+        return await insert_memory(
+            self._pool, self._gw, agent_id=agent_id, sim_time=sim_time, kind=kind,
+            content=content, importance=importance, source_event_seq=source_event_seq, rng_seed=rng_seed,
         )
 
 
