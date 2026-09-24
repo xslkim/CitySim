@@ -1,0 +1,58 @@
+# 01 §9 部署镜像，勿手改数字；修订先回改 01 §9（唯一持有方）再同步本文件
+# 消费方：05 观察端健康面板（数值字面量守卫）、08 T-AUD-08 metrics.py（阈值来源）——一律从本镜像读值，不抄字面量
+# 本文件只持阈值，不持计算口径（口径归 08 metrics.py / 05 health_daily 视图）
+# 区间端点归属（01 §9 表逐字转写）：各条注释写明开闭；比率以小数表示（8% = 0.08）
+
+metrics:
+  - metric: a_grade_event_interval_days          # A 级事件间隔
+    healthy: { max: 1 }                          # ≤1 模拟日（闭）
+    warning: { min: 1, max: 2 }                  # 1~2 模拟日（>1 且 ≤2）
+    alarm: { min: 2 }                            # >2 模拟日
+    window: 7d_mean                              # 相邻 A 级事件间隔的 7 日均值
+    unit: sim_day
+
+  - metric: event_type_entropy_bits              # 事件类型熵
+    healthy: { min: 2.4 }                        # ≥2.4 bit（闭）
+    warning: { min: 2.0, max: 2.4 }              # 2.0~2.4（≥2.0 且 <2.4）
+    alarm: { max: 2.0 }                          # <2.0
+    window: 7d_mean                              # 每日事件 type 分布 Shannon 熵的 7 日均值
+    unit: bit
+
+  - metric: appearance_gini                      # 角色出场基尼系数
+    healthy: { max: 0.45 }                       # ≤0.45（闭）
+    warning: { min: 0.45, max: 0.6 }             # 0.45~0.6（>0.45 且 ≤0.6）
+    alarm: { min: 0.6 }                          # >0.6
+    window: sim_week                             # 每模拟周各角色事件数分布的基尼系数
+    unit: ratio
+
+  - metric: dialogue_3gram_repeat_ratio          # 对话 3-gram 重复度
+    healthy: { max: 0.08 }                       # ≤8%（闭）
+    warning: { min: 0.08, max: 0.12 }            # 8~12%（>8% 且 ≤12%）
+    alarm: { min: 0.12 }                         # >12%
+    window: 7d                                   # 全库台词 3-gram 重复占比，7 日窗
+    unit: ratio
+
+  - metric: relation_graph_weekly_change_ratio   # 关系图周变化率
+    healthy: { min: 0.08, max: 0.25 }            # 8~25%（双闭）
+    warning:
+      low: { min: 0.05, max: 0.08 }              # 5~8%（≥5% 且 <8%）
+      high: { min: 0.25, max: 0.40 }             # 25~40%（>25% 且 ≤40%）
+    alarm:
+      low: { max: 0.05 }                         # <5%
+      high: { min: 0.40 }                        # >40%
+    window: sim_week                             # 每周 |Δaffinity|≥3 的边数 / 活跃边总数
+    unit: ratio
+
+  - metric: high_tension_edge_ratio              # 高张力边占比（存量，评审 P1-9）
+    healthy: { max: 0.08 }                       # ≤8%（闭）
+    warning: { min: 0.08, max: 0.15 }            # 8~15%（>8% 且 ≤15%）
+    alarm: { min: 0.15 }                         # >15%（01 §9 加粗）
+    window: sim_day                              # 全楼 tension>60 的边 / 活跃边总数，每日结算
+    unit: ratio
+
+  - metric: active_conflict_edges                # 冲突边密度（01 §11.2）
+    healthy: { min_total: 12, min_per_star: 1 }  # 全楼活跃冲突边 ≥12 且每名明星角色 ≥1 条
+    warning: { total_range: [8, 12], star_zero_count: 1 }  # 8~12 条，或恰 1 名明星为 0
+    alarm: { max_total: 8, min_star_zero_count: 2 }        # <8 条，或 ≥2 名明星为 0
+    window: sim_day                              # tension≥30 或近 7 模拟日发生过 argue/gossip/refuse/抢功/爽约的边，每日结算
+    unit: count
