@@ -98,7 +98,7 @@ async function main() {
       subView.showLine(line, seg);
       if (seg.kind === 'dialogue') pcard.setSpeaker(line.speaker);
       // 逐句节拍留痕（T-LTV-03 验收 2：实测节奏对拍 at_offset_s）
-      console.log(`[stream] line ${line.index + 1}/${line.total} @${(performance.now() / 1000).toFixed(2)}s seq=${seg.seq}`);
+      if (!ctx.quiet) console.log(`[stream] line ${line.index + 1}/${line.total} @${(performance.now() / 1000).toFixed(2)}s seq=${seg.seq}`);
     },
     onSegmentStart: (seg) => { if (seg.kind === 'dialogue') pcard.begin(seg); },
     onSegmentEnd: (seg) => {
@@ -168,12 +168,14 @@ async function main() {
   ctx.wsClient = client;
 
   // ?soak=1 长挂打点（T-LTV-07 验收 6 / 09 §6 E5）：每 30s 输出 heap 与事件计数
+  ctx.quiet = params.get('quiet') === '1'; // quiet：不打 console（隔离 console 缓冲滞留），heap 写 title
   if (params.get('soak') === '1') {
     let events = 0;
     ctx.handlers.push(() => { events += 1; });
     setInterval(() => {
       const heap = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1024) : -1;
-      console.log(`[soak] heapKB=${heap} events=${events} queue=${queue.queue.length} playing=${queue.playing ? 1 : 0}`);
+      const msg = `[soak] heapKB=${heap} events=${events} queue=${queue.queue.length} playing=${queue.playing ? 1 : 0}`;
+      if (ctx.quiet) document.title = msg; else console.log(msg);
     }, 30_000);
   }
 }
