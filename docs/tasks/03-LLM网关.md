@@ -267,11 +267,11 @@
 |---|---|---|---|---|
 | R1 | GLM in/out 单价与付费档型号 ID | **已实测回填（T-LLM-12，2026-09-25）**：免费档 glm-4.5-flash/glm-4-flash in/out 单价 = ¥0（`models.yaml` 价格表 `measured_free_tier_w2`）；付费档型号 ID 仍占位（账号余额不足，充值后核实回填） | T-LLM-03 起、T-LLM-12 收口 | `config/models.yaml` `providers:` 段 |
 | R2 | GLM 各档 RPM 上限 | **已实测回填（T-LLM-12，2026-09-25）**：glm-4.5-flash 并发上限≈2（超出即 429 码 1302）、持续 ~41 次/分无 429 → `rpm_limit: 50`；glm-4-flash 并发 10 全过 → `rpm_limit: 90`；条目级 `concurrency` 闸同步落值（D41） | T-LLM-05 占位、T-LLM-12 实测 | `config/models.yaml` 模型条目 `rpm_limit`/`concurrency` |
-| R3 | ¥/模拟日初测值 | **已实测（T-LLM-12，2026-09-25）**：8 人 1 模拟日 1166 次调用（zhipu 446 + local_embed 720），**¥0/模拟日**（免费档）；基线 env 已写 0（熔断器按“基线未配置=只告警不动作”口径待机，充值后复测改写） | T-LLM-12 | `.env` `WSIM_COST_LIMIT_CNY_PER_SIMDAY` + 06 §3“项目止损线”行（W2 写死口径）+ commit 留痕 |
-| R4 | 免费/低档实际抗压占比 | `llm_calls.fallback_from` 留痕动机（04 §8.2） | T-LLM-06 数据、T-LLM-12 分析 | 审计日报（08 文档引用） |
+| R3 | ¥/模拟日初测值 | **已实测（T-LLM-12，2026-09-25 复测，干净库 worldsim_m2e）**：8 人 ≈1 模拟日（21.6 模拟小时，timeout SIGTERM 优雅停机）共 2125 次调用（zhipu 790 + local_embed 1335，状态全 ok），**¥0/模拟日**（免费档）；token 用量 = star_decision in 561,935/out 73,385、reflection in 8,679/out 1,159；撞墙/降级统计：HTTP 429 = 0、retry/failed = 0、`fallback_from` 全 NULL、`system.llm.failover`/`system.llm.throttle` 事件 = 0（降级链零走尽，D41 并发闸 + D42 条目级停用生效）；解析降级（04 §6.1 step3 设计路径）WARN 56 次、『走神』think 事件 29 条（约占 star_decision 决策 7.8%）；基线 env 已写 0（熔断器按"基线未配置=只告警不动作"口径待机，充值后复测改写） | T-LLM-12 | `.env` `WSIM_COST_LIMIT_CNY_PER_SIMDAY` + 06 §3"项目止损线"行（W2 写死口径）+ commit 留痕 |
+| R4 | 免费/低档实际抗压占比 | `llm_calls.fallback_from` 留痕动机（04 §8.2）；**实测（2026-09-25）**：降级期调用 0 行，免费档实际扛 100% | T-LLM-06 数据、T-LLM-12 分析 | 审计日报（08 文档引用） |
 | R5 | 次要层调用量口径（192+40 上限 vs 原 ~144 假设作废） | 04 §8.1（评审二轮 N-P1-7），W2 实测定稿 | T-LLM-12 提供计量数据 | 由 04 §8.1 持有方定稿，本模块只供数 |
 | R6 | GLM 审核（层 2）稳定性 | 本地 Qwen3-4B 缺位期替身（00 §1 A3），误杀率高时评估提前启用本地档 | T-LLM-11/T-LLM-12 观察 | 日报观察项；不预设阈值 |
-| R7 | 单 tick 预算内 LLM 延迟占比 | "p95 须 < 预算 60%（W2 实测校准）"（04 §2.2） | T-LLM-12 从 `llm_calls.latency_ms` 出 p95 | 02-模拟内核排程调参输入 |
+| R7 | 单 tick 预算内 LLM 延迟占比 | "p95 须 < 预算 60%（W2 实测校准）"（04 §2.2）；**实测（2026-09-25，llm_calls.latency_ms）**：star_decision p50 3.15s / p95 10.6s / max 43.4s（免费档服务端排队抖动，D42 停用条件③实据）、reflection p95 3.0s、embed（bge-m3 预热后）p50 456ms / p95 507ms | T-LLM-12 从 `llm_calls.latency_ms` 出 p95 | 02-模拟内核排程调参输入 |
 
 ## 6. 适配与偏差（本模块特有；00 §1 已登记者不重复）
 
