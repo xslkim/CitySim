@@ -15,7 +15,7 @@ LOG_DIR="$REPO_ROOT/var/logs"
 log() { printf '[switch_obs_dsn] %s\n' "$*"; }
 die() { log "ERROR: $*"; exit 1; }
 
-current_dsn() { grep -E '^WSIM_OBS_PG_DSN=' "$ENV_FILE" | tail -1 | cut -d= -f2-; }
+current_dsn() { grep -E '^WSIM_OBS_PG_DSN=' "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- || true; }
 
 set_dsn() { # set_dsn <value>（恰一行值变更：注释与键名不动）
   local value="$1"
@@ -56,7 +56,7 @@ set_dsn "$NEW_DSN"
 AFTER="$(current_dsn)"
 [ "$BEFORE" != "$AFTER" ] || die "DSN 未变化"
 log ".env 变更行数：$(diff <(git -C "$REPO_ROOT" show HEAD:.env 2>/dev/null || echo '') "$ENV_FILE" 2>/dev/null | grep -c '^[<>]' || true)（.env gitignored，前后值比对为准）"
-log "WSIM_OBS_PG_DSN: '${BEFORE:-<空>}' → 'postgresql://obs_ro:***@127.0.0.1:5432/${REPLICA_DB}'"
+log "WSIM_OBS_PG_DSN: '$(printf '%s' "$BEFORE" | sed -E 's#(//[^:]+:)[^@]+@#\1***@#')' → 'postgresql://obs_ro:***@127.0.0.1:5432/${REPLICA_DB}'"
 
 # 4) 重启 obs-api
 pkill -f "uvicorn worldsim.observe.app" 2>/dev/null || true
@@ -92,10 +92,14 @@ fi
 # 6) 证据：obs-api 连接用户/库 + obs_ro 写拒绝
 "$PG_BIN/psql" -h /tmp -d postgres -tAc \
   "SELECT usename, datname FROM pg_stat_activity WHERE datname='$REPLICA_DB' AND usename='obs_ro' LIMIT 3"
-"$PG_BIN/psql" "postgresql://obs_ro:${OBS_PWD}@127.0.0.1:5432/${REPLICA_DB}" -c \
+deny_out="$("$PG_BIN/psql" "postgresql://obs_ro:${OBS_PWD}@127.0.0.1:5432/${REPLICA_DB}" -c \
   "INSERT INTO events (seq,tick,sim_time,wall_time,type,source,trigger,payload,visibility)
-   VALUES (-1,0,now(),now(),'agent.move','system','system','{}','internal')" 2>&1 \
-  | grep -q "permission denied" && log "obs_ro INSERT 被拒（双通道只读证据，05 §5）" || die "obs_ro 未被拒写"
+   VALUES (-1,0,now(),now(),'agent.move','system','system','{}','internal')" 2>&1 || true)"
+if printf '%s' "$deny_out" | grep -q "permission denied"; then
+  log "obs_ro INSERT 被拒（双通道只读证据，05 §5）"
+else
+  die "obs_ro 未被拒写：$deny_out"
+fi
 
 [ "$fail" = "0" ] || die "回归有 FAIL"
 log "切换完成且回归全绿"
