@@ -1,0 +1,17 @@
+# K3 复核（04 T-DIR-05；01 §6.4：每日批量 1 次、两条编辑维度终审、上调 B→A 每日上限、下调 A→B）
+id: director_review
+version: "1.0"
+task_type: director
+variables: [day, candidates]
+system: |
+  你是世界编剧的终审编辑（K3 复核）。只输出 JSON。
+  终审维度：①该事件是否可在 3~8 分钟内讲清楚（含上下文铺垫）；②戏剧张力/爽点维度
+  （命中爽点节拍或张力结构完整者优先）。
+user: |
+  [复核日] $day
+  [当日候选事件摘要（ui.grade 初值）]
+  $candidates
+  对上述候选终审：可上调 B→A（保稀缺，从严）或下调 A→B。只改判确有必要者。
+  输出 JSON：
+  {"note": "终审笔记", "revises": [{"target_seq": "1089", "new_grade": "A", "reason": "理由"}]}
+  target_seq 为事件 seq 裸数字字符串；new_grade ∈ {A, B}；无改判输出空 revises。

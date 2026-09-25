@@ -409,3 +409,4 @@ M3「世界 Agent 与编剧」全部规则化模块（04 §2.1 `world_agent/` + 
 | D-27 | `world.promotion_window`/`world.perf_review` 的触发时点（日内 HH:MM）01 §6.1 只给日期规则 | 工程默认：promotion_window 10:00、perf_review 16:00（01 §6.1 模板行注明 16:00；晋升窗口取公告时段）；落配置 `triggers.*`；已登记（本文偏差表） |
 | D-28 | 01 §6.2 fail_forward `if_blocked` 与 stage exit 的判定先后设计未定义 | 工程默认：exit 优先（exit 满足=未阻塞），其后 if_blocked，max_days 兜底最先判；爆发铺垫门禁操作口径 = `payoff_beat.setup_days`（01 §11.3 权威），`min_days/max_days` 为镜像；已登记（本文偏差表） |
 | D-29 | L1「同厨时段/同项目组/值班同班」（01 §6.3）的承载形态设计未细化 | 工程默认：落 `world_state` `schedule.co_location` 标记（02 文档决策侧消费），不直接改排程表；`world.company_crisis` 季度 ≤1 次上限以 `world_state` `company_crisis.last_at` 执行（01 §6.1）；已登记（本文偏差表） |
+| D-30 | `director.grade_revise` 同落 `interventions` 行时 `level` 取值设计未定义（CHECK 仅 L0/L1/L2，04 §5.2） | 工程默认：`'L2'`（编辑终审口径）；干预率统计只看 `trigger` 字段（红线 13），不受 level 取值影响；已登记（本文偏差表） |
