@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "declaration": false,
+    "noEmit": false,
+    "outDir": "node_modules/.cache/proto-check"
+  },
+  "include": ["src/proto/**/*.ts"],
+  "exclude": ["src/proto/**/*.test.ts"]
+}

@@ -60,10 +60,11 @@ async def api_agents(pool: Any = Depends(get_pool)) -> dict[str, Any]:
             "id": a["id"], "name": a["name"], "gender": a.get("gender"), "age": a.get("age"),
             "room_no": a.get("room_no"), "department": a.get("department"), "job_title": a.get("job_title"),
             "lod": a.get("cognition_tier"),
-            "signature_color": (appearance.get("signature_color") or {}).get("hex"),
+            "signature_color": (appearance.get("signature_color") or {}).get("hex")
+            if isinstance(appearance.get("signature_color"), dict) else appearance.get("signature_color"),
             "appearance": {k: v for k, v in appearance.items() if k != "signature_color"} or None,
         })
-    return await ok_envelope(pool, {"items": items})
+    return await ok_envelope(pool, {"items": items}, kind="agents")
 
 
 @router.get("/{agent_id}")
@@ -71,7 +72,7 @@ async def api_agent(
     agent_id: str = Path(pattern=AGENT_ID_PATTERN),
     pool: Any = Depends(get_pool),
 ) -> dict[str, Any]:
-    return await ok_envelope(pool, _persona_card(await _agent_row(pool, agent_id)))
+    return await ok_envelope(pool, _persona_card(await _agent_row(pool, agent_id)), kind="agent")
 
 
 @router.get("/{agent_id}/state")
@@ -86,7 +87,7 @@ async def api_agent_state(
             from .snapshot_merge import agent_state_at_tick
         except ImportError as e:
             raise ApiError("not_implemented", "历史态合并（?at=）归 T-WEB-04") from e
-        return await ok_envelope(pool, await agent_state_at_tick(pool, agent_id, at))
+        return await ok_envelope(pool, await agent_state_at_tick(pool, agent_id, at), kind="agent_state")
     a = await _agent_row(pool, agent_id)
     goals = a.get("goals") or []
     return await ok_envelope(pool, {
@@ -96,7 +97,7 @@ async def api_agent_state(
         "mood": a.get("mood"),
         "goals": goals,
         "frustration": max((int(g.get("frustration") or 0) for g in goals), default=0),
-    })
+    }, kind="agent_state")
 
 
 @router.get("/{agent_id}/schedule")
@@ -123,7 +124,7 @@ async def api_agent_schedule(
         "day": sim_day.isoformat(),
         "routine": a.get("routine") or {},
         "events": [serialize_event(r) for r in rows],
-    })
+    }, kind="agent_schedule")
 
 
 @router.get("/{agent_id}/reflections")
@@ -147,4 +148,4 @@ async def api_agent_reflections(
         "content_display": r["content_display"],
         "importance": r["importance"],
     } for r in rows]
-    return await ok_envelope(pool, {"items": items})
+    return await ok_envelope(pool, {"items": items}, kind="reflections")

@@ -10,6 +10,7 @@
   ① config/payload_whitelist.yaml      sync 键白名单（07 T-SYN-01 消费）
   ② config/economy_audit_types.yaml    economy 审计类型清单（04 §10.1 ① :economy_types 数据源，08 消费；禁 LIKE 前缀对账，00 §4 红线 6）
   ③ ddl/obs_whitelist_seed.sql         obs.payload_key_whitelist 种子 INSERT（T-DB-03 消费）
+  ④ web/src/proto/event_types.ts       前端事件类型枚举（05 T-WEB-09 proto 层消费；06 §1.2 注册表前端镜像）
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ OUT_PATHS = {
     "whitelist": SERVER_ROOT / "config" / "payload_whitelist.yaml",
     "economy": SERVER_ROOT / "config" / "economy_audit_types.yaml",
     "obs_sql": SERVER_ROOT / "ddl" / "obs_whitelist_seed.sql",
+    "web_event_types": SERVER_ROOT.parent / "web" / "src" / "proto" / "event_types.ts",
 }
 
 GEN_HEADER = "生成物勿手改（由 scripts/gen_event_types.py 从 config/event_types.yaml 派生，00 §1 A11 单源生成链）"
@@ -82,7 +84,32 @@ def render_obs_sql(reg: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-RENDERERS = {"whitelist": render_whitelist, "economy": render_economy, "obs_sql": render_obs_sql}
+def render_web_event_types(reg: dict) -> str:
+    types = [t["type"] for t in reg["types"]]
+    lines = [
+        f"// {GEN_HEADER}",
+        "// 06 §1.2 注册表前端镜像（zod 枚举数据源；含 trigger 六枚举与 source 四形态，06 §1.1）",
+        "export const EVENT_TYPES = [",
+    ]
+    lines += [f"  '{t}'," for t in types]
+    lines.append("] as const;")
+    lines.append("export type EventType = (typeof EVENT_TYPES)[number];")
+    return "\n".join(lines) + "\n"
+
+
+RENDERERS = {"whitelist": render_whitelist, "economy": render_economy, "obs_sql": render_obs_sql,
+             "web_event_types": render_web_event_types}
+
+
+REPO_ROOT = SERVER_ROOT.parent
+
+
+def _disp(path: Path) -> str:
+    """展示路径：web/ 派生物在 server/ 之外，统一相对仓根。"""
+    try:
+        return str(path.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)
 
 
 def main() -> int:
@@ -107,7 +134,7 @@ def main() -> int:
         for name, content in rendered.items():
             path = OUT_PATHS[name]
             if not path.exists() or path.read_text(encoding="utf-8") != content:
-                drifted.append(str(path.relative_to(SERVER_ROOT)))
+                drifted.append(_disp(path))
         if drifted:
             print(f"FAIL: 派生物与 event_types.yaml 漂移: {drifted}（重跑 gen_event_types.py）", file=sys.stderr)
             return 1
@@ -115,8 +142,9 @@ def main() -> int:
         return 0
 
     for name, content in rendered.items():
+        OUT_PATHS[name].parent.mkdir(parents=True, exist_ok=True)
         OUT_PATHS[name].write_text(content, encoding="utf-8")
-        print(f"written {OUT_PATHS[name].relative_to(SERVER_ROOT)}")
+        print(f"written {_disp(OUT_PATHS[name])}")
     return 0
 
 

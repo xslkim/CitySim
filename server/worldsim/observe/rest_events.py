@@ -130,7 +130,7 @@ async def api_events(
     return await ok_envelope(pool, {
         "items": [serialize_event(r) for r in rows],
         "next_cursor": int(rows[-1]["seq"]) if has_more and rows else None,
-    })
+    }, kind="events")
 
 
 @router.get("/histogram")
@@ -167,4 +167,4 @@ async def api_events_histogram(
         {"bucket_start": r["bucket_start"].isoformat(), "count": int(r["count"]),
          "a_count": int(r["a_count"])}
         for r in rows
-    ])
+    ], kind="events_histogram")

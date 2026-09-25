@@ -129,8 +129,8 @@ async def api_snapshot(
         except ImportError as e:
             raise ApiError("not_implemented", "历史合并（?tick=）归 T-WEB-04") from e
         data = await snapshot_at_tick(pool, tick)
-        return await ok_envelope(pool, data)
+        return await ok_envelope(pool, data, kind="snapshot")
     snap = await latest_snapshot(pool)
     if snap is None:
         raise ApiError("no_snapshot", "尚无世界快照（obs.world_state_snapshot 为空，先跑 obs_refresh.py）", 404)
-    return await ok_envelope(pool, await assemble_snapshot(pool, snap))
+    return await ok_envelope(pool, await assemble_snapshot(pool, snap), kind="snapshot")

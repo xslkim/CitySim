@@ -39,8 +39,11 @@ def error_body(code: str, message: str) -> dict[str, Any]:
     return {"ok": False, "error": {"code": code, "message": message}}
 
 
-async def ok_envelope(pool: Any, data: Any, meta: dict[str, Any] | None = None) -> dict[str, Any]:
+async def ok_envelope(pool: Any, data: Any, meta: dict[str, Any] | None = None,
+                      kind: str | None = None) -> dict[str, Any]:
     m = {"watermark_tick": await watermark_tick(pool)}
+    if kind:
+        m["kind"] = kind  # proto_check.mjs 按 meta.kind 选 zod schema（05 T-WEB-09）
     if meta:
         m.update(meta)
     return {"ok": True, "data": data, "meta": m}
@@ -86,7 +89,7 @@ def create_app(pool: Any = None, token_db_path: str | None = None) -> FastAPI:
         _pool: Any = Depends(get_pool),
     ) -> dict[str, Any]:
         """门禁④度量（03 §5.1）：访问日志 token×自然日聚合（管理鉴权 = 有效 token，M4 开发期口径）。"""
-        return await ok_envelope(_pool, usage_by_day(from_, to, db_path=app.state.token_db_path))
+        return await ok_envelope(_pool, usage_by_day(from_, to, db_path=app.state.token_db_path), kind="usage")
 
     # 随任务挂载的 REST/WS 路由（T-WEB-03~07；模块未交付时静默缺省）
     for modname in ("rest_snapshot", "rest_agents", "rest_events", "rest_ripple",

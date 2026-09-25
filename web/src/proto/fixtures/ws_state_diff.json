@@ -1,0 +1,2 @@
+{ "_source": "03 §5.2 state_diff 帧", "op": "state_diff", "seq": 88422,
+  "data": { "tick": 12341, "agents": [{ "id": "A07", "location_id": "apt.L3.302", "mood": 70 }] } }

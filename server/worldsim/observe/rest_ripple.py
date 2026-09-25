@@ -122,7 +122,7 @@ async def api_ripple_today(pool: Any = Depends(get_pool)) -> dict[str, Any]:
         f"SELECT (max(sim_time) AT TIME ZONE '{LOCAL_TZ_NAME}')::date FROM obs.events"
     )
     if cur_day is None:
-        return await ok_envelope(pool, {"sim_day": None, "items": []})
+        return await ok_envelope(pool, {"sim_day": None, "items": []}, kind="ripple_today")
     a_events = await pool.fetch(
         f"""
         SELECT e.seq FROM obs.events e JOIN obs.event_grade_view g ON g.seq = e.seq
@@ -143,7 +143,7 @@ async def api_ripple_today(pool: Any = Depends(get_pool)) -> dict[str, Any]:
     return await ok_envelope(pool, {
         "sim_day": cur_day.isoformat(),
         "items": [{**it, "event": it["event"]} for it in items[:5]],
-    })
+    }, kind="ripple_today")
 
 
 @router.get("/{event_id}")
@@ -155,4 +155,4 @@ async def api_ripple(
     exists = await pool.fetchval("SELECT 1 FROM obs.events WHERE seq = $1", e0)
     if not exists:
         raise ApiError("event_not_found", f"无事件 e{e0}", 404)
-    return await ok_envelope(pool, await ripple_five_sections(pool, e0))
+    return await ok_envelope(pool, await ripple_five_sections(pool, e0), kind="ripple")

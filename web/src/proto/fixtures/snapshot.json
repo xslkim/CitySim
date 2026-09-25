@@ -1,0 +1,27 @@
+{
+  "_source": "03 §5.1 /api/snapshot data 示例",
+  "tick": 12340,
+  "sim_time": "2026-10-12T19:42:00+08:00",
+  "sim_day": 12,
+  "compression_ratio": 3.2,
+  "agents": [
+    {
+      "id": "A07",
+      "name": "林小满",
+      "lod": "star",
+      "location_id": "corp.pantry",
+      "activity": "chatting",
+      "mood": 72,
+      "needs": { "hunger": 40, "energy": 55, "mood": 72, "social": 80, "achievement": 61, "wealth": 35 }
+    }
+  ],
+  "economy": { "stocks": [{ "symbol": "星澜科技", "price": 1012.4 }] },
+  "active_dialogues": [
+    {
+      "event_seq": 1102,
+      "participants": ["A07", "A12"],
+      "location_id": "corp.pantry",
+      "lines": [{ "speaker": "A07", "text_display": "今晚约吗?", "at_offset_s": 0 }]
+    }
+  ]
+}

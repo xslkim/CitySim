@@ -1,0 +1,22 @@
+{
+  "_source": "03 §5.1 单条事件 schema 示例（fixture 抽取；_source 键测试前剥除）",
+  "seq": 12338,
+  "tick": 12338,
+  "sim_time": "2026-10-12T19:38:11+08:00",
+  "type": "dialogue.chat",
+  "source": "agent:A07",
+  "trigger": "autonomous",
+  "arc_id": "arc_crush_01",
+  "ui": { "grade": "A" },
+  "payload": {
+    "location_id": "corp.pantry",
+    "participants": ["A07", "A12"],
+    "witnesses": ["A21"],
+    "text_display": "林小满压低声音问王强：今晚约吗？",
+    "caused_by": "1089",
+    "lines": [
+      { "speaker": "A07", "text_display": "今晚约吗?", "at_offset_s": 0 },
+      { "speaker": "A12", "text_display": "好啊，去哪儿", "at_offset_s": 3.2 }
+    ]
+  }
+}

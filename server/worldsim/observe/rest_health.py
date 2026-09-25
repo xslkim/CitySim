@@ -157,4 +157,4 @@ async def health_payload(pool: Any) -> dict[str, Any]:
 
 @router.get("/health")
 async def api_health(pool: Any = Depends(get_pool)) -> dict[str, Any]:
-    return await ok_envelope(pool, await health_payload(pool))
+    return await ok_envelope(pool, await health_payload(pool), kind="health")

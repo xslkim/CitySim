@@ -53,7 +53,7 @@ async def api_relations_agent(
         """,
         agent,
     )
-    return await ok_envelope(pool, {"items": [_edge(r) for r in rows]})
+    return await ok_envelope(pool, {"items": [_edge(r) for r in rows]}, kind="relations_agent")
 
 
 @router.get("/snapshots")
@@ -87,7 +87,7 @@ async def api_relations_snapshots(
             days.setdefault(r["sim_day"].isoformat(), []).append(_edge(r))
     return await ok_envelope(pool, {
         "items": [{"sim_day": d, "edges": edges} for d, edges in sorted(days.items())],
-    })
+    }, kind="relations_snapshots")
 
 
 @router.get("/pair")
@@ -141,4 +141,4 @@ async def api_relations_pair(
             "sim_time": c["sim_time"].isoformat(),
         } for c in changes],
         "key_events": key_events,
-    })
+    }, kind="relations_pair")
