@@ -39,10 +39,17 @@ describe('03 §5.3 映射表', () => {
 
   it('test_unknown_type_gray_bar_logged：无 text_display 未知 type → 灰条 + 错误日志计数', () => {
     const before = unknownTypeLogCount();
-    // 用注册表内但无 text_display 的非显式 type（economy.settle 不带文本）
-    const r = renderEvent(ev('economy.settle', { agent_id: 'A01', amount_cents: -100, reason: 'x' }));
+    // proto 层已拒未注册 type；此处直调渲染器模拟协议被篡改注入（03 §7.2 兜底路径）
+    const r = renderEvent(ev('ghost.unregistered' as never, { zzz: 1 }));
     expect(r.kind).toBe('gray');
     expect(unknownTypeLogCount()).toBe(before + 1);
+  });
+
+  it('未过审占位（03 §7.3）：已注册无 text_display → ▮内容审核中▮，事件可见', () => {
+    const r = renderEvent(ev('economy.settle', { agent_id: 'A01', amount_cents: -100, reason: 'x' }));
+    expect(r.kind).toBe('gray');
+    expect(r.text).toBe('▮内容审核中▮');
+    expect(r.text).not.toContain('amount_cents'); // 无原文泄漏面
   });
 
   it('已注册 + text_display 的未列 type → 通用社交行（不落灰条）', () => {

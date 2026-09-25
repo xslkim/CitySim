@@ -134,9 +134,13 @@ export function renderEvent(ev: ObsEvent, nameOf: NameOf = idName): RenderedEven
   if (SYSTEM_PREFIXES.some((pre) => ev.type.startsWith(pre))) {
     return { ...base, kind: 'system', icon: '⚙', text: text || ev.type }; // 灰色系统条（调试态）
   }
-  if ((EVENT_TYPES as readonly string[]).includes(ev.type) && text) {
-    // 缺省规则：已注册 + text_display → 通用社交行（卡片横幅 + 域图标）
-    return { ...base, kind: 'card', icon: '📌', text };
+  if ((EVENT_TYPES as readonly string[]).includes(ev.type)) {
+    if (text) {
+      // 缺省规则：已注册 + text_display → 通用社交行（卡片横幅 + 域图标）
+      return { ...base, kind: 'card', icon: '📌', text };
+    }
+    // 未过审占位（03 §7.3）：展示文本未生成/被安全管线打回 → 占位气泡，事件可见，无任何原文泄漏面
+    return { ...base, kind: 'gray', icon: '▮', text: '▮内容审核中▮' };
   }
   logUnknown(ev.type); // 无 text_display 未知 type → 灰条原始 JSON + 错误日志（N-P1-8）
   return { ...base, kind: 'gray', icon: '⚙', text: JSON.stringify(ev.payload) };

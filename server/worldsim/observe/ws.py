@@ -93,19 +93,18 @@ async def _feed_ring(events: list[dict[str, Any]]) -> None:
                 RING.append(ev)
 
 
-async def _resume(ws: WebSocket, pool: Any, last_seq: int, ring_capacity: int) -> bool:
+async def _resume(ws: WebSocket, pool: Any, last_seq: int, ring_capacity: int) -> tuple[bool, int]:
     """resume-from-seq（03 §5.2）：缺口 ≤ 环缓冲容量 → 直接补推接 live；超容量 → resync_required
-    （客户端走 /api/snapshot 重建）。环缓冲为推送路径的内存镜像（RING），缺口判定以
-    `db_max_seq - last_seq` vs 容量为口径（环缓冲恰好覆盖最近 ring_capacity 条时两者等价）。"""
+    （客户端走 /api/snapshot 重建）。返回（可否接 live, 补推后的新 last_seq——防 live 段重推）。"""
     db_max = int(await pool.fetchval("SELECT max(seq) FROM obs.events") or 0)
     if db_max - last_seq > ring_capacity:
         await ws.send_text(json.dumps({"op": "resync_required"}, ensure_ascii=False))
-        return False
+        return False, last_seq
     events = await _fetch_events_after(pool, last_seq, limit=ring_capacity)
     for ev in events:
         await ws.send_text(json.dumps(
             {"op": "event", "seq": ev["seq"], "data": _strip_internal(ev)}, ensure_ascii=False))
-    return True
+    return True, max(last_seq, db_max)
 
 
 @router.websocket("/ws")
@@ -181,7 +180,7 @@ async def ws_endpoint(websocket: WebSocket) -> None:
                 req_last = frame.get("last_seq")
                 if req_last is not None:
                     last_seq = int(req_last)
-                    ok = await _resume(websocket, pool, last_seq, ring_capacity)
+                    ok, last_seq = await _resume(websocket, pool, last_seq, ring_capacity)
                     if not ok:
                         continue  # resync_required 已下发，等客户端重建后重新 hello/subscribe
                 else:
