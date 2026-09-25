@@ -14,6 +14,8 @@ import { join } from 'node:path';
 const EXEMPT_FILES = new Set([
   join('src', 'lib', 'rippleLayout.ts'), // 失真三档档值持有方 = 05 §3.7（见文件头豁免②）
   join('src', 'test', 'ripple.test.ts'), // 同上：失真分档测试样本值（05 §3.7 域）
+  join('src', 'lite', 'narrativeMap.ts'), // 同上：lite 失真人话分档（05 §3.7 域，不显示数字）
+  join('src', 'test', 'lite.test.ts'), // 同上：失真人话测试样本值
 ]);
 
 function stripComments(text: string): string {
