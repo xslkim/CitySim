@@ -11,6 +11,7 @@ import { SubtitleQueue } from './lib/subtitle.js';
 import { ModeMachine } from './lib/mode.js';
 import { SubtitleView } from './ui/subtitle-view.js';
 import { PcardView } from './ui/pcard-view.js';
+import { FloatView } from './ui/float-view.js';
 import { StreamWsClient } from './lib/ws-client.js';
 
 const params = new URLSearchParams(location.search);
@@ -123,6 +124,8 @@ async function main() {
   });
   // 形态判定先于字幕/特写（弹卡时读取的已是新形态）
   ctx.handlers = [(_c, ev) => ctx.mode.feed(ev), (_c, ev) => queue.push(ev)];
+  // T-LTV-06 飘屏占位（?float=0 整组隐藏；不接数据源，04 §6.4 口径）
+  new FloatView(document.getElementById('float-mount'), { visible: params.get('float') !== '0' });
   if (params.get('mock')) {
     const { runMock } = await import('./mock.js');
     runMock(ctx);
