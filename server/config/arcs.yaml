@@ -2,10 +2,169 @@
 # 字段：arc_id/title/stage_machine/fail_forward/intervention_budget/actors/min_days/max_days/payoff_beat
 # 条件 DSL（D-16）：exit / if_blocked 只许 {pred, args} 引用 director/arcs.py PREDICATES 预注册表，禁自由文本。
 # payoff_beat.type 限 01 §11.3 八类：打脸/逆袭/告白成功/真相大白/误会解除/复仇/神反转/吃瓜围观。
+# min_days/max_days = payoff_beat.setup_days 的部署镜像（01 §6.2/§11.3 同区间）。
+# actors 引用 seed_8 明星层人设（01 §2.3 拓扑：暗恋链 A01→A02/A08→A02、前任 A03/A04、债务 A01→A06、竞聘 A06/A07）。
 
 meta:
   concurrency_cap: 3      # 活跃弧线 ≤3 条（01 §6.2，超过即排队）
   cooldown_days: 14       # 同模板冷却 ≥2 模拟周（01 §6.2）
   a_drought_days: 2       # 连续 2 个模拟日无 A 级 → 自动启动休眠弧线（01 §6.4）
 
-arcs: []  # 六条骨架模板由 T-DIR-02 逐条填入（A1~A6，01 §6.2 表）
+arcs:
+  - arc_id: ARC-A1                      # A1 暗恋链曝光（01 §6.2 表行 1）
+    title: 暗恋链曝光
+    stage_machine:
+      - stage: S1                       # 各自暗涌（暗恋链积累：送礼/私聊/独处）
+        exit: { pred: count_events, args: { type: social.send_message, min: 2, within_days: 7 } }
+      - stage: S2                       # 中间人察觉
+        exit: { pred: count_events, args: { type: dialogue.chat, min: 2, within_days: 7 } }
+      - stage: S3                       # 八卦扩散（失真链）
+        exit: { pred: count_events, args: { type: dialogue.gossip, min: 2, within_days: 7 } }
+      - stage: S4                       # 当事人对峙
+        exit: { pred: count_events, args: { type: dialogue.argue, min: 1, within_days: 7 } }
+        hooks:
+          - intervene: { level: L0, action: announce,
+                         params: { title: 楼道风声, body: 最近楼里的气氛有点微妙, scope: floor },
+                         reason: A1 对峙预热 }
+      - stage: S5                       # 成对/错位收场
+        exit: { pred: count_events, args: { type: dialogue.confess, min: 1 } }
+    fail_forward:
+      - at: S4                          # 若无人敢对峙 → 八卦链自然烧到当事人（01 §6.2 fail-forward 要点）
+        if_blocked: { pred: stage_age_days, args: { min: 3 } }
+        degrade_to: S5
+    intervention_budget: { L1: 2, L2: 1 }
+    actors: { main: [A01, A02], support: [A08] }
+    min_days: 5
+    max_days: 14
+    payoff_beat:
+      type: 告白成功
+      setup_days: [5, 14]
+      burst_event: dialogue.confess
+      aftermath: 恋人标签公开，情敌线收束或激化
+
+  - arc_id: ARC-A2                      # A2 职场竞聘对决（01 §6.2 表行 2；接 T-WA-07 晋升窗口）
+    title: 职场竞聘对决
+    stage_machine:
+      - stage: S1                       # 晋升窗口公告
+        exit: { pred: count_events, args: { type: world.promotion_window, min: 1, within_days: 40 } }
+      - stage: S2                       # 候选人备战（加班/拉票）
+        exit: { pred: count_events, args: { type: world.overtime, min: 2, within_days: 14 } }
+      - stage: S3                       # 一方失误或使坏
+        exit: { pred: count_events, args: { type: dialogue.gossip, min: 1, within_days: 7 } }
+      - stage: S4                       # 评审（黄金档公开答辩）
+        exit: { pred: count_events, args: { type: world.perf_review, min: 1, within_days: 40 } }
+      - stage: S5                       # 胜者对败者的关系重构
+        exit: { pred: stage_age_days, args: { min: 2 } }
+    fail_forward:
+      - at: S4                          # 落选者触发迁怒/换策略规则，天然接 A6 弧线（01 §6.2）
+        if_blocked: { pred: stage_age_days, args: { min: 7 } }
+        degrade_to: done
+    intervention_budget: { L1: 2, L2: 1 }
+    actors: { main: [A06, A07], support: [A02] }
+    min_days: 7
+    max_days: 21
+    payoff_beat:
+      type: 打脸
+      setup_days: [7, 21]
+      burst_event: world.perf_review
+      aftermath: 胜负双方关系重排
+
+  - arc_id: ARC-A3                      # A3 前任重逢（01 §6.2 表行 3）
+    title: 前任重逢
+    stage_machine:
+      - stage: S1                       # 同楼偶遇激化（tension 淤积超线）
+        exit: { pred: relation_delta, args: { a: A03, b: A04, tension_above: 60 } }
+      - stage: S2                       # 第三方介入（新欢/闺蜜参谋）
+        exit: { pred: count_events, args: { type: dialogue.chat, min: 2, within_days: 7 } }
+      - stage: S3                       # 旧账重提（argue）
+        exit: { pred: count_events, args: { type: dialogue.argue, min: 1, within_days: 7 } }
+      - stage: S4                       # 和解/彻底决裂
+        exit: { pred: count_events, args: { type: dialogue.apologize, min: 1, within_days: 14 } }
+    fail_forward:
+      - at: S1                          # 双方回避 7 天 → 编剧安排公共区偶遇（L1）；仍回避则软收尾（01 §6.2）
+        if_blocked: { pred: stage_age_days, args: { min: 7 } }
+        degrade_to: done
+    intervention_budget: { L1: 2, L2: 1 }
+    actors: { main: [A03, A04], support: [A05] }
+    min_days: 4
+    max_days: 14
+    payoff_beat:
+      type: 误会解除
+      setup_days: [4, 14]
+      burst_event: dialogue.apologize
+      aftermath: 和解或新怨
+
+  - arc_id: ARC-A4                      # A4 债务追讨（01 §6.2 表行 4；接 debts 状态与 social.repay_money）
+    title: 债务追讨
+    stage_machine:
+      - stage: S1                       # 债主资金紧张（财富 <30）
+        exit: { pred: need_below, args: { agent: A01, need: wealth, below: 30 } }
+      - stage: S2                       # 委婉暗示
+        exit: { pred: count_events, args: { type: social.send_message, min: 1, within_days: 7 } }
+      - stage: S3                       # 公开催讨/第三人知晓
+        exit: { pred: count_events, args: { type: dialogue.argue, min: 1 } }
+      - stage: S4                       # 还钱/撕破脸
+        exit: { pred: count_events, args: { type: social.repay_money, min: 1, within_days: 14 } }
+    fail_forward:
+      - at: S4                          # 欠款人真没钱 → 以工抵债/分期剧情，关系重构而非断裂（01 §6.2）
+        if_blocked: { pred: stage_age_days, args: { min: 5 } }
+        degrade_to: done
+    intervention_budget: { L1: 1, L2: 1 }
+    actors: { main: [A01, A06], support: [] }
+    min_days: 5
+    max_days: 14
+    payoff_beat:
+      type: 真相大白
+      setup_days: [5, 14]
+      burst_event: social.repay_money
+      aftermath: 债务边结算与关系余震
+
+  - arc_id: ARC-A5                      # A5 谣言风暴（01 §6.2 表行 5；接 gossip cites 链，深度口径 01 §4.1）
+    title: 谣言风暴
+    stage_machine:
+      - stage: S1                       # 一条 gossip 生成
+        exit: { pred: count_events, args: { type: dialogue.gossip, min: 1, within_days: 7 } }
+      - stage: S2                       # 三手传播失真
+        exit: { pred: count_events, args: { type: dialogue.gossip, min: 3, within_days: 3 } }
+      - stage: S3                       # 当事人听闻（关键翻转版本）
+        exit: { pred: count_events, args: { type: dialogue.argue, min: 1 } }
+      - stage: S4                       # 辟谣大会/误会加深
+        exit: { pred: count_events, args: { type: dialogue.chat, min: 1 } }
+    fail_forward:
+      - at: S2                          # 3 天内未传回当事人 → 编剧安排目击者复述（L1）送链入轨（01 §6.2）
+        if_blocked: { pred: stage_age_days, args: { min: 3 } }
+        degrade_to: S3
+    intervention_budget: { L1: 2, L2: 0 }
+    actors: { main: [A03], support: [A05, A08] }
+    min_days: 3
+    max_days: 10
+    payoff_beat:
+      type: 吃瓜围观
+      setup_days: [3, 10]
+      burst_event: dialogue.argue
+      aftermath: 辟谣或误会固化
+
+  - arc_id: ARC-A6                      # A6 低谷与反弹（01 §6.2 表行 6；接裁员候选池/挫败链）
+    title: 低谷与反弹
+    stage_machine:
+      - stage: S1                       # 连续挫败（绩效 C+目标失败+爽约；挫败值口径 §3.3）
+        exit: { pred: frustration_above, args: { agent: A06, above: 30 } }
+      - stage: S2                       # 情绪崩溃（深夜天台/买醉）
+        exit: { pred: need_below, args: { agent: A06, need: mood, below: 30 } }
+      - stage: S3                       # 某人伸出援手
+        exit: { pred: count_events, args: { type: social.help, min: 1, within_days: 7 } }
+      - stage: S4                       # 关系跃迁
+        exit: { pred: relation_delta, args: { a: A01, b: A06, affinity_above: 40 } }
+    fail_forward:
+      - at: S3                          # 无人援手 48h → 世界 Agent 排 team_building/lucky 托底情绪（L0/L1，01 §6.2）
+        if_blocked: { pred: stage_age_days, args: { min: 2 } }
+        degrade_to: S4
+    intervention_budget: { L1: 1, L2: 1 }
+    actors: { main: [A06], support: [A01, A02] }
+    min_days: 7
+    max_days: 21
+    payoff_beat:
+      type: 逆袭
+      setup_days: [7, 21]
+      burst_event: social.help
+      aftermath: 新盟友或新暗恋线

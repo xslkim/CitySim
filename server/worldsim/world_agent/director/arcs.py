@@ -115,7 +115,7 @@ def load_arcs(path: str | None = None) -> dict[str, Any]:
     """加载并 schema 校验 arcs.yaml；失败抛 ArcSchemaError（拒绝启动口径同 T-WA-01）。"""
     from pathlib import Path
 
-    p = Path(path) if path else Path(__file__).resolve().parents[2] / "config" / "arcs.yaml"
+    p = Path(path) if path else Path(__file__).resolve().parents[3] / "config" / "arcs.yaml"
     try:
         raw = yaml.safe_load(p.read_text(encoding="utf-8"))
     except OSError as e:
@@ -331,12 +331,7 @@ class ArcEngine:
         if days_active > max_days:
             await self._force_close(inst, tpl, reason="max_days_exceeded")
             return
-        # fail_forward：当前 stage 有降级分支且阻塞条件成立 → degrade_to
-        ff = next((f for f in tpl["fail_forward"] if f["at"] == inst["stage"]), None)
-        if ff is not None and await self._eval_cond(ff["if_blocked"], inst):
-            await self._jump(inst, stages, ff["degrade_to"], now, via="fail_forward")
-            return
-        # min_days 内不爆发（01 §11.3：铺垫不足不爽）——末态前的推进受 min_days 门禁
+        # exit 优先于 fail_forward：exit 条件满足 = 未阻塞（if_blocked 语义，01 §6.2）
         if stage.get("exit") and await self._eval_cond(stage["exit"], inst):
             is_last = idx == len(stages) - 1
             if is_last:
@@ -344,6 +339,11 @@ class ArcEngine:
             elif days_active >= min_days or idx < len(stages) - 2:
                 # 中间 stage 自由推进；进入末态前须过 min_days 铺垫门禁（01 §11.3 铺垫不足不爽）
                 await self._jump(inst, stages, stages[idx + 1]["stage"], now, via="advance")
+            return
+        # fail_forward：当前 stage 有降级分支且阻塞条件成立 → degrade_to
+        ff = next((f for f in tpl["fail_forward"] if f["at"] == inst["stage"]), None)
+        if ff is not None and await self._eval_cond(ff["if_blocked"], inst):
+            await self._jump(inst, stages, ff["degrade_to"], now, via="fail_forward")
             return
 
     async def _eval_cond(self, cond: dict[str, Any], inst: dict[str, Any]) -> bool:
@@ -355,6 +355,7 @@ class ArcEngine:
     async def _jump(self, inst: dict[str, Any], stages: list[dict], target: str, now: dt.datetime,
                     *, via: str) -> None:
         if target == "done":
+            await self._audit(via, inst["arc_id"], {"to": "done"})
             await self._complete(inst, self._templates[inst["arc_id"]], now, via=via)
             return
         inst["stage"] = target

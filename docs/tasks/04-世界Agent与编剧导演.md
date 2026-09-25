@@ -407,3 +407,4 @@ M3「世界 Agent 与编剧」全部规则化模块（04 §2.1 `world_agent/` + 
 | D-25 | 挂账期间"余额充足自动补扣清账"的部分补扣设计未定义 | 工程默认：足额才扣（余额 < 挂账额不动，防半清状态歧义）；每日 09:30 扫描（`economy.overdue.daily`，时点为工程默认）；已登记（本文偏差表） |
 | D-26 | 8 人小世界（seed_8）无部门经理 NPC（M 级全为 16 名 NPC，01 §1.3），`world.perf_review.manager_id` 无真实人可指 | 工程默认：无经理时 `manager_id=null`（键保留）；40 人 seed 起指真实经理；已登记（本文偏差表） |
 | D-27 | `world.promotion_window`/`world.perf_review` 的触发时点（日内 HH:MM）01 §6.1 只给日期规则 | 工程默认：promotion_window 10:00、perf_review 16:00（01 §6.1 模板行注明 16:00；晋升窗口取公告时段）；落配置 `triggers.*`；已登记（本文偏差表） |
+| D-28 | 01 §6.2 fail_forward `if_blocked` 与 stage exit 的判定先后设计未定义 | 工程默认：exit 优先（exit 满足=未阻塞），其后 if_blocked，max_days 兜底最先判；爆发铺垫门禁操作口径 = `payoff_beat.setup_days`（01 §11.3 权威），`min_days/max_days` 为镜像；已登记（本文偏差表） |
