@@ -65,7 +65,7 @@ def test_thresholds_match_design() -> None:
     assert th["retrieval_quota"] == {"N": 10, "M": 5, "K": 10}          # 04 §7.1
     assert th["rotation"] == {"promote_in": 0.62, "demote_out": 0.45}   # 04 §4.2
     assert th["reflection"]["importance_acc"] == 20                     # 04 §7.2
-    assert th["cost_breaker"] == {"alarm_ratio": 1.5, "throttle_ratio": 2.0}  # 源方案 §5.2（06 §3）
+    assert th["cost_breaker"] == {"alarm_ratio": 1.5, "throttle_ratio": 2.0, "recover_ratio": 1.3}  # 源方案 §5.2（06 §3；恢复行 04 §8.4"回落 <1.3×"）
     assert th["intervention_rate_cap"] == 0.15                          # 源方案 §4.8（06 §3）
 
 

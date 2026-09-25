@@ -110,5 +110,5 @@ thresholds:                                     # 阈值集中段（04 §12.4）
     gini_cold_bonus_above: 0.45           # 出场基尼超预警线时 cold_bonus 权重上调 ×2（阈值持有方 = 01 §9 预警线，02 D23）
   reflection: { importance_acc: 20 }            # 反思触发阈值（04 §7.2）
   dialogue: { daily_cap: 42 }                   # 每模拟日对话场次上限默认值（未降速时；降速档 ×60%，04 §8.4 ③；值 = 01 §1.6 推算区间上界的工程默认，02 D29）
-  cost_breaker: { alarm_ratio: 1.5, throttle_ratio: 2.0 }   # 熔断倍数（数值持有方 = 源方案 §5.2，06 §3 登记；04 §8.4 镜像）
+  cost_breaker: { alarm_ratio: 1.5, throttle_ratio: 2.0, recover_ratio: 1.3 }   # 熔断倍数（数值持有方 = 源方案 §5.2，06 §3 登记；04 §8.4 镜像；恢复行"回落 <1.3× 逐级撤销"）
   intervention_rate_cap: 0.15                   # 干预率上限（数值持有方 = 源方案 §4.8，06 §3 登记；消费方 = 04 T-DIR-03 滑窗 / 08 T-AUD-05 审计④，本段唯一写入方）
