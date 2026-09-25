@@ -165,23 +165,23 @@ def write_snapshot_files(
     return full_path, wl_path, digest
 
 
-async def dump_snapshot(
-    pool: Any, *, sim_day: dt.date, out_dir: str | Path, tick: int, sim_now: dt.datetime,
-    compression_ratio: float = 1.0, schedule: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """每模拟日全量快照：读全量 → 白名单子集 → 落盘 + sidecar digest → world_state 留痕键（D12）。"""
-    full = await read_full_state(pool)
-    announcements = [
+async def fetch_announcements(pool: Any, limit: int = ANNOUNCEMENTS_LIMIT) -> list[str]:
+    """近期公告展示文本（world.announce 的 text_display，D32）；dump 与 sync 快照流共用。"""
+    return [
         str(r["text"])
         for r in await pool.fetch(
             """
             SELECT payload->>'text_display' AS text FROM events
             WHERE type='world.announce' AND payload ? 'text_display' ORDER BY seq DESC LIMIT $1
             """,
-            ANNOUNCEMENTS_LIMIT,
+            limit,
         )
     ]
-    activity_rows = await pool.fetch(
+
+
+async def fetch_latest_activity(pool: Any, *, sim_day: dt.date, sim_now: dt.datetime) -> dict[str, str]:
+    """各 agent 当日最近一条事件类型名（activity 公开字段，D32）；dump 与 sync 快照流共用。"""
+    rows = await pool.fetch(
         """
         SELECT DISTINCT ON (u.agent_id) u.agent_id, e.type FROM events e
         CROSS JOIN LATERAL unnest(e.actors) AS u(agent_id)
@@ -190,7 +190,17 @@ async def dump_snapshot(
         """,
         dt.datetime.combine(sim_day, dt.time(0, 0), tzinfo=sim_now.tzinfo),
     )
-    latest_activity = {r["agent_id"]: r["type"] for r in activity_rows}
+    return {r["agent_id"]: r["type"] for r in rows}
+
+
+async def dump_snapshot(
+    pool: Any, *, sim_day: dt.date, out_dir: str | Path, tick: int, sim_now: dt.datetime,
+    compression_ratio: float = 1.0, schedule: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """每模拟日全量快照：读全量 → 白名单子集 → 落盘 + sidecar digest → world_state 留痕键（D12）。"""
+    full = await read_full_state(pool)
+    announcements = await fetch_announcements(pool)
+    latest_activity = await fetch_latest_activity(pool, sim_day=sim_day, sim_now=sim_now)
     whitelist = build_whitelist_state(
         full, sim_day=sim_day, sim_time=sim_now, compression_ratio=compression_ratio,
         schedule=schedule, latest_activity=latest_activity, announcements=announcements,
