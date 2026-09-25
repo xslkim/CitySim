@@ -22,6 +22,7 @@ export const healthMetricSchema = z
     }),
     color: z.enum(['green', 'yellow', 'red']).nullable(), // 前端映射 green→positive/yellow→warn/red→negative（02 §7.1）
     advice: z.string().nullable(),
+    history: z.array(z.object({ sim_day: z.string(), value: z.number().nullable() })), // 趋势 sparkline（03 §3.6）
   })
   .strip();
 

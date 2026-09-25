@@ -100,6 +100,9 @@ def classify_color(value: float | None, metric_spec: dict[str, Any]) -> str | No
 async def health_payload(pool: Any) -> dict[str, Any]:
     """`/api/health` data 组装（WS health 频道每分钟推送复用本函数，T-WEB-07）。"""
     latest = await pool.fetchrow("SELECT * FROM obs.health_daily ORDER BY sim_day DESC LIMIT 1")
+    history_rows = await pool.fetch(
+        "SELECT * FROM obs.health_daily ORDER BY sim_day DESC LIMIT 7"  # sparkline 数据源（03 §3.6 趋势线）
+    )
     metrics = []
     for spec in load_thresholds():
         key = spec["metric"]
@@ -109,6 +112,11 @@ async def health_payload(pool: Any) -> dict[str, Any]:
             "key": key,
             "column": col,
             "value": float(value) if value is not None else None,
+            "history": [
+                {"sim_day": r["sim_day"].isoformat(),
+                 "value": float(r[col]) if col and r[col] is not None else None}
+                for r in reversed(history_rows)
+            ] if col else [],
             "unit": spec.get("unit"),
             "window": spec.get("window"),
             "thresholds": {k: spec.get(k) for k in ("healthy", "warning", "alarm")},
