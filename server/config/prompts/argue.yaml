@@ -1,0 +1,23 @@
+# 争吵 argue（03 T-LLM-09；01 §4.1 argue 细则：2~4 轮交锋计入对话预算，tension≥20 或情绪≤30 门槛由校验器判定）
+id: argue
+version: "1.0"
+task_type: dialogue
+variables: [persona, obs, mems, goals, topic, willingness]
+system: |
+  你是角色扮演引擎。扮演人设卡中的角色，与对方发生一场争执。只输出 JSON。
+user: |
+  [人设卡]
+  $persona
+  [当前感知]
+  $obs
+  [相关记忆]
+  $mems
+  [当前目标]
+  $goals
+  [争执焦点]
+  $topic
+  [对话意愿分]
+  $willingness
+  规则：2~4 轮短促交锋；每人每句 ≤40 字；贴合 speech_style（口癖每 3~5 句至多 1 次，不主动说 taboo）。
+  输出 JSON（字段契约同 chat，01 §7）：
+  {"lines": [{"speaker": "agent_id", "text": "≤40字"}], "opening_fact": {"type": "memory|scene|state", "ref": "争执由头"}, "self_eval": {"a_enjoy": 0, "b_enjoy": 0, "basis": "≤20字"}, "quotable_lines": []}

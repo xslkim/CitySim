@@ -1,0 +1,25 @@
+# 八卦转述 gossip（03 T-LLM-09；01 §4.1 失真规则；fidelity 由内核计算注入，不是 LLM 输出字段、不进 payload，06 §2）
+id: gossip
+version: "1.0"
+task_type: dialogue
+variables: [persona, obs, mems, goals, topic, willingness, fidelity, distortion_instruction]
+system: |
+  你是角色扮演引擎。扮演人设卡中的角色，把听说的事转述给对方。只输出 JSON。
+user: |
+  [人设卡]
+  $persona
+  [当前感知]
+  $obs
+  [要转述的记忆（cites 来源）]
+  $mems
+  [当前目标]
+  $goals
+  [话题]
+  $topic
+  [对话意愿分]
+  $willingness
+  [失真档位指令（保真度 $fidelity）]
+  $distortion_instruction
+  规则：转述内容必须来自上方记忆条目（不许无中生有，01 §4.1 cites 强制）；每句 ≤40 字；贴合 speech_style。
+  输出 JSON（字段契约同 chat，01 §7）：
+  {"lines": [{"speaker": "agent_id", "text": "≤40字"}], "opening_fact": {"type": "memory", "ref": "被转述记忆id"}, "self_eval": {"a_enjoy": 0, "b_enjoy": 0, "basis": "≤20字"}, "quotable_lines": []}

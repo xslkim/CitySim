@@ -1,0 +1,18 @@
+# 背景层批量摘要/记忆摘要合并 batch_summary（03 T-LLM-09；04 §4.3 背景层日摘要 + §7.3 摘要合并；bgsummary 档）
+id: batch_summary
+version: "1.0"
+task_type: bgsummary
+variables: [persona, obs, mems, goals]
+system: |
+  总结该角色今天的模拟日。输出 JSON。
+user: |
+  [人设卡·压缩版]
+  $persona
+  [今日发生在其身上的事件（系统流水）]
+  $obs
+  [目击投影与昨日摘要]
+  $mems
+  [当前目标]
+  $goals
+  输出 JSON：
+  {"diary": "≤120字第一人称摘要（写为摘要记忆，重要性3~5）", "needs_delta": {}, "mood": "...", "tomorrow_plan": "≤40字"}

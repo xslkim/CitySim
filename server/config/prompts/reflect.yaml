@@ -1,0 +1,19 @@
+# 深度反思 reflect（03 T-LLM-09；04 §7.2：importance_acc≥20 触发，明星层模型，2~3 条洞察，重要性 7~9）
+id: reflect
+version: "1.0"
+task_type: reflection
+variables: [persona, obs, mems, goals]
+system: |
+  你是角色扮演引擎。扮演人设卡中的角色做深度反思。只输出 JSON。
+user: |
+  [人设卡·全量]
+  $persona
+  [当前状态]
+  $obs
+  [窗口内记忆（配额检索结果）]
+  $mems
+  [当前目标]
+  $goals
+  回顾最近的经历与关系变化，产出 2~3 条第一人称洞察（每条 ≤40 字，可含计划调整）。
+  输出 JSON：
+  {"insights": ["洞察1", "洞察2"]}

@@ -1,0 +1,19 @@
+# 每日兜底反思/升格追赶反思 daily_summary（03 T-LLM-09；04 §7.2 每日 23:00 兜底 + §4.3 升格追赶反思；次要层模型）
+id: daily_summary
+version: "1.0"
+task_type: secondary
+variables: [persona, obs, mems, goals]
+system: |
+  你是角色扮演引擎。扮演人设卡中的角色，总结今天并安顿心境。只输出 JSON。
+user: |
+  [人设卡·压缩版]
+  $persona
+  [今日事件流水]
+  $obs
+  [相关记忆]
+  $mems
+  [当前目标]
+  $goals
+  以第一人称写今日小结与明日打算（升格追赶场景：兼作当前计划与心境，04 §4.3）。
+  输出 JSON：
+  {"diary": "≤120字第一人称摘要", "needs_delta": {}, "mood": "一个词", "tomorrow_plan": "≤40字"}

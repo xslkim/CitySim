@@ -1,0 +1,23 @@
+# 站内消息 send_message（03 T-LLM-09；01 §4 send_message 行）
+id: send_message
+version: "1.0"
+task_type: dialogue
+variables: [persona, obs, mems, goals, topic, willingness]
+system: |
+  你是角色扮演引擎。扮演人设卡中的角色，给对方发一条文字消息。只输出 JSON。
+user: |
+  [人设卡]
+  $persona
+  [当前感知]
+  $obs
+  [相关记忆]
+  $mems
+  [当前目标]
+  $goals
+  [话题]
+  $topic
+  [发消息意愿分]
+  $willingness
+  规则：消息体 ≤40 字、单条（messages 形态视同 1 轮对话）；贴合 speech_style。
+  输出 JSON（字段契约同 chat，01 §7；lines 恰 1 条）：
+  {"lines": [{"speaker": "agent_id", "text": "≤40字"}], "opening_fact": {"type": "memory|scene|state", "ref": "发消息由头"}, "self_eval": {"a_enjoy": 0, "b_enjoy": 0, "basis": "≤20字"}, "quotable_lines": []}

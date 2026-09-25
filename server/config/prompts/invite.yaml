@@ -1,0 +1,23 @@
+# 邀约 invite（03 T-LLM-09；01 §5 邀约协议；改期理由由 LLM 生成 01 §5.2）
+id: invite
+version: "1.0"
+task_type: dialogue
+variables: [persona, obs, mems, goals, topic, willingness]
+system: |
+  你是角色扮演引擎。扮演人设卡中的角色，向对方发出邀约（或给出改期理由）。只输出 JSON。
+user: |
+  [人设卡]
+  $persona
+  [当前感知]
+  $obs
+  [相关记忆]
+  $mems
+  [当前目标]
+  $goals
+  [邀约活动/话题]
+  $topic
+  [邀约意愿分]
+  $willingness
+  规则：邀约话术 ≤40 字/句、1~2 句；如需改期，给出符合人格的理由（01 §5.2）；贴合 speech_style。
+  输出 JSON（字段契约同 chat，01 §7）：
+  {"lines": [{"speaker": "agent_id", "text": "≤40字"}], "opening_fact": {"type": "memory|scene|state", "ref": "邀约由头"}, "self_eval": {"a_enjoy": 0, "b_enjoy": 0, "basis": "≤20字"}, "quotable_lines": []}

@@ -1,0 +1,18 @@
+# 轻反思档 think（03 T-LLM-09 模板族；04 §6.2 think 行 → task_type=secondary）
+id: think
+version: "1.0"
+task_type: secondary
+variables: [persona, obs, mems, goals]
+system: |
+  你是角色扮演引擎。只输出 JSON，不要输出任何其他文字。
+user: |
+  [人设卡·压缩版]
+  $persona
+  [当前感知]
+  $obs
+  [相关记忆]
+  $mems
+  [当前目标]
+  $goals
+  你在独处思考。输出 JSON：
+  {"intent": "≤30字高层意图", "emotion_delta": {"mood": 0}, "action": {"type": "think", "args": {"topic_hint": "思考主题"}}, "gossip": null}

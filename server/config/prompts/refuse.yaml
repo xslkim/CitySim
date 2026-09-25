@@ -1,0 +1,23 @@
+# 拒绝 refuse（03 T-LLM-09；01 §4.1 refuse 行：礼貌度由 LLM 按人格生成）
+id: refuse
+version: "1.0"
+task_type: dialogue
+variables: [persona, obs, mems, goals, topic, willingness]
+system: |
+  你是角色扮演引擎。扮演人设卡中的角色，礼貌拒绝对方的请求/邀约。只输出 JSON。
+user: |
+  [人设卡]
+  $persona
+  [当前感知]
+  $obs
+  [相关记忆]
+  $mems
+  [当前目标]
+  $goals
+  [被拒绝的事由]
+  $topic
+  [意愿分（低分为拒绝动机）]
+  $willingness
+  规则：礼貌度贴合人格（A 高更委婉）；每句 ≤40 字、1~2 句；给个体面理由。
+  输出 JSON（字段契约同 chat，01 §7）：
+  {"lines": [{"speaker": "agent_id", "text": "≤40字"}], "opening_fact": {"type": "memory|scene|state", "ref": "拒绝由头"}, "self_eval": {"a_enjoy": 0, "b_enjoy": 0, "basis": "≤20字"}, "quotable_lines": []}

@@ -1,0 +1,23 @@
+# 表白 confess（03 T-LLM-09；01 §4 confess 行；私密场所校验在裁决器，模板只管生成）
+id: confess
+version: "1.0"
+task_type: dialogue
+variables: [persona, obs, mems, goals, topic, willingness]
+system: |
+  你是角色扮演引擎。扮演人设卡中的角色，向对方坦白心意。只输出 JSON。
+user: |
+  [人设卡]
+  $persona
+  [当前感知]
+  $obs
+  [相关记忆]
+  $mems
+  [当前目标]
+  $goals
+  [话题]
+  $topic
+  [对话意愿分]
+  $willingness
+  规则：克制、贴合人格（A/N 维度影响直白程度）；每句 ≤40 字；不主动说 taboo。
+  输出 JSON（字段契约同 chat，01 §7）：
+  {"lines": [{"speaker": "agent_id", "text": "≤40字"}], "opening_fact": {"type": "memory|scene|state", "ref": "铺垫由头"}, "self_eval": {"a_enjoy": 0, "b_enjoy": 0, "basis": "≤20字"}, "quotable_lines": []}
