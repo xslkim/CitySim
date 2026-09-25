@@ -28,6 +28,8 @@ def serialize_event(row: Any) -> dict[str, Any]:
     payload = dict(payload or {})
     if row["location_id"] and "location_id" not in payload:
         payload["location_id"] = row["location_id"]
+    if "actors" not in payload:
+        payload["actors"] = list(row["actors"] or [])  # 出站白名单列（05 §3.1）并入，03 §5.1 示例形态同构
     ui = row["ui"]
     if isinstance(ui, str):
         ui = json.loads(ui)

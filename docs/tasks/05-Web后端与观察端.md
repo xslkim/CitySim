@@ -466,3 +466,5 @@
 - **D20（已登记（本文偏差表））**：contrib `pg_trgm`/`fuzzystrmatch` 在 M0 装机时未编译（pg_build.sh 只编 pgvector/pg_partman），T-WEB-01 实装并补 `pg_build.sh` phase 2.5（幂等）；`obs_derived_v1.sql` 对主库 `events` 增两个**加性**索引（`payload->>'text_display'` trgm GIN、`caused_by` 部分索引），不改 schema_v1 冻结列形。
 - **D21（已登记（本文偏差表））**：涟漪第 ⑤ 段匹配口径扩展——03 §3.4 原文 `relation_change_log WHERE event_seq IN (:chain)`；但 `relation.changed` 为 internal 事件，其顶层 `caused_by` 被 obs 键白名单剥除（06 §1.2 该行仅 `changes[]` 放行），永不可能进入 ④ 的 caused_by 链。实现补 OR 分支：`relation.changed` 事件的 `changes[].cause`（裸 seq 数字字符串，06 §2）∈ 链即命中——与 03 §3.4"链上事件引发的 relation 变更"语义一致，不改 05 §3.3 列形。
 - **D22（已登记（本文偏差表））**：`/api/snapshot` 的 `sim_day` 落为**日序整数**（03 §5.1 示例 `"sim_day": 12` 形态）：obs 层无内核 `world_state` 时钟键，epoch 取 `obs.events` 最早 `sim_time` 本地日期 = Day 1。
+- **D23（已登记（本文偏差表））**：事件序列化（`observe/serde.py`）把出站白名单**列** `location_id`/`actors` 并入 `payload` 同名键下发（05 §3.1 列清单本就含此两列；03 §5.1 示例的 `payload.location_id` 同构；`actors` 供 promoted/demoted 等文案取行动方，03 §5.3 模板 `{name}` 数据源）。不改白名单键语义、不新增内容。
+- **D24（已登记（本文偏差表））**：vite dev server 以中间件直托 `/assets/*` → `ui/assets/*`（头像开发期取用；06 T-ART-03 的 obs-api 静态三挂载属 M5，生产 nginx 直托入 deploy/ 属 M5/M6）。
