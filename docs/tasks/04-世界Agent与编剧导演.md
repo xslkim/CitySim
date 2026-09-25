@@ -408,3 +408,4 @@ M3「世界 Agent 与编剧」全部规则化模块（04 §2.1 `world_agent/` + 
 | D-26 | 8 人小世界（seed_8）无部门经理 NPC（M 级全为 16 名 NPC，01 §1.3），`world.perf_review.manager_id` 无真实人可指 | 工程默认：无经理时 `manager_id=null`（键保留）；40 人 seed 起指真实经理；已登记（本文偏差表） |
 | D-27 | `world.promotion_window`/`world.perf_review` 的触发时点（日内 HH:MM）01 §6.1 只给日期规则 | 工程默认：promotion_window 10:00、perf_review 16:00（01 §6.1 模板行注明 16:00；晋升窗口取公告时段）；落配置 `triggers.*`；已登记（本文偏差表） |
 | D-28 | 01 §6.2 fail_forward `if_blocked` 与 stage exit 的判定先后设计未定义 | 工程默认：exit 优先（exit 满足=未阻塞），其后 if_blocked，max_days 兜底最先判；爆发铺垫门禁操作口径 = `payoff_beat.setup_days`（01 §11.3 权威），`min_days/max_days` 为镜像；已登记（本文偏差表） |
+| D-29 | L1「同厨时段/同项目组/值班同班」（01 §6.3）的承载形态设计未细化 | 工程默认：落 `world_state` `schedule.co_location` 标记（02 文档决策侧消费），不直接改排程表；`world.company_crisis` 季度 ≤1 次上限以 `world_state` `company_crisis.last_at` 执行（01 §6.1）；已登记（本文偏差表） |
