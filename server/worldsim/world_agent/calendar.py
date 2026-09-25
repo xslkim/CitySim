@@ -317,3 +317,68 @@ class CalendarEngine:
             aid = r["id"]
             marks[aid] = "leave" if await self.is_on_leave(aid, fire_time.date()) else "present"
         await self.set_state(f"attendance.{fire_time.date().isoformat()}", marks)
+
+
+# ---- 裁员传闻规则触发（T-WA-06；01 §6.1 规则触发口径；06 §1.2 world.layoff_rumor） ----
+
+RUMOR_CONSUMED_KEY = "layoff_rumor.consumed"  # world_state：已消费的股票 tick seq（防跨周末重复触发）
+RUMOR_BOOST_KEY = "layoff_rumor.gossip_boost"  # gossip 意图权重上调标记（02 文档决策侧消费）
+
+
+async def settle_layoff_rumor(cal: "CalendarEngine", fire_time: dt.datetime) -> int | None:
+    """每日触发时点判定：星澜科技最近一个交易日 `r` 跌破阈值（读 triggers.layoff_rumor，
+    01 §6.1 持有）→ 落 `world.layoff_rumor`（payload `{drop_pct, scope}` 逐字 06 §1.2，
+    `source='world'`、`trigger='world'` 不占干预率；无冷却逐日判定，D-08 已登记）。
+
+    效果结算（01 §6.1）：全公司 gossip 意图权重上调标记（窗口配置化，02 决策侧消费）+
+    成就需求全员变更落 `state.needs_delta`（trigger='system'、cause=本事件 seq）。
+    """
+    cfg = cal.cfg["triggers"]["layoff_rumor"]
+    symbol = str(cfg["symbol"])
+    row = await cal.pool.fetchrow(
+        """
+        SELECT seq, payload FROM events WHERE type='economy.stock.tick' AND payload->>'symbol'=$1
+          AND sim_time < $2 ORDER BY seq DESC LIMIT 1
+        """, symbol, fire_time)
+    if row is None:
+        return None
+    consumed = await cal.get_state(RUMOR_CONSUMED_KEY)
+    if consumed is not None and int(consumed) >= int(row["seq"]):
+        return None  # 该跌幅已出过传闻（跨周末/连续扫描不重复；D-08 口径=每个过线交易日一条）
+    payload = row["payload"]
+    r = float((json.loads(payload) if isinstance(payload, str) else dict(payload))["r"])
+    threshold = float(cfg["drop_pct_threshold"])
+    if r >= -threshold / 100.0:
+        return None
+    drop_pct = round(-r * 100.0, 2)
+    seq = await cal.insert_event(
+        type_="world.layoff_rumor",
+        payload={"drop_pct": drop_pct, "scope": str(cfg["scope"]),
+                 "text_display": f"{symbol} 单日大跌 {drop_pct}%，裁员传闻四起"},
+        sim_time=fire_time, rng_seed=cal.clock.tick_of(fire_time),
+    )
+    await cal.set_state(RUMOR_CONSUMED_KEY, int(row["seq"]))
+    # gossip 意图权重上调标记（持续时长配置化；02 文档决策侧消费）
+    until = fire_time.date() + dt.timedelta(days=int(cfg["gossip_window_days"]))
+    await cal.set_state(RUMOR_BOOST_KEY, {
+        "multiplier": float(cfg["gossip_weight_multiplier"]), "until": until.isoformat(),
+        "for_event": str(seq),
+    })
+    # 成就需求全员变更（trigger='system'、cause=本事件 seq，04 §6.5）
+    if cal.agg is not None:
+        for r2 in await cal.pool.fetch("SELECT id FROM agents ORDER BY id"):
+            await cal.agg.apply_needs_delta(
+                agent_id=r2["id"], need="achievement", delta=float(cfg["achievement_delta"]),
+                cause=str(seq))
+    log.warning("裁员传闻触发：%s 跌幅 %.2f%% 超阈值 %.1f%%（seq=%d）", symbol, drop_pct, threshold, seq)
+    return seq
+
+
+def register_layoff_rumor_job(cal: "CalendarEngine") -> None:
+    """注册裁员传闻每日判定（触发时点读 triggers.layoff_rumor.trigger_time，01 §6.1 镜像）。"""
+    trigger_time = str(cal.cfg["triggers"]["layoff_rumor"]["trigger_time"])
+
+    async def _judge(c: "CalendarEngine", t: dt.datetime) -> None:
+        await settle_layoff_rumor(c, t)
+
+    cal.register_job("world.layoff_rumor", trigger_time, lambda d: True, _judge)
