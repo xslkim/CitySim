@@ -265,9 +265,9 @@
 
 | # | 回填/风险项 | 口径与设计依据 | 产出任务 | 登记位置 |
 |---|---|---|---|---|
-| R1 | GLM in/out 单价与付费档型号 ID | 免费档型号 ID 已定案（glm-4.5-flash/glm-4-flash，00 §1 A9）；单价与付费档 ID"开工当天以官方文档核实"（04 §8.1），占位待 M2 实测回填 | T-LLM-03 起、T-LLM-12 收口 | `config/models.yaml` `providers:` 段 |
-| R2 | GLM 各档 RPM 上限 | "上限按开工当天核实值配置"（04 §8.2/§8.5） | T-LLM-05 占位、T-LLM-12 实测 | `config/models.yaml` `rpm_limit` |
-| R3 | ¥/模拟日初测值 | 公式 04 §8.3；是熔断基线与项目止损线的输入 | T-LLM-12 | `.env` `WSIM_COST_LIMIT_CNY_PER_SIMDAY` + 06 §3"项目止损线"行（W2 写死口径）+ commit 留痕 |
+| R1 | GLM in/out 单价与付费档型号 ID | **已实测回填（T-LLM-12，2026-09-25）**：免费档 glm-4.5-flash/glm-4-flash in/out 单价 = ¥0（`models.yaml` 价格表 `measured_free_tier_w2`）；付费档型号 ID 仍占位（账号余额不足，充值后核实回填） | T-LLM-03 起、T-LLM-12 收口 | `config/models.yaml` `providers:` 段 |
+| R2 | GLM 各档 RPM 上限 | **已实测回填（T-LLM-12，2026-09-25）**：glm-4.5-flash 并发上限≈2（超出即 429 码 1302）、持续 ~41 次/分无 429 → `rpm_limit: 50`；glm-4-flash 并发 10 全过 → `rpm_limit: 90`；条目级 `concurrency` 闸同步落值（D41） | T-LLM-05 占位、T-LLM-12 实测 | `config/models.yaml` 模型条目 `rpm_limit`/`concurrency` |
+| R3 | ¥/模拟日初测值 | **已实测（T-LLM-12，2026-09-25）**：8 人 1 模拟日 1166 次调用（zhipu 446 + local_embed 720），**¥0/模拟日**（免费档）；基线 env 已写 0（熔断器按“基线未配置=只告警不动作”口径待机，充值后复测改写） | T-LLM-12 | `.env` `WSIM_COST_LIMIT_CNY_PER_SIMDAY` + 06 §3“项目止损线”行（W2 写死口径）+ commit 留痕 |
 | R4 | 免费/低档实际抗压占比 | `llm_calls.fallback_from` 留痕动机（04 §8.2） | T-LLM-06 数据、T-LLM-12 分析 | 审计日报（08 文档引用） |
 | R5 | 次要层调用量口径（192+40 上限 vs 原 ~144 假设作废） | 04 §8.1（评审二轮 N-P1-7），W2 实测定稿 | T-LLM-12 提供计量数据 | 由 04 §8.1 持有方定稿，本模块只供数 |
 | R6 | GLM 审核（层 2）稳定性 | 本地 Qwen3-4B 缺位期替身（00 §1 A3），误杀率高时评估提前启用本地档 | T-LLM-11/T-LLM-12 观察 | 日报观察项；不预设阈值 |
@@ -297,3 +297,4 @@
 | D43 | **ChainExhausted（链尽 pause_clock 等末端动作）M2 期裁决侧降级 think 兜底** | 04 §8.1"明星档暂停时钟"的消费接口属裁决器/08 T-OPS-03 范围；M2 真接入期先以降级 think + ERROR 日志防主循环崩溃（pipeline._decide_one 与 adjudication_loop 双护栏），消费接线归位后撤除 | **已登记（本文偏差表）** |
 | D44 | **glm-4.5-flash 开发期 `thinking: disabled`**（models.yaml 模型条目键，zhipu provider 透传 OpenAI 兼容 `thinking.type`） | 实测（2026-09-25）：免费档 reasoning 开时单调用 15~55s 且常因 reasoning 耗尽 max_tokens 截断为空正文；关闭后 ~2s、completion ~54 token。D40 的 max_tokens 放大保留作头部余量；充值升付费档后仅改配置恢复 reasoning | **已登记（本文偏差表）** |
 | D45 | **撞墙判定键 = 端点级 `provider别名/model`**（FailoverBreaker 全部状态以端点为键）+ **护栏覆盖到批处理路径** | 实测 429（码 1302）为账号级但 p95 延迟是型号级指标；别名级键控会让明星档慢调用误伤次要档（2026-09-25 试跑实发：明星档 p95 误 trip 致 bgsummary ProviderUnavailable）。护栏从裁决决策扩展到 batch 段/after_tick/hygiene 摘要（同 D43 口径：末端动作消费归 08 T-OPS-3 后再撤） | **已登记（本文偏差表）** |
+| D46 | **T-LLM-12 验收 1 口径适配**：原判据 `COUNT(*)=COUNT(*) FILTER (provider='zhipu')` 写作时 embed 预设走智谱；A10 定案本地 bge-m3 后 embed 行 provider='local_embed' 为合法真实调用 → 判据调整为：全量 >0 且 zhipu >0 且 **mock = 0**（实测 1166/446/0） | 00 §1 A10 定案的必然推论；验收语义（全量且真实、无 mock 混入）不变 | **已登记（本文偏差表）** |
