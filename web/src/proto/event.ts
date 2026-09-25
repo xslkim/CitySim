@@ -33,6 +33,8 @@ export const dialogueLineSchema = z
   })
   .strip();
 
+export type DialogueLine = z.infer<typeof dialogueLineSchema>;
+
 /**
  * payload JSONB：结构键宽松透传 + 已登记引用键值形态强校验（06 §2）：
  * caused_by/for_event_ref/target_seq/request_ref = 裸 seq 数字字符串；cites[] = 裸 seq 串列表；
