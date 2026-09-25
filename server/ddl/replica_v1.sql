@@ -12,7 +12,7 @@
 -- ---------------------------------------------------------------------------
 -- 05 §3.1 events（白名单列同步；seq PK 即幂等位点，04 §9.1）
 -- ---------------------------------------------------------------------------
-CREATE TABLE events (
+CREATE TABLE IF NOT EXISTS events (
   seq BIGINT PRIMARY KEY,                 -- 与主库同值（幂等与重灌键）
   tick BIGINT NOT NULL,
   sim_time TIMESTAMPTZ NOT NULL,
@@ -30,17 +30,17 @@ CREATE TABLE events (
                                           -- 最新 grade 以 event_grade_view 为准（§3.8）
   schema_version SMALLINT NOT NULL DEFAULT 1
 );
-CREATE INDEX events_simday_idx ON events (((sim_time AT TIME ZONE 'Asia/Shanghai')::date));  -- 重灌/digest 分组
-CREATE INDEX events_type_time ON events (type, sim_time DESC);
-CREATE INDEX events_actors_gin ON events USING GIN (actors);
-CREATE INDEX events_loc_time ON events (location_id, sim_time DESC);
-CREATE INDEX events_caused_by ON events ((payload->>'caused_by'))   -- 涟漪后续链；值为裸 seq 数字字符串（'1089'），可直接 ::bigint
+CREATE INDEX IF NOT EXISTS events_simday_idx ON events (((sim_time AT TIME ZONE 'Asia/Shanghai')::date));  -- 重灌/digest 分组
+CREATE INDEX IF NOT EXISTS events_type_time ON events (type, sim_time DESC);
+CREATE INDEX IF NOT EXISTS events_actors_gin ON events USING GIN (actors);
+CREATE INDEX IF NOT EXISTS events_loc_time ON events (location_id, sim_time DESC);
+CREATE INDEX IF NOT EXISTS events_caused_by ON events ((payload->>'caused_by'))   -- 涟漪后续链；值为裸 seq 数字字符串（'1089'），可直接 ::bigint
   WHERE payload ? 'caused_by';
 
 -- ---------------------------------------------------------------------------
 -- 05 §3.2 memory_projection（记忆展示通道投影；只出 content_display，行不可变）
 -- ---------------------------------------------------------------------------
-CREATE TABLE memory_projection (
+CREATE TABLE IF NOT EXISTS memory_projection (
   memory_id BIGINT PRIMARY KEY,           -- 主库 memories.id
   agent_id TEXT NOT NULL,                 -- 'A01'~'A40'
   sim_time TIMESTAMPTZ NOT NULL,
@@ -50,15 +50,15 @@ CREATE TABLE memory_projection (
   source_event_seq BIGINT,                -- 主库 memories.source_event_seq（= events.seq；06 §2 定名）
   is_witness BOOLEAN NOT NULL DEFAULT FALSE  -- 目击投影=true（04 §6.3 写入，直传）
 );
-CREATE INDEX memproj_agent_time ON memory_projection (agent_id, sim_time DESC);
-CREATE INDEX memproj_src_event ON memory_projection (source_event_seq);       -- 涟漪第 1 段
-CREATE INDEX memproj_reflection ON memory_projection (agent_id, sim_time DESC)
+CREATE INDEX IF NOT EXISTS memproj_agent_time ON memory_projection (agent_id, sim_time DESC);
+CREATE INDEX IF NOT EXISTS memproj_src_event ON memory_projection (source_event_seq);       -- 涟漪第 1 段
+CREATE INDEX IF NOT EXISTS memproj_reflection ON memory_projection (agent_id, sim_time DESC)
   WHERE kind = 'reflection';                                               -- 角色页"最新反思"
 
 -- ---------------------------------------------------------------------------
 -- 05 §3.3 relation_change_log（关系变更流水，由 relation.changed 事件投影）
 -- ---------------------------------------------------------------------------
-CREATE TABLE relation_change_log (
+CREATE TABLE IF NOT EXISTS relation_change_log (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   event_seq BIGINT NOT NULL,              -- relation.changed 事件 seq（BIGINT 值 = events.seq；'e<seq>' 仅展示形态）
   a_id TEXT NOT NULL, b_id TEXT NOT NULL, -- 有序对 A→B
@@ -70,14 +70,14 @@ CREATE TABLE relation_change_log (
   sim_day DATE NOT NULL,
   UNIQUE (event_seq, a_id, b_id)
 );
-CREATE INDEX rcl_pair_time ON relation_change_log (a_id, b_id, sim_time);
-CREATE INDEX rcl_event ON relation_change_log (event_seq);
-CREATE INDEX rcl_simday ON relation_change_log (sim_day);          -- 重灌单位
+CREATE INDEX IF NOT EXISTS rcl_pair_time ON relation_change_log (a_id, b_id, sim_time);
+CREATE INDEX IF NOT EXISTS rcl_event ON relation_change_log (event_seq);
+CREATE INDEX IF NOT EXISTS rcl_simday ON relation_change_log (sim_day);          -- 重灌单位
 
 -- ---------------------------------------------------------------------------
 -- 05 §3.4 relation_daily（每日关系矩阵快照；递推口径见 05 §3.4 末段）
 -- ---------------------------------------------------------------------------
-CREATE TABLE relation_daily (
+CREATE TABLE IF NOT EXISTS relation_daily (
   sim_day DATE NOT NULL,
   a_id TEXT NOT NULL, b_id TEXT NOT NULL,
   affinity SMALLINT NOT NULL,
@@ -89,7 +89,7 @@ CREATE TABLE relation_daily (
 -- ---------------------------------------------------------------------------
 -- 05 §3.5 health_daily（五指标 + 结构两指标 + 干预率 + 成本日聚合；阈值不存本表）
 -- ---------------------------------------------------------------------------
-CREATE TABLE health_daily (
+CREATE TABLE IF NOT EXISTS health_daily (
   sim_day DATE PRIMARY KEY,
   a_grade_gap_days NUMERIC,        -- A 级事件间隔（grade 取 event_grade_view 最新值，§3.8）
   type_entropy NUMERIC,            -- 事件类型熵（bit）
@@ -106,7 +106,7 @@ CREATE TABLE health_daily (
 -- ---------------------------------------------------------------------------
 -- 05 §3.6 world_state_snapshot（每模拟日全量状态；state 字段白名单见 05 §3.6）
 -- ---------------------------------------------------------------------------
-CREATE TABLE world_state_snapshot (
+CREATE TABLE IF NOT EXISTS world_state_snapshot (
   sim_day DATE PRIMARY KEY,
   state JSONB NOT NULL,            -- 字段白名单见 05 §3.6
   digest TEXT NOT NULL,            -- 'sha256:…'，本机生成，云端复核
@@ -116,7 +116,7 @@ CREATE TABLE world_state_snapshot (
 -- ---------------------------------------------------------------------------
 -- 05 §3.7 ripple_edge（八卦传播边 + 失真度离线预计算；hop 上限 4 手，01 §4.1）
 -- ---------------------------------------------------------------------------
-CREATE TABLE ripple_edge (
+CREATE TABLE IF NOT EXISTS ripple_edge (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   root_event_seq BIGINT NOT NULL,   -- 链根：被转述链的源事件 seq（涟漪页查询键）
   dst_event_seq BIGINT NOT NULL,    -- 本手 gossip 事件 seq
@@ -129,13 +129,13 @@ CREATE TABLE ripple_edge (
   sim_day DATE NOT NULL,
   UNIQUE (root_event_seq, dst_event_seq)
 );
-CREATE INDEX ripple_root ON ripple_edge (root_event_seq, hop, sim_time);
-CREATE INDEX ripple_simday ON ripple_edge (sim_day);
+CREATE INDEX IF NOT EXISTS ripple_root ON ripple_edge (root_event_seq, hop, sim_time);
+CREATE INDEX IF NOT EXISTS ripple_simday ON ripple_edge (sim_day);
 
 -- ---------------------------------------------------------------------------
 -- 05 §3.8 event_grade_view（物化表：最新 grade 唯一读取处；events 行永不 UPDATE）
 -- ---------------------------------------------------------------------------
-CREATE TABLE event_grade_view (
+CREATE TABLE IF NOT EXISTS event_grade_view (
   seq BIGINT PRIMARY KEY,               -- 目标事件 seq（= events.seq）
   grade TEXT NOT NULL CHECK (grade IN ('A','B','C')),  -- 最新 grade（含复核修订）
   revised_by_seq BIGINT,                -- 最近一次 director.grade_revise 事件 seq；NULL = 未经复核（初值）
@@ -151,7 +151,7 @@ CREATE TABLE event_grade_view (
 -- ---------------------------------------------------------------------------
 -- 05 §4.1 derived_task（摄入派生队列表；不授权 obs_ro，05 §5）
 -- ---------------------------------------------------------------------------
-CREATE TABLE derived_task (
+CREATE TABLE IF NOT EXISTS derived_task (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   task_type TEXT NOT NULL,            -- project_relation_change|compute_ripple_edge|
                                       -- materialize_event_grade|refresh_relation_daily|refresh_health_daily
@@ -161,4 +161,4 @@ CREATE TABLE derived_task (
   attempts INT NOT NULL DEFAULT 0,
   run_at TIMESTAMPTZ, done_at TIMESTAMPTZ, last_error TEXT
 );
-CREATE INDEX derived_task_pending ON derived_task (id) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS derived_task_pending ON derived_task (id) WHERE status = 'pending';
