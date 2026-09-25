@@ -25,11 +25,14 @@ FIXTURE = {
     "topic": {"topic_id": "T-DLY-01", "text": "晚饭吃什么"},
     "willingness": 62.5,
     "fidelity": 0.6,
+    "day": "2026-10-12",
+    "candidates": "e101 [B] dialogue.chat: 测试",
 }
 
 EXPECTED_IDS = {
     "think", "chat", "argue", "gossip", "confess", "apologize",
     "send_message", "invite", "refuse", "reflect", "daily_summary", "batch_summary",
+    "director_review",  # 04 T-DIR-05 K3 复核模板（M3 新增族）
 }
 
 # 模板族 → task_type 映射（03 T-LLM-09 实现要点清单）
@@ -38,6 +41,7 @@ EXPECTED_TASK_TYPE = {
     "confess": "dialogue", "apologize": "dialogue", "send_message": "dialogue",
     "invite": "dialogue", "refuse": "dialogue", "reflect": "reflection",
     "daily_summary": "secondary", "batch_summary": "bgsummary",
+    "director_review": "director",
 }
 
 
