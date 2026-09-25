@@ -458,7 +458,15 @@ async def _run(args: argparse.Namespace) -> int:
             )
             tg.create_task(hygiene.hygiene_loop(clock=clock, stop=stop))  # T-MEM-03 日界归档（04 §2.2）
             tg.create_task(_watch(clock_task))
-            # sync/audit/rotation 协程挂接点（M6/M3/T-LOD-03 接，04 §2.2 伪码行）
+            # M6 接线（07 T-SYN-03，04 §2.2 挂接点）：WSIM_CLOUD_INGEST_URL 配置后启用出站 sync
+            # 独立协程（断网不阻塞内核；崩溃从 sync_state 续传；replay 模式不接）
+            if os.environ.get("WSIM_CLOUD_INGEST_URL"):
+                from .sync.ws_client import SyncClient
+
+                sync_client = SyncClient(pool)
+                tg.create_task(sync_client.run_forever(stop=stop))
+                log.info("出站同步协程已启动 → %s", sync_client.url)
+            # audit/rotation 协程挂接点（M3/T-LOD-03 接，04 §2.2 伪码行）
 
         sim_end = clock.now_sim()
         new_events = await pool.fetchval("SELECT count(*) FROM events WHERE seq > $1", baseline_events)

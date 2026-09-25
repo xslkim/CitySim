@@ -299,15 +299,19 @@ class SyncClient:
 
     # ---- 主循环 ------------------------------------------------------------------
 
-    async def run_forever(self, *, poll_s: float = 0.5, https_fallback: Any = None) -> None:
-        """连接 → sync_once 循环；断网退避重连；WS 长期不可用走 HTTPS 回退（T-SYN-04）。"""
+    async def run_forever(self, *, poll_s: float = 0.5, https_fallback: Any = None,
+                          stop: asyncio.Event | None = None) -> None:
+        """连接 → sync_once 循环；断网退避重连；WS 长期不可用走 HTTPS 回退（T-SYN-04）。
+
+        `stop` 置位后随当前周期结束退出（内核停机联动，main.py TaskGroup 收口）。
+        """
         ws_failures = 0
-        while True:
+        while stop is None or not stop.is_set():
             try:
                 await self.connect()
                 ws_failures = 0
                 await self.send_snapshots_pending()
-                while True:
+                while stop is None or not stop.is_set():
                     await self.sync_once()
                     await self.sleep(poll_s)
             except (ConnectionError, OSError, asyncio.TimeoutError,
