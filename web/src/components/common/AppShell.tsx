@@ -5,9 +5,16 @@
  */
 import { useEffect } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { apiGet } from '../../api/client';
+import { agentListSchema } from '../../proto/agents';
+import { snapshotSchema } from '../../proto/snapshot';
+import { useAgentsStore } from '../../stores/agentsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { useWorldStore } from '../../stores/worldStore';
+import { wsManager } from '../../ws/manager';
+import AgentList from './AgentList';
 import LatencyBar from './LatencyBar';
+import LocationTree from '../map/LocationTree';
 
 const NAV = [
   { to: '/map', label: '地图' },
@@ -39,6 +46,21 @@ export default function AppShell() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [toggleDebug]);
+
+  // 首屏引导（03 §6.3：首屏只拉 /api/snapshot + 角色档案；增量走 WS）
+  useEffect(() => {
+    apiGet('/api/agents', agentListSchema)
+      .then((r) => useAgentsStore.getState().setProfiles(r.data.items))
+      .catch(() => undefined);
+    apiGet('/api/snapshot', snapshotSchema)
+      .then((r) => {
+        useWorldStore.getState().setSnapshot(r.data);
+        useWorldStore.getState().setWatermarkTick(r.meta.watermark_tick);
+      })
+      .catch(() => undefined);
+    wsManager.start();
+    return () => wsManager.stop();
+  }, []);
 
   if (isLite) {
     // lite 观众版：呈现层减法（03 §1.1），无三栏调试壳
@@ -90,11 +112,9 @@ export default function AppShell() {
       </header>
       <div className="flex min-h-0 flex-1">
         <aside className="w-60 overflow-y-auto border-r border-border bg-bg-1 p-2" data-testid="left-pane">
-          <div id="location-tree" className="text-aux text-text-1">
-            地点树（/map 页装载）
-          </div>
-          <div id="agent-list" className="mt-2 text-aux text-text-1">
-            角色列表（/map 页装载）
+          <LocationTree />
+          <div className="mt-3 border-t border-border pt-2">
+            <AgentList />
           </div>
         </aside>
         <main className="min-w-0 flex-1 overflow-y-auto p-2">

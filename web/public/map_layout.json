@@ -1,0 +1,309 @@
+{
+  "sites": [
+    {
+      "id": "apt",
+      "name": "单身公寓",
+      "type": "building",
+      "floors": 6,
+      "roomsPerFloor": 4,
+      "rooms": [
+        {
+          "id": "apt.L1.101",
+          "name": "101",
+          "floor": 1,
+          "col": 1,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L1.102",
+          "name": "102",
+          "floor": 1,
+          "col": 2,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L1.103",
+          "name": "103",
+          "floor": 1,
+          "col": 3,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L1.104",
+          "name": "104",
+          "floor": 1,
+          "col": 4,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L2.201",
+          "name": "201",
+          "floor": 2,
+          "col": 1,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L2.202",
+          "name": "202",
+          "floor": 2,
+          "col": 2,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L2.203",
+          "name": "203",
+          "floor": 2,
+          "col": 3,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L2.204",
+          "name": "204",
+          "floor": 2,
+          "col": 4,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L3.301",
+          "name": "301",
+          "floor": 3,
+          "col": 1,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L3.302",
+          "name": "302",
+          "floor": 3,
+          "col": 2,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L3.303",
+          "name": "303",
+          "floor": 3,
+          "col": 3,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L3.304",
+          "name": "304",
+          "floor": 3,
+          "col": 4,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L4.401",
+          "name": "401",
+          "floor": 4,
+          "col": 1,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L4.402",
+          "name": "402",
+          "floor": 4,
+          "col": 2,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L4.403",
+          "name": "403",
+          "floor": 4,
+          "col": 3,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L4.404",
+          "name": "404",
+          "floor": 4,
+          "col": 4,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L5.501",
+          "name": "501",
+          "floor": 5,
+          "col": 1,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L5.502",
+          "name": "502",
+          "floor": 5,
+          "col": 2,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L5.503",
+          "name": "503",
+          "floor": 5,
+          "col": 3,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L5.504",
+          "name": "504",
+          "floor": 5,
+          "col": 4,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L6.601",
+          "name": "601",
+          "floor": 6,
+          "col": 1,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L6.602",
+          "name": "602",
+          "floor": 6,
+          "col": 2,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L6.603",
+          "name": "603",
+          "floor": 6,
+          "col": 3,
+          "w": 80,
+          "h": 64
+        },
+        {
+          "id": "apt.L6.604",
+          "name": "604",
+          "floor": 6,
+          "col": 4,
+          "w": 80,
+          "h": 64
+        }
+      ],
+      "commons": [
+        {
+          "id": "apt.lobby",
+          "name": "大堂+快递柜+公告栏",
+          "floor": "1F"
+        },
+        {
+          "id": "apt.kitchen",
+          "name": "公共厨房/餐厅",
+          "floor": "2F"
+        },
+        {
+          "id": "apt.gym",
+          "name": "健身房",
+          "floor": "B1"
+        },
+        {
+          "id": "apt.laundry",
+          "name": "洗衣房",
+          "floor": "B1"
+        },
+        {
+          "id": "apt.roof",
+          "name": "天台花园",
+          "floor": "顶层"
+        }
+      ]
+    },
+    {
+      "id": "corp",
+      "name": "公司",
+      "zones": [
+        {
+          "id": "corp.product",
+          "name": "产品部工位区"
+        },
+        {
+          "id": "corp.tech",
+          "name": "技术部工位区"
+        },
+        {
+          "id": "corp.market",
+          "name": "市场部工位区"
+        },
+        {
+          "id": "corp.ops",
+          "name": "运营部工位区"
+        },
+        {
+          "id": "corp.design",
+          "name": "设计部工位区"
+        },
+        {
+          "id": "corp.admin",
+          "name": "职能部工位区"
+        },
+        {
+          "id": "corp.meeting.1",
+          "name": "会议室 1"
+        },
+        {
+          "id": "corp.meeting.2",
+          "name": "会议室 2"
+        },
+        {
+          "id": "corp.pantry",
+          "name": "茶水间"
+        },
+        {
+          "id": "corp.elevator",
+          "name": "电梯厅"
+        },
+        {
+          "id": "corp.reception",
+          "name": "前台"
+        },
+        {
+          "id": "corp.ceo",
+          "name": "总经理室"
+        }
+      ]
+    },
+    {
+      "id": "ext",
+      "name": "外部",
+      "zones": [
+        {
+          "id": "ext.restaurant",
+          "name": "餐厅"
+        }
+      ]
+    },
+    {
+      "id": "offsite",
+      "name": "校外",
+      "type": "aggregate",
+      "zones": [
+        {
+          "id": "offsite.home",
+          "name": "校外住处",
+          "occupancy_badge": true,
+          "matches_prefix": "home."
+        }
+      ]
+    }
+  ]
+}
