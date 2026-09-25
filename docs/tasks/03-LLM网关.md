@@ -286,3 +286,8 @@
 | D7 | **疑点**："仍 block 则置 internal 并记安全审计"（04 §11.1）的"安全审计"无 DDL 落点（04 §5.2 无 safety_audit 表，06 §1.2 无对应事件类型） | 本模块 interim：结构化 WARN 日志 + `llm_calls`（task_type='safety'）行留痕；若需表/事件，须先回登 06 再实现（00 §4-5） | **待回登 06 裁决** |
 | D8 | ~~04 §1.6 环境变量表仍列 `WSIM_GLM_API_KEY`~~ | 04 §1.6 已回改为 `WSIM_ZHIPU_API_KEY`（2026-09-23 评审 R1 仲裁者回登），与 00 §1 A3 一致 | **已销项** |
 | D9 | `server/config/prompts/`、`server/config/schemas/`、`server/config/safety/wordlist.txt` 布局登记 | 00 §2 仓库布局已补此三项；`schemas/` 与 `prompts/` 平级——T-LLM-10 交付物据此定为 `server/config/schemas/*.json`，不放 `prompts/` 子目录 | 已对齐 00 §2（2026-09-23 评审 R1） |
+| D35 | **rpm_limit 未回填期路由模式工程默认 60**（网关 `DEFAULT_RPM_LIMIT` 常量） | models.yaml `rpm_limit` 为 T-LLM-12 实测回填项（04 §8.2"开工当天核实值"）；回填前降级链路由模式以保守默认运转，回填后一律以 yaml 为准 | **已登记（本文偏差表）** |
+| D36 | **单价单位 = ¥/百万 tokens**：`cost_micro_cny = prompt_tokens×in_price + completion_tokens×out_price`（tokens×¥/Mtok 数值上恰为微元，整数化 round） | 04 §8.3 给了公式未给单价单位；单位落 ledger.py 文档串与 models.yaml 注释 | **已登记（本文偏差表）** |
+| D37 | **04 §8.5 优先级序未列 task_type（reflection/world_copy/embed）取中档默认优先级 3** | 04 §8.5 只列 6 项优先级；其余任务桶内排队取中档（clients.py `DEFAULT_PRIORITY`） | **已登记（本文偏差表）** |
+| D38 | **dialogue schema `lines` 上下界取全族并集 1~8** | chat 6~8 轮（源方案 §3.4/§4.7）/ argue 2~4 轮（01 §4.1）/ send_message 恰 1 条共用 dialogue 输出契约；细分轮数约束在模板措辞与裁决器侧，schema 只钉并集上下界 | **已登记（本文偏差表）** |
+| D39 | **safety 层 2 审核输出无法解析为标签时保守按 block 处理** | 04 §11.1 未定解析失败口径；宁误杀不放行（误杀观察归 T-LLM-12 日报，§5 R6） | **已登记（本文偏差表）** |

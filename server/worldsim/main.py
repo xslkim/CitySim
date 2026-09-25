@@ -84,6 +84,15 @@ def _load_root_env() -> None:
             os.environ[key] = value
 
 
+async def drive_invite_due(invite_machine: Any, *, tick: int, sim_now: dt.datetime) -> None:
+    """T-LLM-FIX-01（02 文档遗漏接线，02 偏差表 D34）：邀约提醒/爽约判定每 tick 驱动。
+
+    T-30min 提醒与 T+15min 宽限后爽约结算的唯一主循环入口（01 §5.3 时序；rng_seed = 本 tick 规则骰子）。
+    """
+    await invite_machine.due_reminders(sim_now=sim_now, tick=tick, rng_seed=tick)
+    await invite_machine.due_stood_ups(sim_now=sim_now, tick=tick, rng_seed=tick)
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="worldsim.main", description="WorldSim 内核主循环（04 §2.2）")
     p.add_argument("--sim-hours", type=float, default=None,
@@ -264,6 +273,8 @@ async def _run(args: argparse.Namespace) -> int:
             await agg.flush(tick=tick, sim_now=sim_now, trigger="system", rng_seed=tick)
             # T-MEM-02：每模拟日 23:00 批量兜底反思（按 agent 日幂等）
             await reflector.run_due_daily_fallbacks(agent_ids, sim_now, rng_seed=tick)
+            # T-LLM-FIX-01（02 遗漏接线，D34）：邀约提醒/爽约判定每 tick 驱动
+            await drive_invite_due(invite_machine, tick=tick, sim_now=sim_now)
 
         # ---- 波次 2a：batch 段钩子（唯一挂载点，02 T-TIME-03） --------------------------
         hygiene = MemoryHygiene(pool, gateway)
