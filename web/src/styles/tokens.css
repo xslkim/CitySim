@@ -1,0 +1,34 @@
+/* 视觉 token（唯一持有方 = docs/design/02 §7.1，HEX 逐字镜像，勿改值；改值先回改 02 §7.1） */
+:root {
+  --bg-0: #0E1116;      /* 页面底色 */
+  --bg-1: #161B22;      /* 面板/卡片底 */
+  --bg-2: #1F2630;      /* 悬浮层、选中态 */
+  --border: #2D333D;    /* 分割线、卡片描边 */
+  --text-0: #E6E9EF;    /* 主文字 */
+  --text-1: #9AA4B2;    /* 次要文字、时间戳 */
+  --accent: #5AC3ED;    /* 选中角色/当前跟拍 */
+  --positive: #2EFA8D;  /* affinity 正值、收益、正面情绪描边 */
+  --negative: #F75752;  /* tension 高、亏损、干预标记、涟漪失真 >40% */
+  --warn: #FEAE3E;      /* 告警、涟漪失真 15~40% */
+  --neutral: #8A93A0;   /* 中性、对话连线虚线、涟漪失真 ≤15% */
+  --director: #BF86E8;  /* 编剧干预事件专属色 */
+}
+
+/* 卡片/字号阶梯（02 §7.3）：圆角 8px / 内边距 12px / 8px 网格 / 标题 14 正文 13 辅助 12 时间戳 11 */
+.card {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+html, body {
+  background: var(--bg-0);
+  color: var(--text-0);
+  font-size: 13px;
+  font-family: ui-sans-serif, system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
