@@ -1,0 +1,20 @@
+# WorldSim 内核单元（08 T-OPS-04；04 §1.4 清单；本机无 systemd 时静态审查 + systemd-analyze verify，00 §1 A16）
+# 部署根 /opt/worldsim（04 §1.5 口径）；开发期装机时替换为仓库根路径
+[Unit]
+Description=WorldSim kernel（模拟内核；04 §1.4 worldsim-kernel.service）
+After=postgresql.service
+# 上线期补 After=vllm-*（本批不含 vLLM 单元，defer 上线部署期，08 D5）
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/worldsim/server
+EnvironmentFile=/opt/worldsim/.env
+# 调用约定 00 §1 A14：uv run 自 server/
+ExecStart=%h/.local/bin/uv run python -m worldsim.main
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+# 日志归 journald；应用分级日志另落 var/logs/server.log（T-ENV-06）
+
+[Install]
+WantedBy=multi-user.target

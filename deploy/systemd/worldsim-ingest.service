@@ -1,0 +1,17 @@
+# WorldSim 摄入 API 单元（08 T-OPS-04；04 §1.4 worldsim-ingest.service；开发期同机 00 §1 A5）
+[Unit]
+Description=WorldSim ingest API（FastAPI/uvicorn；WS 主通道 + HTTPS 回退 + /v1/digest）
+After=postgresql.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/worldsim/server
+EnvironmentFile=/opt/worldsim/.env
+# 绑定读 WSIM_INGEST_BIND（host:port，07 D2）；生产 4 worker 无状态（04 §1.4 备注）
+ExecStart=/bin/sh -c '%h/.local/bin/uv run uvicorn worldsim.ingest:app \
+  --host ${WSIM_INGEST_BIND%:*} --port ${WSIM_INGEST_BIND##*:}'
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
