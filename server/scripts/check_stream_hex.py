@@ -29,7 +29,8 @@ def main() -> int:
     allowed = load_allowed()
     found: dict[str, list[str]] = {}
     for p in sorted(STREAM_DIR.rglob("*")):
-        if p.is_file():
+        # tests/ 内 HEX 是纯逻辑断言值（非页面呈现色），不计入（06 T-ART-01 口径 = "stream 页"取色）
+        if p.is_file() and "tests" not in p.relative_to(STREAM_DIR).parts:
             for m in HEX_RE.findall(p.read_text(encoding="utf-8")):
                 found.setdefault(m.upper(), []).append(str(p.relative_to(REPO_ROOT)))
     bad = {h: ps for h, ps in found.items() if h not in allowed}

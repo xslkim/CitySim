@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>WorldSim 直播画面</title>
+<link rel="stylesheet" href="./css/tokens.css">
+<link rel="stylesheet" href="./css/screen.css">
+</head>
+<body>
+<div class="phone" id="phone">
+
+  <!-- ================= 全幅演出画面（场景底图，两形态切换） ================= -->
+  <div class="stage">
+    <img class="stage-img" id="stage-normal" src="./assets/stage-normal.svg" alt="公寓夜景" draggable="false">
+    <img class="stage-img" id="stage-climax" src="./assets/stage-climax.svg" alt="天台夜景" draggable="false" hidden>
+    <div class="warm-filter" id="warm-filter" hidden></div>
+    <div class="scrim-top"></div>
+  </div>
+
+  <!-- 左上：地点 + 模拟时间（T-LTV-03 数据源接线） -->
+  <div class="tag-tl">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 21s-7-5.8-7-11a7 7 0 0 1 14 0c0 5.2-7 11-7 11z"/><circle cx="12" cy="10" r="2.4"/></svg>
+    <b id="tag-loc">…</b>&nbsp;<span id="tag-time">Day – · --:--</span>
+  </div>
+
+  <!-- 名场面标签（climax 形态，T-LTV-05） -->
+  <div class="tag-climax" id="tag-climax" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linejoin="round"><polygon points="12 3 14.4 9.1 21 9.6 16.2 13.9 17.7 20.4 12 16.9 6.3 20.4 7.8 13.9 3 9.6 9.6 9.1"/></svg>
+    <span id="tag-climax-text">名场面</span>
+  </div>
+
+  <!-- 右上：AI 生成内容水印（内容侧合规，常驻） -->
+  <div class="ai-wm">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><rect x="5" y="9" width="14" height="10" rx="2.5"/><line x1="12" y1="9" x2="12" y2="5"/><circle cx="12" cy="4" r="1" fill="currentColor"/><circle cx="9.5" cy="13.5" r=".9" fill="currentColor"/><circle cx="14.5" cy="13.5" r=".9" fill="currentColor"/><line x1="9" y1="16.8" x2="15" y2="16.8"/></svg>
+    <span>AI 生成内容</span>
+  </div>
+
+  <!-- 飘屏占位（T-LTV-06 填充；URL 参数 ?float=0 整组隐藏） -->
+  <div id="float-mount"></div>
+
+  <!-- 人物特写浮层挂载点（T-LTV-04 填充） -->
+  <div id="pcard-mount"></div>
+
+  <!-- 字幕条（避开底部 220px 平台安全区；默认隐藏，无字幕不占位） -->
+  <div class="subtitle" id="subtitle" hidden>
+    <div class="sub-chip" id="sub-chip"><span id="sub-chip-name"></span></div>
+    <div class="sub-body">
+      <div class="sub-text" id="sub-text"></div>
+      <div class="sub-meta"><i class="dotp" id="sub-dot"></i><span id="sub-meta-text"></span></div>
+    </div>
+  </div>
+
+</div>
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
