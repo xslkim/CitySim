@@ -1,0 +1,11 @@
+# arcs.yaml —— 编剧弧线模板唯一载体（04 T-DIR-01 schema / T-DIR-02 六骨架；01 §6.2 逐字段承接）
+# 字段：arc_id/title/stage_machine/fail_forward/intervention_budget/actors/min_days/max_days/payoff_beat
+# 条件 DSL（D-16）：exit / if_blocked 只许 {pred, args} 引用 director/arcs.py PREDICATES 预注册表，禁自由文本。
+# payoff_beat.type 限 01 §11.3 八类：打脸/逆袭/告白成功/真相大白/误会解除/复仇/神反转/吃瓜围观。
+
+meta:
+  concurrency_cap: 3      # 活跃弧线 ≤3 条（01 §6.2，超过即排队）
+  cooldown_days: 14       # 同模板冷却 ≥2 模拟周（01 §6.2）
+  a_drought_days: 2       # 连续 2 个模拟日无 A 级 → 自动启动休眠弧线（01 §6.4）
+
+arcs: []  # 六条骨架模板由 T-DIR-02 逐条填入（A1~A6，01 §6.2 表）
