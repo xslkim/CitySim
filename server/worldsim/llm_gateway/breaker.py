@@ -60,7 +60,12 @@ async def insert_system_event(
 
 
 class FailoverBreaker:
-    """GLM 撞墙判定机（04 §8.2）：三条件命中 → trip；冷却 30min → 探测恢复。"""
+    """GLM 撞墙判定机（04 §8.2）：三条件命中 → trip；冷却 30min → 探测恢复。
+
+    判定键 = 端点（`provider别名/model`，03 §6 D45）：429/RPM 撞墙实测为账号级（1302），
+    但 p95 延迟是型号级指标；端点级键控避免明星档慢调用误伤次要档（两型号独立 trip/探测恢复，
+    账号级撞墙时两端点各自 trip、各自探测，语义等价）。
+    """
 
     def __init__(self, clock: Clock | None = None) -> None:
         self._clock = clock or RealClock()
@@ -71,8 +76,13 @@ class FailoverBreaker:
 
     # ---- 数据流输入（T-LLM-05 调用记录流） ---------------------------------
 
-    def record_attempt(self, provider: str, *, kind: str, latency_ms: int, rpm_limit: int | None = None) -> str | None:
-        """记录一次尝试并做撞墙判定；命中三条件之一 → trip 并返回 reason，否则 None。"""
+    def record_attempt(self, provider: str, *, kind: str, latency_ms: int, rpm_limit: int | None = None,
+                       p95_trip_ms: int | None = None) -> str | None:
+        """记录一次尝试并做撞墙判定；命中三条件之一 → trip 并返回 reason，否则 None。
+
+        `p95_trip_ms`：条件③阈值条目级覆盖（models.yaml 模型条目 `p95_trip_ms`；缺省 8s = 04 §8.2 口径。
+        开发期免费档 reasoning 模型固有延迟超 8s，条目级阈见 03 §6 D42）。
+        """
         now = self._clock.now()
         w = self._window.setdefault(provider, deque())
         w.append((now, kind, latency_ms))
@@ -84,12 +94,12 @@ class FailoverBreaker:
             self._consec_wall[provider] = self._consec_wall.get(provider, 0) + 1
         elif kind == "ok":
             self._consec_wall[provider] = 0
-        reason = self._check_trip(provider, rpm_limit)
+        reason = self._check_trip(provider, rpm_limit, p95_trip_ms=p95_trip_ms)
         if reason:
             self._tripped_at[provider] = now
         return reason
 
-    def _check_trip(self, provider: str, rpm_limit: int | None) -> str | None:
+    def _check_trip(self, provider: str, rpm_limit: int | None, *, p95_trip_ms: int | None = None) -> str | None:
         if self._consec_wall.get(provider, 0) >= TRIP_CONSECUTIVE_ERRORS:
             return "consecutive_429_5xx"  # 条件①
         w = self._window.get(provider)
@@ -99,9 +109,10 @@ class FailoverBreaker:
             usage = len(w) / (rpm_limit * WINDOW_S / 60.0)
             if usage > RPM_USAGE_TRIP:
                 return "rpm_usage_over_90pct"
+        p95_limit = p95_trip_ms or P95_LATENCY_TRIP_MS
         lat = sorted(lat for _, _, lat in w)
         p95 = lat[min(len(lat) - 1, int(len(lat) * 0.95))]
-        if len(lat) >= 2 and p95 > P95_LATENCY_TRIP_MS:  # 条件③：窗口 p95 >8s
+        if len(lat) >= 2 and p95 > p95_limit:  # 条件③：窗口 p95 超阈（04 §8.2；条目级覆盖 D42）
             return "p95_latency_over_8s"
         return None
 

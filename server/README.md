@@ -63,11 +63,17 @@ cd server
 uv run python -m worldsim.main --sim-hours 1     # 试跑模式：推进 1 模拟小时后优雅停机（退出码 0）
 uv run python -m worldsim.main                   # 持续模式：按变速表 paced 跑至 SIGINT/SIGTERM
 uv run python -m worldsim.main --sim-hours 2 --ratio 6   # 试跑 + 覆盖压缩比
+uv run python -m worldsim.main --sim-hours 24 --llm routed   # M2 真接入：models.yaml 路由（智谱免费档 + 本地 bge-m3）+ RPM 桶/降级链/熔断
 ```
 
 - 装配：连接池 → `TimeEngine`(clock.anchor 锚点，seed 占位首启重锚) → `AdjudicationQueue` →
-  `LLMGateway`（M1 注入 `MockProvider`，`default_provider='mock'`）→ `Pipeline`（六步骨架，
+  `LLMGateway`（`--llm mock` 默认注入 `MockProvider`；`--llm routed` 走 `ModelRouter` 真路由 +
+  `FailoverBreaker` 撞墙降级链 + SIGHUP 热更，T-LLM-04/05/06）→ `Pipeline`（六步骨架，
   think/move 轻动作闭环）→ `asyncio.TaskGroup`（clock.run / adjudication_loop 唯一写协程 / watch）。
+- LLM 网关 M2 模块：`llm_gateway/{router,clients,breaker,ledger,parse,prompts}.py` +
+  `providers/{mock,zhipu,local_embed}.py`；模板族 `config/prompts/*.yaml`（12 族）、
+  输出 schema `config/schemas/*.json`、安全词表 `config/safety/wordlist.txt`；
+  计量 SQL `scripts/llm_cost.sql`；占位扫描 `scripts/check_config_fill.py`。
 - 试跑模式（`--sim-hours`）：unthrottled 尽快递 tick（仍 sim 网格锚定、逐 tick 串行落库），
   不做段切换与 batch 段自动进入；持续模式全量生效（段切换/batch 段/SIGHUP 热更）。
 - env：`WSIM_PG_DSN`（必填；根 `.env` 兜底加载，仅补缺 WSIM_*）/ `WSIM_SPEED_TABLE` /

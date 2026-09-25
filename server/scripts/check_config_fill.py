@@ -23,9 +23,14 @@ import yaml  # noqa: E402
 
 
 def find_unfilled(node: object, path: str = "") -> list[str]:
-    """递归收集占位项路径（`__FILL__` / placeholder_pending_w2 / 关键数值 null）。"""
+    """递归收集占位项路径（`__FILL__` / placeholder_pending_w2 / 关键数值 null）。
+
+    `enabled: false` 的占位条目（付费档/vLLM/embedding-3 备选）不参与检查——启用时才需回填。
+    """
     hits: list[str] = []
     if isinstance(node, dict):
+        if node.get("enabled") is False:
+            return hits
         for k, v in node.items():
             p = f"{path}.{k}" if path else str(k)
             if v == "__FILL__":

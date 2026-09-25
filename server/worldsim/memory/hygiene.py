@@ -95,15 +95,22 @@ class MemoryHygiene:
         lines = "\n".join(f"- {m['content']}" for m in mems)
         if self._gw is None:
             return f"早前的经历（{len(mems)} 条合并）：" + mems[0]["content"][:40] + "……"
-        result = await self._gw.chat(
-            "bgsummary",
-            [
-                {"role": "system", "content": "把这段较早的经历压缩成一条第一人称摘要（≤60字）。输出 JSON。"},
-                {"role": "user", "content": f"较早的经历：\n{lines}"},
-            ],
-            self._gw.gen_params("bgsummary") if hasattr(self._gw, "gen_params") else None,
-            seed=rng_seed, agent_id=agent_id, sim_time=sim_now,
-        )
+        from ..llm_gateway import ChainExhausted, ProviderUnavailable
+
+        try:
+            result = await self._gw.chat(
+                "bgsummary",
+                [
+                    {"role": "system", "content": "把这段较早的经历压缩成一条第一人称摘要（≤60字）。输出 JSON。"},
+                    {"role": "user", "content": f"较早的经历：\n{lines}"},
+                ],
+                self._gw.gen_params("bgsummary") if hasattr(self._gw, "gen_params") else None,
+                seed=rng_seed, agent_id=agent_id, sim_time=sim_now,
+            )
+        except (ChainExhausted, ProviderUnavailable) as exc:
+            # M2 真接入崩溃护栏（03 §6 D45）：LLM 链路不可用 → 退化为确定性合并摘要，不拖垮 hygiene_loop
+            log.error("摘要合并 LLM 链路不可用（%s）→ 退化确定性摘要", exc)
+            return f"早前的经历（{len(mems)} 条合并）：" + mems[0]["content"][:40] + "……"
         try:
             body = json.loads(result.text)
             return str(body.get("diary") or result.text)[:120]

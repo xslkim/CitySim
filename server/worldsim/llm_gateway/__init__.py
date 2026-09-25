@@ -46,8 +46,10 @@ log = logging.getLogger(__name__)
 
 REPLAY_ENV = "WSIM_REPLAY_MODE"
 
-# rpm_limit 未回填期（T-LLM-12 实测回填前）路由模式的保守工程默认（03 §6 偏差表登记）
+# rpm_limit 未回填期（T-LLM-12 实测回填前）路由模式的保守工程默认（03 §6 D35 登记）
 DEFAULT_RPM_LIMIT = 60
+# 在飞并发闸默认（模型条目未配 concurrency 时；实测口径见 T-LLM-12 回填）
+DEFAULT_MAX_CONCURRENCY = 4
 
 
 class ReplayViolation(RuntimeError):
@@ -235,10 +237,13 @@ class LLMGateway:
             impl = self._providers.get(hop.provider)
             if impl is None or not isinstance(impl, ChatProvider):
                 continue  # 未注册/占位跳（enabled:false 已在 router.chain 过滤）
+            if hop.model and hasattr(impl, "for_model"):
+                impl = impl.for_model(hop.model, thinking=self._model_entry(hop.provider, hop.model).get("thinking"))
             saw_hop = True
-            if self._breaker is not None and self._breaker.is_tripped(hop.provider):
+            endpoint = f"{hop.provider}/{hop.model}"  # breaker 端点键（03 §6 D45）
+            if self._breaker is not None and self._breaker.is_tripped(endpoint):
                 fallback_from = fallback_from or hop.provider  # 降级期留痕（04 §8.2）
-                if not self._breaker.due_for_probe(hop.provider):
+                if not self._breaker.due_for_probe(endpoint):
                     continue
                 # 冷却 30 分钟满 → 单请求探测（04 §8.2）
                 if not await self._probe(hop, impl, task_type, messages, gen, seed=seed):
@@ -250,7 +255,7 @@ class LLMGateway:
                     to_provider=hop.provider, reason="recovered",
                     tick=tick, sim_time=sim_time, rng_seed=seed or 0,
                 )
-            client = self._client_for(hop.provider, impl)
+            client = self._client_for(hop.provider, impl, model=hop.model)
             before = len(client.records)
             outcome = await client.call(task_type, messages, gen, seed=seed)
             attempts = client.records[before:]
@@ -296,36 +301,66 @@ class LLMGateway:
     async def _probe(self, hop: Any, impl: Any, task_type: str, messages: list[Message], gen: dict[str, Any], *, seed: int | None) -> bool:
         """单请求探测（04 §8.2 冷却恢复）；结果回报 breaker，探测行照常留痕。"""
         started = time.perf_counter()
+        endpoint = f"{hop.provider}/{hop.model}"
         try:
             await impl.chat(task_type, messages, gen, seed=seed)
         except Exception:
-            self._breaker.probe_result(hop.provider, ok=False)
+            self._breaker.probe_result(endpoint, ok=False)
             return False
-        self._breaker.probe_result(hop.provider, ok=True)
+        self._breaker.probe_result(endpoint, ok=True)
         log.info("LLM 降级恢复探测成功：%s（冷却满单请求探测，04 §8.2）；探测耗时 %dms", hop.provider, int((time.perf_counter() - started) * 1000))
         return True
 
-    def _client_for(self, provider: str, impl: Any) -> Any:
-        """每 provider 一个 RateLimitedClient（令牌桶容量 = models.yaml rpm_limit，04 §8.5）。"""
+    def _model_entry(self, provider: str, model: str) -> dict[str, Any]:
+        if self._router:
+            pcfg = self._router.provider_config(provider)
+            for section in ("chat", "embedding"):
+                for m in pcfg.get(section) or []:
+                    if m.get("id") == model:
+                        return dict(m)
+        return {}
+
+    def _model_limits(self, provider: str, model: str) -> tuple[int, int, int | None]:
+        """(rpm_limit, concurrency, p95_trip_ms)：优先读模型条目（providers.<alias>.chat[]/embedding[]），
+        缺省回落 provider 级 rpm_limit，再缺省工程默认（03 §6 D35/D41/D42）。"""
+        rpm: int | None = None
+        conc: int | None = None
+        p95: int | None = None
+        if self._router:
+            pcfg = self._router.provider_config(provider)
+            for section in ("chat", "embedding"):
+                for m in pcfg.get(section) or []:
+                    if m.get("id") == model:
+                        rpm = m.get("rpm_limit") or rpm
+                        conc = m.get("concurrency") or conc
+                        p95 = m.get("p95_trip_ms") or p95
+            rpm = rpm or pcfg.get("rpm_limit")
+        return rpm or DEFAULT_RPM_LIMIT, conc or DEFAULT_MAX_CONCURRENCY, p95
+
+    def _client_for(self, provider: str, impl: Any, *, model: str = "") -> Any:
+        """每 (provider, model) 一个 RateLimitedClient（令牌桶容量 = models.yaml rpm_limit，04 §8.5）。"""
         from .clients import RateLimitedClient
 
-        client = self._clients.get(provider)
+        key = f"{provider}/{model}"
+        client = self._clients.get(key)
         if client is None:
-            rpm = (self._router.provider_config(provider).get("rpm_limit") if self._router else None) or DEFAULT_RPM_LIMIT
-            client = RateLimitedClient(impl, rpm_limit=rpm, clock=self._clock)
-            self._clients[provider] = client
+            rpm, conc, _ = self._model_limits(provider, model)
+            client = RateLimitedClient(impl, rpm_limit=rpm, clock=self._clock, max_concurrency=conc)
+            self._clients[key] = client
         return client
 
     def _breaker_feed(self, hop: Any, rec: Any) -> str | None:
         if self._breaker is None:
             return None
         kind = "ok" if rec.status == "ok" else ("429" if rec.retry_after_s is not None or "429" in (rec.error or "") else "5xx")
-        rpm = (self._router.provider_config(hop.provider).get("rpm_limit") if self._router else None) or DEFAULT_RPM_LIMIT
-        return self._breaker.record_attempt(hop.provider, kind=kind, latency_ms=rec.latency_ms, rpm_limit=rpm)
+        rpm, _, p95 = self._model_limits(hop.provider, hop.model)
+        return self._breaker.record_attempt(
+            f"{hop.provider}/{hop.model}", kind=kind, latency_ms=rec.latency_ms, rpm_limit=rpm, p95_trip_ms=p95,
+        )
 
     def _breaker_feed_ok(self, hop: Any, rec: Any) -> None:
         if self._breaker is not None:
-            self._breaker.record_attempt(hop.provider, kind="ok", latency_ms=rec.latency_ms if rec else 0)
+            self._breaker.record_attempt(f"{hop.provider}/{hop.model}", kind="ok", latency_ms=rec.latency_ms if rec else 0)
 
     async def _record_attempt(self, task_type: str, agent_id: str | None, hop: Any, rec: Any, sim_time: Any, prompt_hash: str, fallback_from: str | None) -> None:
         """中间失败尝试留痕（04 §8.3 全量记录含重试；tokens 未知记 0，成本 0）。"""

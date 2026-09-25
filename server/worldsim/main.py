@@ -103,6 +103,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--speed-table", default=None, help="speed_table.yaml 路径（缺省 env WSIM_SPEED_TABLE → config/）")
     p.add_argument("--models-config", default=None, help="models.yaml 路径（缺省 env WSIM_MODELS_CONFIG → config/）")
     p.add_argument("--world-config", default=None, help="world.yaml 路径（缺省 env WSIM_WORLD_CONFIG → config/）")
+    p.add_argument("--llm", choices=["mock", "routed"], default="mock",
+                   help="LLM 供给：mock（默认，M1 确定性口径）/ routed（真接入：models.yaml 路由+桶+降级链，T-LLM-12）")
     return p
 
 
@@ -140,12 +142,34 @@ async def _run(args: argparse.Namespace) -> int:
         queue.bind_notify_event(notify)
         drained = asyncio.Event() if trial else None
 
+        models_path = args.models_config or os.environ.get("WSIM_MODELS_CONFIG") or str(SERVER_ROOT / "config" / "models.yaml")
         models_cfg = _load_yaml(args.models_config, "WSIM_MODELS_CONFIG", "models.yaml")
         world_cfg = _load_yaml(args.world_config, "WSIM_WORLD_CONFIG", "world.yaml")
         needs_cfg = load_needs_config(str(SERVER_ROOT / "config" / "needs.yaml"))
         relations_cfg = load_relations_config(str(SERVER_ROOT / "config" / "relations.yaml"))
         goals_cfg = load_goals(str(SERVER_ROOT / "config" / "goals.yaml"))
-        gateway = LLMGateway(pool, models_cfg, providers={"mock": MockProvider()}, default_provider="mock")
+        if args.llm == "routed":
+            # T-LLM-12 真接入：models.yaml 路由 + RPM 桶/退避 + 撞墙降级链 + SIGHUP 热更（04 §8/§12.4）
+            from .llm_gateway.breaker import FailoverBreaker
+            from .llm_gateway.providers.local_embed import LocalEmbedProvider
+            from .llm_gateway.providers.zhipu import ZhipuProvider
+            from .llm_gateway.router import ModelRouter
+
+            router = ModelRouter(models_cfg, path=models_path)
+            router.install_sighup()
+            embed_cfg = models_cfg.get("providers", {}).get("local_embed", {})
+            gateway = LLMGateway(
+                pool, models_cfg,
+                providers={
+                    "zhipu": ZhipuProvider(model="glm-4.5-flash"),
+                    "local_embed": LocalEmbedProvider(model=embed_cfg.get("model", "BAAI/bge-m3")),
+                    "mock": MockProvider(),
+                },
+                router=router, breaker=FailoverBreaker(),
+            )
+            log.info("LLM 供给 = routed（models.yaml 路由真接入；embed=本地 bge-m3）")
+        else:
+            gateway = LLMGateway(pool, models_cfg, providers={"mock": MockProvider()}, default_provider="mock")
         # 波次 2a 接线：聚合器（04 §6.5）/ 检索（T-MEM-01）/ 反思（T-MEM-02）/ 治理（T-MEM-03）/
         # 需求衰减（T-REL-01）/ 关系（T-REL-02）/ 目标（T-REL-03）/ 冷却（T-REL-04）
         agg = StateAggregator(pool)

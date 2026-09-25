@@ -7,20 +7,26 @@ providers:
     type: openai_compatible
     base_url: https://open.bigmodel.cn/api/paas/v4
     api_key_env: WSIM_ZHIPU_API_KEY
-    rpm_limit: null                             # 开工当天按账户实际档位核实回填（04 §8.2/§8.5，§5 R4）
     chat:
       - id: glm-4.5-flash                       # 免费档·主用（00 §1 A9 实测）：明星/深度反思/导演/世界文案档
         tier: free
-        reasoning: true                         # reasoning 模型：max_tokens 须留足、响应只取 content 字段（provider 实现归 03）
-        input_price: null
-        output_price: null
-        price_status: placeholder_pending_w2
+        reasoning: true                         # reasoning 模型：响应只取 content 字段（provider 实现归 03）
+        thinking: disabled                      # 开发期关 reasoning（03 §6 D44：实测 2026-09-25 延迟 50s→2s、配额消耗 ~12 倍→1×）
+        rpm_limit: 30                           # 实测（2026-09-25，T-LLM-12，§5 R2 收口）：并发上限≈2（超出即 429 码1302），桶保守取 30
+        concurrency: 2                          # 在飞并发闸（实测并发 2 全过、并发 3 触发 1302）
+        p95_trip_ms: 15000                      # 撞墙条件③条目级阈（03 §6 D42；thinking disabled 后实测 ~2s）
+        input_price: 0                          # 免费档实测 ¥0（2026-09-25，T-LLM-12，§5 R1 收口）
+        output_price: 0
+        price_status: measured_free_tier_w2
       - id: glm-4-flash                         # 免费档（00 §1 A9 实测）：次要/背景摘要/安全档
         tier: free
         reasoning: false
-        input_price: null
-        output_price: null
-        price_status: placeholder_pending_w2
+        rpm_limit: 60                           # 实测（2026-09-25）：并发 10 全过、间隔 2s 顺序连发无 429
+        concurrency: 5
+        p95_trip_ms: 15000                      # 撞墙条件③条目级阈（03 §6 D42）；实测 p50≈1s，留足头部空间
+        input_price: 0
+        output_price: 0
+        price_status: measured_free_tier_w2
       # 付费档占位：充值后仅改配置升档（00 §1 A9）；型号 id 开工当天按官方文档核实填入（04 §8.1）
       # - id: glm-4.5-air                       # 付费档候选（2026-09-23 实测 1113 余额不足，00 §1 附）
       #   tier: paid
@@ -87,13 +93,13 @@ task_routes:                                    # 04 §8.1 全部 9 个 task_typ
     fallback:                                   # GPU 忙→云端批量（WSIM_EMBED_BACKEND=cloud，04 §8.1）
       - { provider: zhipu, model: embedding-3, enabled: false }
 
-generation_params:                              # 04 §8.6 逐行照抄（7 行）
-  star_decision: { temperature: 0.8, max_tokens: 400, response_format: json }
-  dialogue:      { temperature: 0.9, max_tokens: 1200, presence_penalty: 0.3 }   # 台词反套路（配合 04 §10.2 n-gram 指标）
+generation_params:                              # 04 §8.6 逐行照抄（7 行）为设计镜像；glm-4.5-flash 行 max_tokens 实测放大（D40）
+  star_decision: { temperature: 0.8, max_tokens: 2000, response_format: json }   # 设计镜像 400；reasoning 实测正文前耗 ~600 token（D40，T-LLM-12）
+  dialogue:      { temperature: 0.9, max_tokens: 6000, presence_penalty: 0.3 }   # 设计镜像 1200；台词反套路（配合 04 §10.2 n-gram 指标）；reasoning 预留（D40）
   secondary:     { temperature: 0.7, max_tokens: 250, response_format: json }
   bgsummary:     { temperature: 0.3, max_tokens: 300, response_format: json }
-  reflection:    { temperature: 0.6, max_tokens: 500 }
-  director:      { temperature: 1.0, max_tokens: 2000 }                          # 上下文内带弧线状态机全量
+  reflection:    { temperature: 0.6, max_tokens: 3000 }                          # 设计镜像 500；reasoning 预留（D40）
+  director:      { temperature: 1.0, max_tokens: 8000 }                          # 设计镜像 2000；上下文内带弧线状态机全量；reasoning 预留（D40）
   safety:        { temperature: 0.0, max_tokens: 50 }                            # 分类标签输出
 
 thresholds:                                     # 阈值集中段（04 §12.4）；数字引用持有方，不新造

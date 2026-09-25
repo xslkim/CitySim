@@ -129,6 +129,7 @@ class RateLimitedClient:
         rpm_limit: int,
         clock: Clock | None = None,
         rng: random.Random | None = None,
+        max_concurrency: int = 100,
     ) -> None:
         self.provider = provider
         self.clock = clock or RealClock()
@@ -137,6 +138,9 @@ class RateLimitedClient:
         self._pending: list[_Waiter] = []
         self._seq = itertools.count()
         self.records: list[AttemptRecord] = []
+        import asyncio
+
+        self._sem = asyncio.Semaphore(max_concurrency)  # 在飞并发闸（models.yaml 模型条目 concurrency）
 
     async def call(
         self,
@@ -151,7 +155,8 @@ class RateLimitedClient:
         for attempt in range(MAX_RETRIES + 1):
             started = self.clock.now()
             try:
-                result = await self.provider.chat(task_type, messages, gen_params, seed=seed)
+                async with self._sem:  # 在飞并发闸（免费档并发上限实测口径，T-LLM-12）
+                    result = await self.provider.chat(task_type, messages, gen_params, seed=seed)
             except RateLimited as exc:
                 attempts.append(self._mark(attempt, started, str(exc), retry_after_s=exc.retry_after_s))
                 if attempt >= MAX_RETRIES:

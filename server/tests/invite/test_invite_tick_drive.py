@@ -16,6 +16,7 @@ import pytest
 import pytest_asyncio
 import yaml
 
+from tests.conftest import DDL_DIR, _build_db, _drop_db
 from worldsim.adjudicator.state_events import StateAggregator
 from worldsim.invite.state_machine import InviteMachine
 from worldsim.llm_gateway.providers.base import ChatResult
@@ -29,6 +30,18 @@ pytestmark = pytest.mark.asyncio
 
 SIM_NOW = dt.datetime(2026, 10, 12, 12, 0, 0, tzinfo=LOCAL_TZ)  # 周一 12:00
 CFG = yaml.safe_load((Path(__file__).resolve().parents[2] / "config" / "relations.yaml").read_text(encoding="utf-8"))
+
+_DRIVE_DB = "worldsim_invite_drive"
+
+
+@pytest.fixture(scope="module")
+def drive_dsn():
+    """私有 scratch 库（events append-only 不可清库，隔离惯例同 tests/adjudicator/test_pipeline.py）。"""
+    dsn = _build_db(_DRIVE_DB, DDL_DIR / "schema_v1.sql")
+    try:
+        yield dsn
+    finally:
+        _drop_db(_DRIVE_DB)
 
 
 class _StubGateway:
@@ -44,8 +57,8 @@ class _StubGateway:
 
 
 @pytest_asyncio.fixture()
-async def machine(test_db_dsn: str):
-    pool = await asyncpg.create_pool(test_db_dsn, min_size=1, max_size=4)
+async def machine(drive_dsn: str):
+    pool = await asyncpg.create_pool(drive_dsn, min_size=1, max_size=4)
     persona = {"big_five": {"agreeableness": 50, "extraversion": 50, "conscientiousness": 50, "neuroticism": 40, "openness": 50}}
     for aid in ("A02", "A03"):
         await pool.execute(

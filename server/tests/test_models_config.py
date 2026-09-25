@@ -57,7 +57,14 @@ def test_dev_routes_free_tier() -> None:
 
 
 def test_generation_params_match_04_8_6() -> None:
-    assert _load()["generation_params"] == GENERATION_PARAMS_04_8_6
+    """04 §8.6 镜像：非 max_tokens 键逐字相等；glm-4.5-flash 行 max_tokens ≥ 设计值（reasoning 预留，03 §6 D40）。"""
+    actual = _load()["generation_params"]
+    reasoning_rows = {"star_decision", "dialogue", "reflection", "director"}  # 走 glm-4.5-flash（reasoning 模型）
+    for task, want in GENERATION_PARAMS_04_8_6.items():
+        got = dict(actual[task])
+        if task in reasoning_rows:
+            assert got.pop("max_tokens") >= want.pop("max_tokens"), task
+        assert got == want, task
 
 
 def test_thresholds_match_design() -> None:

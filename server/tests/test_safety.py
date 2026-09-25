@@ -14,6 +14,7 @@ import json
 import asyncpg
 import pytest
 
+from tests.conftest import DDL_DIR, _build_db, _drop_db
 from worldsim.llm_gateway.providers.base import ChatResult
 from worldsim.safety import LocalRules, SafetyPipeline
 
@@ -21,6 +22,18 @@ pytestmark = pytest.mark.asyncio
 
 BANNED = "安全哨兵违禁词"  # config/safety/wordlist.txt 测试哨兵行
 SENTINEL_RAW = "原文哨兵-只能在-text_raw"
+
+_SAFETY_DB = "worldsim_safety"
+
+
+@pytest.fixture(scope="module")
+def safety_dsn():
+    """私有 scratch 库（events append-only 不可清库，隔离惯例同 tests/adjudicator/test_pipeline.py）。"""
+    dsn = _build_db(_SAFETY_DB, DDL_DIR / "schema_v1.sql")
+    try:
+        yield dsn
+    finally:
+        _drop_db(_SAFETY_DB)
 
 
 class _StubGateway:
@@ -54,7 +67,7 @@ async def test_l1_short_circuits_l2() -> None:
     assert r2.label == "pass" and r2.layer == "L2_glm" and gw.calls == 1
 
 
-async def test_block_regenerate_once_then_internal(test_db_dsn: str) -> None:
+async def test_block_regenerate_once_then_internal(safety_dsn: str) -> None:
     """连续 block → 恰好 1 次重生成 → 事件 internal、payload 无 text_display（03 验收 2，SQL 验证）。"""
     pipe, gw = _pipeline(["block", "block"])
     regen_calls = 0
@@ -70,7 +83,7 @@ async def test_block_regenerate_once_then_internal(test_db_dsn: str) -> None:
     assert decision.text_raw and BANNED in decision.text_raw
 
     # 按决策落库（消费侧口径演示）+ SQL 契约断言
-    pool = await asyncpg.create_pool(test_db_dsn)
+    pool = await asyncpg.create_pool(safety_dsn)
     try:
         seq = await pool.fetchval(
             """

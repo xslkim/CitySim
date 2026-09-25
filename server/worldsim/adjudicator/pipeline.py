@@ -23,7 +23,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
-from ..llm_gateway import LLMGateway
+from ..llm_gateway import LLMGateway, ChainExhausted, ProviderUnavailable
 from ..memory.store import insert_memory
 from ..time_engine.batch import batch_advance
 from ..time_engine.clock import TimeEngine
@@ -151,9 +151,15 @@ class Pipeline:
         last_text = ""
         for attempt in range(2):  # 首次 + 重试 1 次（04 §6.1 step3）
             attempts += 1
-            result = await self._gw.chat(
-                "star_decision", messages, gen_params, seed=rng_seed, agent_id=agent_id, sim_time=sim_now
-            )
+            try:
+                result = await self._gw.chat(
+                    "star_decision", messages, gen_params, seed=rng_seed, agent_id=agent_id, sim_time=sim_now
+                )
+            except (ChainExhausted, ProviderUnavailable) as exc:
+                # M2 真接入崩溃护栏（03 §6 D43/D45）：链尽/全跳不可用（pause_clock 等末端动作的消费
+                # 接线归 08 T-OPS-03）→ 裁决侧降级 think 兜底，防单点撞墙拖垮主循环。
+                log.error("LLM 链路不可用（%s）→ 本拍降级 think 兜底", exc)
+                break
             last_text = result.text
             decision = self._parse_decision(agent_id, last_text, attempts)
             if decision is not None:
@@ -180,13 +186,20 @@ class Pipeline:
         action = body.get("action")
         if not isinstance(action, dict) or not isinstance(action.get("type"), str):
             return None
+        # 真 LLM 鲁棒性（T-LLM-12）：args/emotion_delta 非 object 时走重试/降级，不崩管道
+        args = action.get("args")
+        if args is not None and not isinstance(args, dict):
+            return None
+        emotion_delta = body.get("emotion_delta")
+        if emotion_delta is not None and not isinstance(emotion_delta, dict):
+            return None
         return Decision(
             agent_id=agent_id,
             intent=str(body.get("intent", "")),
             action_type=action["type"],
-            action_args=dict(action.get("args") or {}),
+            action_args=dict(args or {}),
             say=body.get("say") if isinstance(body.get("say"), str) else None,
-            emotion_delta=dict(body.get("emotion_delta") or {}),
+            emotion_delta=dict(emotion_delta or {}),
             attempts=attempts,
         )
 
@@ -451,10 +464,13 @@ async def adjudication_loop(
                     if batch_summarize is None:
                         log.warning("enter_batch 到达但无 batch_summarize 注入，跳过")
                         continue
-                    await batch_advance(
-                        clock, agent_ids, float(enter["sim_hours"]),
-                        summarize=batch_summarize, director_preempt=director_preempt,
-                    )
+                    try:
+                        await batch_advance(
+                            clock, agent_ids, float(enter["sim_hours"]),
+                            summarize=batch_summarize, director_preempt=director_preempt,
+                        )
+                    except (ChainExhausted, ProviderUnavailable) as exc:
+                        log.error("batch 段 LLM 链路不可用（%s）→ 本批 LLM 摘要跳过（03 §6 D45 护栏）", exc)
             elif it.kind == WAKEUP:
                 if it.agent_id and it.agent_id not in agents_due:
                     agents_due.append(it.agent_id)
@@ -472,9 +488,17 @@ async def adjudication_loop(
                         agents_due.append(r["id"])
         if agents_due:
             sim_now = clock.sim_of_tick(tick)
-            await pipeline.run_tick(tick=tick, sim_now=sim_now, agent_ids=agents_due, rng_seed=tick)
+            try:
+                await pipeline.run_tick(tick=tick, sim_now=sim_now, agent_ids=agents_due, rng_seed=tick)
+            except (ChainExhausted, ProviderUnavailable) as exc:
+                # M2 真接入崩溃护栏（03 §6 D43/D45）：结算/对话路径链尽不拖垮主循环；
+                # pause_clock 等末端动作的消费接线归 08 T-OPS-03。
+                log.error("LLM 链路不可用（%s）→ 本 tick 剩余结算跳过", exc)
         if after_tick is not None and not clock.batch_mode:
-            await after_tick(tick, clock.now_sim())
+            try:
+                await after_tick(tick, clock.now_sim())
+            except (ChainExhausted, ProviderUnavailable) as exc:
+                log.error("after_tick LLM 链路不可用（%s）→ 本 tick 收尾 LLM 作业跳过（03 §6 D45 护栏）", exc)
         if drained is not None:
             drained.set()
     log.info("adjudication_loop 退出（stop）")

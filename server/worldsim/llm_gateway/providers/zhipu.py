@@ -81,13 +81,27 @@ class ZhipuProvider:
         api_key: str | None = None,
         connect_timeout_s: float = DEFAULT_CONNECT_TIMEOUT_S,
         read_timeout_s: float = DEFAULT_READ_TIMEOUT_S,
+        thinking: str | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self.model = model
         self._base_url = base_url
         self._api_key = api_key if api_key is not None else os.environ.get(API_KEY_ENV)
         self._timeout = httpx.Timeout(read_timeout_s, connect=connect_timeout_s)
+        self._thinking = thinking  # "disabled"/"enabled"（models.yaml 模型条目 thinking 键，03 §6 D44）
         self._transport = transport
+
+    def for_model(self, model: str, *, thinking: str | None = None) -> ZhipuProvider:
+        """按型号绑定副本（同 provider 别名多型号共享连接/超时/密钥，型号逐跳不同，04 §8.1 降级链）。
+
+        `thinking` 缺省继承母实例；显式传入覆盖（网关按 models.yaml 模型条目注入）。
+        """
+        return ZhipuProvider(
+            model=model, base_url=self._base_url, api_key=self._api_key,
+            connect_timeout_s=self._timeout.connect, read_timeout_s=self._timeout.read,
+            thinking=self._thinking if thinking is None else thinking,
+            transport=self._transport,
+        )
 
     async def chat(
         self,
@@ -139,6 +153,8 @@ class ZhipuProvider:
                 body[key] = gen_params[key]
         if gen_params.get("response_format") == "json":  # 04 §8.6 response_format=json 档
             body["response_format"] = {"type": "json_object"}
+        if self._thinking:
+            body["thinking"] = {"type": self._thinking}  # 03 §6 D44（免费档关 reasoning 控延迟/配额）
         return body
 
     @staticmethod
