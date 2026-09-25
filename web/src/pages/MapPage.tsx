@@ -12,7 +12,7 @@ import Avatar from '../components/common/Avatar';
 import ScrubBar from '../components/map/ScrubBar';
 import SiteSvg from '../components/map/SiteSvg';
 import TodayRipples from '../components/ripple/TodayRipples';
-import { getLayout, loadMapLayout, locationName, siteOf, type Site } from '../lib/mapLayout';
+import { getLayout, tryLoadMapLayout, locationName, siteOf, type Site } from '../lib/mapLayout';
 import { snapshotSchema, type SnapshotData } from '../proto/snapshot';
 import { useAgentsStore } from '../stores/agentsStore';
 import { useTimelineStore } from '../stores/timelineStore';
@@ -35,7 +35,7 @@ export default function MapPage() {
   const [historical, setHistorical] = useState<SnapshotData | null>(null);
 
   useEffect(() => {
-    loadMapLayout().then(setLayout);
+    tryLoadMapLayout().then(setLayout);
   }, []);
 
   const view = historical ?? snapshot;

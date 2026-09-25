@@ -29,6 +29,15 @@ export async function loadMapLayout(): Promise<{ sites: Site[] }> {
   return LAYOUT;
 }
 
+/** 容错变体（jsdom/离线不抛未捕获拒绝；布局仍不可用返回 null） */
+export async function tryLoadMapLayout(): Promise<{ sites: Site[] } | null> {
+  try {
+    return await loadMapLayout();
+  } catch {
+    return null;
+  }
+}
+
 /** 测试/直播页注入（同名同文件同源，T-ART-03 第三挂载口径） */
 export function injectLayout(layout: { sites: Site[] }): void {
   LAYOUT = layout;

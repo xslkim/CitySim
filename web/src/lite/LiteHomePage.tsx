@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiGet } from '../api/client';
 import Avatar from '../components/common/Avatar';
-import { getLayout, loadMapLayout, nodeRect, type Site } from '../lib/mapLayout';
+import { getLayout, tryLoadMapLayout, nodeRect, type Site } from '../lib/mapLayout';
 import { envelopeEventsSchema } from '../proto';
 import type { ObsEvent } from '../proto/event';
 import { rippleTodaySchema } from '../proto/ripple';
@@ -80,7 +80,7 @@ export default function LiteHomePage() {
   const nameOf = (id: string) => names.get(id) ?? id;
 
   useEffect(() => {
-    loadMapLayout().then(setLayout);
+    tryLoadMapLayout().then(setLayout);
     apiGet('/api/ripple/today', rippleTodaySchema).then((r) => setToday(r.data)).catch(() => undefined);
     apiGet('/api/events?limit=30', envelopeEventsSchema)
       .then((r) => setFeed(r.data.items.filter((e) => e.payload.text_display).reverse()))

@@ -1,7 +1,7 @@
 /** 地点树（03 §2.1 左栏：公寓 L1~L6×4 房+公共区 / 公司各部门 / 外部 / 校外聚合区块）。 */
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getLayout, loadMapLayout, type Site } from '../../lib/mapLayout';
+import { getLayout, tryLoadMapLayout, type Site } from '../../lib/mapLayout';
 import { useUiStore } from '../../stores/uiStore';
 import { useWorldStore } from '../../stores/worldStore';
 
@@ -27,7 +27,7 @@ export default function LocationTree() {
   const [layout, setLayout] = useState(getLayout());
   const snapshot = useWorldStore((s) => s.snapshot);
   useEffect(() => {
-    loadMapLayout().then(setLayout);
+    tryLoadMapLayout().then(setLayout);
   }, []);
   if (!layout) return <div className="text-aux text-text-1">地点树加载中…</div>;
   const offsiteN = (snapshot?.agents ?? []).filter((a) => a.location_id?.startsWith('home.')).length;
