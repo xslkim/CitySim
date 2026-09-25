@@ -69,11 +69,14 @@ def canonical_event_payload(
 
 async def digest_events(
     pool: Any, sim_day: dt.date, *, whitelist: dict[str, Any] | None = None,
+    exclude_blocked: bool = False,
 ) -> dict[str, Any]:
     """events 流 digest（05 §2.2）：按 `date(sim_time)`（本地时区）分组取 sim_day 一组。
 
     返回 {sim_day, count, sum_seq, digest('sha256:…')}；digest = sha256(按 seq 序拼接的
     md5(canonical(payload)) 串)。内容无关快速校验可只用 count/sum_seq。
+    `exclude_blocked=True`（M6 sync 侧口径）：block→internal 行（visibility='internal' 且
+    payload 携 text_raw，07 D3 整行不出站）不计入——与 outbox 读取器同一判定，两端一致。
     """
     rows = await pool.fetch(
         "SELECT seq, sim_time, type, visibility, payload FROM events ORDER BY seq",
@@ -88,6 +91,8 @@ async def digest_events(
         payload = r["payload"]
         if isinstance(payload, str):
             payload = json.loads(payload)
+        if exclude_blocked and r["visibility"] == "internal" and "text_raw" in payload:
+            continue  # 07 D3：整行不出站 → 不进 digest（与 sync/outbox.py 同判定）
         md5s.append(md5_hex(canonical_event_payload(
             payload, type_=r["type"], visibility=r["visibility"], whitelist=whitelist,
         )))

@@ -50,7 +50,7 @@ def snapshot_digest_from_disk(sim_day: dt.date, *, out_dir: str | Path | None = 
 async def build_push_body(pool: Any, sim_day: dt.date, *,
                           out_dir: str | Path | None = None) -> dict[str, Any]:
     """04 §9.1 /v1/digest body 契约逐键。"""
-    ev = await digest_events(pool, sim_day)
+    ev = await digest_events(pool, sim_day, exclude_blocked=True)  # 07 D3：block 行不计入（两端一致）
     mem = await digest_memories(pool, sim_day)
     return {
         "sim_day": sim_day.isoformat(),
