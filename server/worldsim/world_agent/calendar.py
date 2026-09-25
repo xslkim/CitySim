@@ -66,6 +66,23 @@ class CalendarEngine:
         self._last_settled: dt.datetime | None = None
         self._holidays = self._expand_holidays(world_cfg.get("holidays", {}))
 
+    # ---- 访问器（各 WA 结算模块消费） ------------------------------------------
+    @property
+    def pool(self) -> Any:
+        return self._pool
+
+    @property
+    def cfg(self) -> dict[str, Any]:
+        return self._cfg
+
+    @property
+    def clock(self) -> Any:
+        return self._clock
+
+    @property
+    def agg(self) -> Any:
+        return self._agg
+
     # ---- 内部：节假日展开 ---------------------------------------------------
 
     @staticmethod
