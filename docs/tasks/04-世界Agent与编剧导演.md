@@ -410,3 +410,6 @@ M3「世界 Agent 与编剧」全部规则化模块（04 §2.1 `world_agent/` + 
 | D-28 | 01 §6.2 fail_forward `if_blocked` 与 stage exit 的判定先后设计未定义 | 工程默认：exit 优先（exit 满足=未阻塞），其后 if_blocked，max_days 兜底最先判；爆发铺垫门禁操作口径 = `payoff_beat.setup_days`（01 §11.3 权威），`min_days/max_days` 为镜像；已登记（本文偏差表） |
 | D-29 | L1「同厨时段/同项目组/值班同班」（01 §6.3）的承载形态设计未细化 | 工程默认：落 `world_state` `schedule.co_location` 标记（02 文档决策侧消费），不直接改排程表；`world.company_crisis` 季度 ≤1 次上限以 `world_state` `company_crisis.last_at` 执行（01 §6.1）；已登记（本文偏差表） |
 | D-30 | `director.grade_revise` 同落 `interventions` 行时 `level` 取值设计未定义（CHECK 仅 L0/L1/L2，04 §5.2） | 工程默认：`'L2'`（编辑终审口径）；干预率统计只看 `trigger` 字段（红线 13），不受 level 取值影响；已登记（本文偏差表） |
+| D-31 | 晋升窗口触发日 = 季度首月 1 日，Q1 恒落元旦——若按「节假日工作事件停发」（01 §6.1）则 Q1 永不触发 | 工程口径：promotion_window 属公司公告类事件，不受停发约束（perf_review/overtime 仍停发）；退租危机 L1 动作映射 = `world.company_crisis`（scope=floor）；已登记（本文偏差表） |
+| D-32 | mock provider 无 K3 复核输出 → mock 世界 A 级 KPI 链路（初值 B → K3 上调 → 有效 A）无法在确定性口径下演练 | 工程默认：mock director 分支读 prompt OBS_JSON 的 candidates，确定性上调首个 B → A（每日 ≤1，在 daily_up_cap 内）；真 LLM 路径不受影响（03 §6 mock 语义扩展）；已登记（本文偏差表） |
+| D-33 | T-DIR-06 验收 5 的 smoke.sh m3 段需求条目 | 已提交并获接收：08 T-OPS-05 实现要点「m3 段需求接收」行（封装 `uv run pytest tests/integration/test_m3_sim_week.py` 为 `smoke.sh m3` 子命令、m3 段结果计入 `var/logs/smoke_report.txt`、实测回填表落 `var/logs/audit/m3_measurements.json` 随日报留痕）；M6 由 T-OPS-05 落地实现 |

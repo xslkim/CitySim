@@ -58,13 +58,14 @@ class ReviewEngine:
 
     def __init__(self, pool: Any, gateway: Any, clock: Any, *,
                  revise_cfg: dict[str, Any], registry: Any = None,
-                 call_factor: Callable[[], float] | None = None) -> None:
+                 call_factor: Callable[[], float] | None = None, grader: Any = None) -> None:
         self._pool = pool
         self._gw = gateway
         self._clock = clock
         self._daily_up_cap = int((revise_cfg or {}).get("daily_up_cap", 2))
         self._registry = registry
         self._call_factor = call_factor
+        self._grader = grader  # T-DIR-04 全事件覆盖：grade_revise 同写 ui.grade 初值
 
     # ---- 候选集 ----------------------------------------------------------------
 
@@ -143,15 +144,20 @@ class ReviewEngine:
     async def _emit_revise(self, target_seq: int, new_grade: str, reason: str, *,
                            arc_id: str | None, sim_now: dt.datetime) -> int:
         tick = self._clock.tick_of(sim_now)
+        payload = {"target_seq": str(target_seq), "new_grade": new_grade, "reason": reason}
+        ui: dict[str, Any] | None = None
+        if self._grader is not None:
+            ui = {"grade": await self._grader.grade(
+                type_="director.grade_revise", actors=[], payload=payload, sim_now=sim_now)}
         seq = await self._pool.fetchval(
             """
-            INSERT INTO events (tick, sim_time, type, source, trigger, arc_id, actors, rng_seed, visibility, payload)
-            VALUES ($1, $2, 'director.grade_revise', 'director', 'director', $3, '{}', $4, 'public', $5::jsonb)
+            INSERT INTO events (tick, sim_time, type, source, trigger, arc_id, actors, rng_seed, visibility, payload, ui)
+            VALUES ($1, $2, 'director.grade_revise', 'director', 'director', $3, '{}', $4, 'public', $5::jsonb, $6::jsonb)
             RETURNING seq
             """,
             tick, sim_now, arc_id, tick,
-            json.dumps({"target_seq": str(target_seq), "new_grade": new_grade, "reason": reason},
-                       ensure_ascii=False),
+            json.dumps(payload, ensure_ascii=False),
+            json.dumps(ui, ensure_ascii=False) if ui else None,
         )
         await self._pool.execute(
             """
@@ -172,13 +178,18 @@ class ReviewEngine:
         summary = "\n".join(
             f"e{c['seq']} [{c['grade']}] {c['type']}: {(c.get('text_display') or '')[:40]}"
             for c in candidates)
+        # OBS_JSON 行 = mock provider 的 K3 复核桩输入（04 §6 D-32；真 K3 亦读候选摘要文本）
+        obs_line = "\nOBS_JSON=" + json.dumps(
+            {"candidates": [{"seq": int(c["seq"]), "grade": c["grade"], "type": c["type"]}
+                            for c in candidates]}, ensure_ascii=False)
         if self._registry is not None:
             _, _, messages = self._registry.render(
                 "director_review", day=day.isoformat(), candidates=summary)
+            messages[-1] = {**messages[-1], "content": messages[-1]["content"] + obs_line}
             return messages
         return [
             {"role": "system", "content": "你是世界编剧的终审编辑（K3 复核）。只输出 JSON。"},
-            {"role": "user", "content": f"[复核日] {day.isoformat()}\n{candidates and summary}"},
+            {"role": "user", "content": f"[复核日] {day.isoformat()}\n{candidates and summary}{obs_line}"},
         ]
 
     # ---- 排队标记（04 §8.1 任务排队延后） ---------------------------------------------

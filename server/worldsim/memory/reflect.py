@@ -69,9 +69,11 @@ class Reflector:
         threshold: int = 20,
         throttle: ThrottleState | None = None,
         tick_of: Callable[[dt.datetime], int] | None = None,
+        grader: Any = None,
     ) -> None:
         self._pool = pool
         self._gw = gateway
+        self._grader = grader  # T-DIR-04 全事件覆盖：agent.reflection 同写 ui.grade 初值
         self._threshold = threshold
         self._throttle = throttle or NullThrottleState()
         self._tick_of = tick_of or (lambda _sim: 0)
@@ -228,14 +230,20 @@ class Reflector:
     async def _emit_reflection_event(self, agent_id: str, texts: list[str], sim_now: dt.datetime, rng_seed: int) -> int:
         """双通道②：`agent.reflection` display-only 事件——visibility='public'、trigger='autonomous'、
         payload 白名单仅 `text_display`（06 §1.2；反思原文永不入 payload，只走 memory_projection）。"""
+        payload = {"text_display": "；".join(texts)}
+        ui = None
+        if self._grader is not None:
+            ui = {"grade": await self._grader.grade(
+                type_="agent.reflection", actors=[agent_id], payload=payload, sim_now=sim_now)}
         return await self._pool.fetchval(
             """
-            INSERT INTO events (tick, sim_time, type, source, trigger, actors, rng_seed, visibility, payload)
-            VALUES ($1, $2, 'agent.reflection', $3, 'autonomous', $4, $5, 'public', $6::jsonb)
+            INSERT INTO events (tick, sim_time, type, source, trigger, actors, rng_seed, visibility, payload, ui)
+            VALUES ($1, $2, 'agent.reflection', $3, 'autonomous', $4, $5, 'public', $6::jsonb, $7::jsonb)
             RETURNING seq
             """,
             self._tick_of(sim_now), sim_now, f"agent:{agent_id}", [agent_id], rng_seed,
-            json.dumps({"text_display": "；".join(texts)}, ensure_ascii=False),
+            json.dumps(payload, ensure_ascii=False),
+            json.dumps(ui, ensure_ascii=False) if ui else None,
         )
 
     @staticmethod

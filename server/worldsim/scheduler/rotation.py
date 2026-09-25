@@ -60,11 +60,23 @@ def extract_targets(event: dict[str, Any]) -> list[str]:
     return sorted(targets)
 
 
+
+async def _grade_ui(grader: Any, *, type_: str, actors: list[str], payload: dict[str, Any],
+                    sim_now: dt.datetime) -> dict[str, Any] | None:
+    """升格/降格事件 ui.grade 初值（T-DIR-04 全事件覆盖口径；grader=None = 不打分，测试兼容位）。"""
+    if grader is None:
+        return None
+    return {"grade": await grader.grade(
+        type_=type_, actors=actors, payload=payload, sim_now=sim_now,
+        followups=bool(payload.get("caused_by")))}
+
+
 class EventDrivenLOD:
     """事件驱动升格/挤出/回落。`pool` = asyncpg pool；`cfg` = models.yaml thresholds.lod 段。"""
 
-    def __init__(self, pool: Any, cfg: dict[str, Any] | None = None) -> None:
+    def __init__(self, pool: Any, cfg: dict[str, Any] | None = None, *, grader: Any = None) -> None:
         self._pool = pool
+        self._grader = grader
         cfg = cfg or {}
         self._cap = int(cfg.get("secondary_cap", 16))
         self._cooldown_days = int(cfg.get("cooldown_demote_sim_days", 2))
@@ -106,13 +118,16 @@ class EventDrivenLOD:
             if not caused_by.isdigit():
                 raise ValueError(f"caused_by 必须为裸 seq 数字字符串，得到 {caused_by!r}（00 §4 红线 3）")
             payload["caused_by"] = caused_by
+        ui = await _grade_ui(self._grader, type_="agent.promoted", actors=[agent_id],
+                             payload=payload, sim_now=sim_now)
         seq = await self._pool.fetchval(
             """
-            INSERT INTO events (tick, sim_time, type, source, trigger, actors, visibility, payload)
-            VALUES ($1, $2, 'agent.promoted', 'system', 'system', $3, 'public', $4::jsonb)
+            INSERT INTO events (tick, sim_time, type, source, trigger, actors, visibility, payload, ui)
+            VALUES ($1, $2, 'agent.promoted', 'system', 'system', $3, 'public', $4::jsonb, $5::jsonb)
             RETURNING seq
             """,
             tick, sim_now, [agent_id], json.dumps(payload, ensure_ascii=False),
+            json.dumps(ui, ensure_ascii=False) if ui else None,
         )
         log.info("升格：%s %s → %s（%s）", agent_id, from_tier, to_tier, reason)
         return int(seq)
@@ -192,13 +207,16 @@ class EventDrivenLOD:
             if not caused_by.isdigit():
                 raise ValueError(f"caused_by 必须为裸 seq 数字字符串，得到 {caused_by!r}（00 §4 红线 3）")
             payload["caused_by"] = caused_by
+        ui = await _grade_ui(self._grader, type_="agent.demoted", actors=[agent_id],
+                             payload=payload, sim_now=sim_now)
         seq = await self._pool.fetchval(
             """
-            INSERT INTO events (tick, sim_time, type, source, trigger, actors, visibility, payload)
-            VALUES ($1, $2, 'agent.demoted', 'system', 'system', $3, 'public', $4::jsonb)
+            INSERT INTO events (tick, sim_time, type, source, trigger, actors, visibility, payload, ui)
+            VALUES ($1, $2, 'agent.demoted', 'system', 'system', $3, 'public', $4::jsonb, $5::jsonb)
             RETURNING seq
             """,
             tick, sim_now, [agent_id], json.dumps(payload, ensure_ascii=False),
+            json.dumps(ui, ensure_ascii=False) if ui else None,
         )
         log.info("降格：%s %s → %s（%s）", agent_id, from_tier, to_tier, reason)
         return int(seq)
@@ -239,8 +257,10 @@ class StarRotation:
         thresholds_lod: dict[str, Any] | None = None,
         reflector: Any = None,
         event_lod: EventDrivenLOD | None = None,
+        grader: Any = None,
     ) -> None:
         self._pool = pool
+        self._grader = grader
         self._gw = gateway
         rot = thresholds_rotation or {}
         lod = thresholds_lod or {}
@@ -428,13 +448,16 @@ class StarRotation:
             "score": {"total": round(score, 4), **{k: round(v, 4) for k, v in breakdown.items()}},
             "gini": round(gini, 4),
         }
+        ui = await _grade_ui(self._grader, type_=type_, actors=[agent_id],
+                             payload=payload, sim_now=sim_now)
         seq = await self._pool.fetchval(
             """
-            INSERT INTO events (tick, sim_time, type, source, trigger, actors, visibility, payload)
-            VALUES ($1, $2, $3, 'system', 'system', $4, 'public', $5::jsonb)
+            INSERT INTO events (tick, sim_time, type, source, trigger, actors, visibility, payload, ui)
+            VALUES ($1, $2, $3, 'system', 'system', $4, 'public', $5::jsonb, $6::jsonb)
             RETURNING seq
             """,
             tick, sim_now, type_, [agent_id], json.dumps(payload, ensure_ascii=False),
+            json.dumps(ui, ensure_ascii=False) if ui else None,
         )
         log.info("路径一%s：%s → %s（score=%.3f gini=%.3f）",
                  "升格" if type_ == "agent.promoted" else "降格", agent_id, to_tier, score, gini)

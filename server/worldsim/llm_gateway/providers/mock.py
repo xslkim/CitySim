@@ -127,7 +127,15 @@ class MockProvider:
         if task_type == "reflection":
             return {"insights": [f"洞察{tag:06x}-{i}" for i in range(rng.randint(2, 3))]}
         if task_type == "director":
-            return {"note": f"导演笔记（{tag:06x}）", "actions": []}
+            # K3 复核桩（M3 T-DIR-05 联调口径，04 §6 D-32）：prompt OBS_JSON 携带 candidates 时，
+            # 确定性上调首个 B 候选 → A（每日 ≤1，在 director.revise.daily_up_cap 内）；无候选则空。
+            revises = []
+            for c in obs.get("candidates") or []:
+                if isinstance(c, dict) and c.get("grade") == "B" and str(c.get("seq", "")).isdigit():
+                    revises = [{"target_seq": str(c["seq"]), "new_grade": "A",
+                                "reason": f"mock 终审上调（{tag:06x}）"}]
+                    break
+            return {"note": f"导演笔记（{tag:06x}）", "actions": [], "revises": revises}
         if task_type == "world_copy":
             return {"title": f"公告{tag:06x}", "body": f"公告正文（{tag:06x}）"}
         if task_type == "safety":

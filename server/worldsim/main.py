@@ -144,7 +144,9 @@ async def _run(args: argparse.Namespace) -> int:
 
         models_path = args.models_config or os.environ.get("WSIM_MODELS_CONFIG") or str(SERVER_ROOT / "config" / "models.yaml")
         models_cfg = _load_yaml(args.models_config, "WSIM_MODELS_CONFIG", "models.yaml")
-        world_cfg = _load_yaml(args.world_config, "WSIM_WORLD_CONFIG", "world.yaml")
+        from .world_agent.config import load_world_config  # T-WA-01：全量校验，失败拒绝启动
+
+        world_cfg = load_world_config(args.world_config or os.environ.get("WSIM_WORLD_CONFIG") or None)
         needs_cfg = load_needs_config(str(SERVER_ROOT / "config" / "needs.yaml"))
         relations_cfg = load_relations_config(str(SERVER_ROOT / "config" / "relations.yaml"))
         goals_cfg = load_goals(str(SERVER_ROOT / "config" / "goals.yaml"))
@@ -184,7 +186,7 @@ async def _run(args: argparse.Namespace) -> int:
         reflector = Reflector(
             pool, gateway,
             threshold=int(models_cfg.get("thresholds", {}).get("reflection", {}).get("importance_acc", 20)),
-            tick_of=clock.tick_of,
+            tick_of=clock.tick_of, grader=grader,
         )
         needs_engine = NeedsEngine(needs_cfg)
         relation_engine = RelationEngine(pool, relations_cfg)
@@ -196,7 +198,7 @@ async def _run(args: argparse.Namespace) -> int:
             ),
         )
         # T-LOD-02：事件驱动即时升格（被交互/被邀约/进镜头当 tick 升格；secondary ≤16 + LRU 挤出）
-        lod_events = EventDrivenLOD(pool, models_cfg.get("thresholds", {}).get("lod", {}))
+        lod_events = EventDrivenLOD(pool, models_cfg.get("thresholds", {}).get("lod", {}), grader=grader)
 
         async def after_settle(decision: Any, seqs: list[int]) -> None:
             """step5 收尾挂点：新落库事件触发路径二升格判定（当 tick 生效，04 §4.2）。"""
@@ -246,6 +248,57 @@ async def _run(args: argparse.Namespace) -> int:
             ),
         )
 
+        # ---- M3 接线（04 文档 T-WA/T-DIR）：日历引擎 + 世界 Agent 全作业 + 编剧导演 --------------
+        from .llm_gateway.prompts import PromptRegistry
+        from .world_agent.calendar import (
+            CalendarEngine, register_career_jobs, register_evening_jobs, register_layoff_rumor_job,
+        )
+        from .world_agent.director.arcs import ArcEngine, load_arcs
+        from .world_agent.director.intervene import InterventionFramework
+        from .world_agent.director.review import ReviewEngine
+        from .world_agent.disturb import register_disturb_jobs
+        from .world_agent.economy import register_economy_jobs, register_overdue_jobs, register_stock_jobs
+
+        calendar = CalendarEngine(pool, world_cfg, clock, agg=agg, grader=grader, gateway=gateway)
+        calendar.register_core_jobs()          # T-WA-02（8:00 打卡内部结算）
+        register_stock_jobs(calendar)          # T-WA-05
+        register_layoff_rumor_job(calendar)    # T-WA-06
+        register_career_jobs(calendar)         # T-WA-07
+        register_evening_jobs(calendar)        # T-WA-08
+        register_disturb_jobs(calendar)        # T-WA-09
+        arcs_cfg = load_arcs()
+        director_fw = InterventionFramework(
+            pool, calendar, clock, arcs_cfg=arcs_cfg,
+            intervention_rate_cap=float(models_cfg.get("thresholds", {}).get("intervention_rate_cap", 0.15)),
+            event_lod=lod_events, gateway=gateway,
+        )
+        arc_engine = ArcEngine(pool, arcs_cfg, clock, intervene=director_fw.intervene)
+        review_engine = ReviewEngine(
+            pool, gateway, clock, revise_cfg=world_cfg.get("director", {}).get("revise", {}),
+            registry=PromptRegistry.load(),
+            call_factor=lambda: 1.0,  # 降速读取点 seam：ThrottleState.director_call_factor 接线归 08 T-OPS-02
+            grader=grader,
+        )
+
+        async def _on_rent_crisis(cal, fire_time, agent_id, owed) -> int:
+            """退租危机 L1（01 §1.5 欠租链末级 → 01 §6.3 L1 计干预率；动作映射=company_crisis，D-31）。"""
+            return await director_fw.intervene(
+                "L1", "company_crisis", reason=f"退租危机：{agent_id} 连续 2 周期欠租（挂账 {owed} 分）",
+                params={"scope": "floor", "severity": "high"}, sim_now=fire_time)
+
+        register_economy_jobs(calendar)        # T-WA-03
+        register_overdue_jobs(calendar, relations_cfg=relations_cfg, on_crisis=_on_rent_crisis)  # T-WA-04
+
+        async def director_daily(cal, fire_time) -> None:
+            """编剧日界作业（T-DIR-01/05）：K3 复核昨日 → 无 A 级自动启弧线检查（01 §6.4）。"""
+            day = fire_time.date() - dt.timedelta(days=1)
+            await review_engine.run_daily_review(day)
+            await arc_engine.daily_check()
+
+        calendar.register_job("director.daily", "00:05", lambda d: True, director_daily)
+        log.info("M3 接线完成：日历作业 %d 项 + 弧线 %d 模板 + 干预框架 + K3 复核",
+                 len(calendar.jobs), len(arcs_cfg.get("arcs", [])))
+
         agent_ids = tuple(r["id"] for r in await pool.fetch("SELECT id FROM agents ORDER BY id"))
         log.info("世界装载：%d agents（%s）", len(agent_ids), "、".join(agent_ids))
 
@@ -294,6 +347,8 @@ async def _run(args: argparse.Namespace) -> int:
         async def after_tick(tick: int, sim_now: dt.datetime) -> None:
             # T-LOD-04：驻留规则每 tick 评估（不占认知循环；移位落 agent.move trigger='system'）
             await residence.evaluate(tick=tick, sim_now=sim_now, rng_seed=tick)
+            # T-WA-02：日历引擎连续段驱动（日界/排程项结算；产 needs_delta 先入 agg 缓冲）
+            await calendar.tick(sim_now)
             # T-REL-01：全员六需求被动衰减（只读 sim_time；cause = 本裁决点前最后一事件 seq，工程口径 D22）
             cause = str(await pool.fetchval("SELECT coalesce(max(seq), 0) FROM events"))
             for aid in agent_ids:
@@ -307,6 +362,8 @@ async def _run(args: argparse.Namespace) -> int:
             await reflector.run_due_daily_fallbacks(agent_ids, sim_now, rng_seed=tick)
             # T-LLM-FIX-01（02 遗漏接线，D34）：邀约提醒/爽约判定每 tick 驱动
             await drive_invite_due(invite_machine, tick=tick, sim_now=sim_now)
+            # T-DIR-01：弧线状态机每 tick 评估（谓词只读 DB；钩子经 T-DIR-03 唯一入口）
+            await arc_engine.tick(sim_now)
 
         # ---- 波次 2a：batch 段钩子（唯一挂载点，02 T-TIME-03） --------------------------
         hygiene = MemoryHygiene(pool, gateway)
@@ -329,12 +386,15 @@ async def _run(args: argparse.Namespace) -> int:
 
         register_batch_hook("kernel.calendar", kernel_calendar_hook)
 
+        # T-WA-02：世界 Agent 日历跨日结算单入口（04 §3.3 batch 段唯一挂载点）
+        register_batch_hook("world_agent.calendar", calendar.run_batch_calendar)
+
         # T-LOD-03：基尼驱动明星轮换（路径一，每模拟日 1 次，迟滞）；挂 batch 段回调注册表（唯一挂载点）
         star_rotation = StarRotation(
             pool, gateway,
             thresholds_rotation=models_cfg.get("thresholds", {}).get("rotation", {}),
             thresholds_lod=models_cfg.get("thresholds", {}).get("lod", {}),
-            reflector=reflector, event_lod=lod_events,
+            reflector=reflector, event_lod=lod_events, grader=grader,
         )
 
         async def kernel_rotation_hook(ctx: Any) -> None:
@@ -381,6 +441,7 @@ async def _run(args: argparse.Namespace) -> int:
                     stop=stop, notify=notify, drained=drained,
                     agent_ids=agent_ids, batch_summarize=batch_summarize,
                     after_tick=after_tick,
+                    director_preempt=lambda: arc_engine.tick(),  # T-DIR-01：batch 段弧线插队（04 §3.3）
                     lod=LodScheduler(pool),  # T-LOD-01：next_due 时钟兜底排程（三层分发接口就位）
                 )
             )

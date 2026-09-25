@@ -559,7 +559,9 @@ def register_career_jobs(cal: "CalendarEngine") -> None:
     perf_wd = int(perf["monthly_last_weekday"])
 
     def _promo_on(d: dt.date) -> bool:
-        return d.month in quarter_months and d.day == promo_day and not cal.holiday_flags(d)["work_events_suspended"]
+        # 晋升窗口是公司公告类事件（非「工作事件」），不受节假日停发约束——否则 Q1 恒落元旦永死
+        # （工程口径，D-31）；perf_review 仍遵守停发。
+        return d.month in quarter_months and d.day == promo_day
 
     def _perf_on(d: dt.date) -> bool:
         return d == _last_weekday_of_month(d.year, d.month, perf_wd) \
