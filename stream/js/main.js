@@ -8,6 +8,7 @@
 
 import { loadRoster } from './lib/roster.js';
 import { SubtitleQueue } from './lib/subtitle.js';
+import { ModeMachine } from './lib/mode.js';
 import { SubtitleView } from './ui/subtitle-view.js';
 import { PcardView } from './ui/pcard-view.js';
 import { StreamWsClient } from './lib/ws-client.js';
@@ -96,7 +97,32 @@ async function main() {
     },
   });
   ctx.subtitleQueue = queue;
-  ctx.handlers = [(_c, ev) => queue.push(ev)];
+  // T-LTV-05 climax 形态：触发集判定（02 §7.6）→ 底图/名场面标签/滤镜/字幕描边切换；30s 回落（B4）
+  const els = {
+    phone: document.getElementById('phone'),
+    stageNormal: document.getElementById('stage-normal'),
+    stageClimax: document.getElementById('stage-climax'),
+    tagClimax: document.getElementById('tag-climax'),
+    tagClimaxText: document.getElementById('tag-climax-text'),
+    warm: document.getElementById('warm-filter'),
+    tense: document.getElementById('tense-filter'),
+  };
+  ctx.mode = new ModeMachine({
+    onChange: (mode, info) => {
+      const climax = mode === 'climax';
+      els.stageNormal.hidden = climax;
+      els.stageClimax.hidden = !climax;
+      els.tagClimax.hidden = !climax;
+      els.warm.hidden = !(climax && info?.kind === 'warm');
+      els.tense.hidden = !(climax && info?.kind === 'tense');
+      els.phone.classList.toggle('climax', climax);
+      subView.setClimax(climax);
+      if (climax) els.tagClimaxText.textContent = info?.label || '名场面';
+      console.log(`[stream] mode → ${mode}${info ? `（${info.key}）` : ''}`);
+    },
+  });
+  // 形态判定先于字幕/特写（弹卡时读取的已是新形态）
+  ctx.handlers = [(_c, ev) => ctx.mode.feed(ev), (_c, ev) => queue.push(ev)];
   if (params.get('mock')) {
     const { runMock } = await import('./mock.js');
     runMock(ctx);

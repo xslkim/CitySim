@@ -1,0 +1,25 @@
+/* T-LTV-05 climax 形态视觉（原型 ui/mobile/stream-climax.html 口径；02 §7.6 强化约束：动画 ≤3s、不打断逐句节奏） */
+
+/* 名场面标签（director token 描边） */
+.tag-climax { position:absolute; top:46px; left:12px; z-index:20; display:flex; align-items:center; gap:4px;
+  background:rgba(191,134,232,.14); border:1px solid rgba(191,134,232,.55); border-radius:10px;
+  padding:4px 9px; font-size:10px; font-weight:700; color:var(--director); white-space:nowrap }
+.tag-climax svg { width:10px; height:10px; stroke:var(--director) }
+
+/* VN 式双人特写栈：当前说话人在前，另一人错位缩小退后（原型参数） */
+.pstack { position:absolute; left:12px; top:86px; z-index:21 }
+.pstack .pcard-front { left:0; top:0; width:120px; z-index:2;
+  box-shadow:0 4px 18px rgba(0,0,0,.5), 0 0 16px color-mix(in srgb, var(--sig) 45%, transparent) }
+.pstack .pcard-back { left:96px; top:44px; width:84px; z-index:1; filter:opacity(.6) saturate(.85);
+  animation-delay:.15s }
+.pstack .pcard-back figcaption { font-size:9px; padding:1px 8px; bottom:-7px }
+
+/* 情绪滤镜（02 §2.3）：温馨 = 叠 15% #F4A7B9；紧张 = 叠 20% #E63946 */
+.warm-filter { position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(ellipse 320px 300px at 195px 430px, rgba(244,167,185,.17), rgba(244,167,185,.05) 55%, rgba(244,167,185,0) 78%),
+             radial-gradient(ellipse 700px 900px at 195px 380px, rgba(244,167,185,0) 55%, rgba(14,17,22,.28) 100%) }
+.tense-filter { position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(180deg, rgba(230,57,70,.10), rgba(230,57,70,.2)) }
+
+/* climax 字幕条签名色描边（颜色由 subtitle-view 按当前说话人签名色内联下发） */
+.phone.climax .subtitle { border-width:2px }

@@ -25,17 +25,25 @@ export class SubtitleView {
     this.root.hidden = false;
     if (line.speaker && this.roster) {
       const color = this.roster.colorOf(line.speaker); // 已提亮 10%（02 §7.1 深色底口径）
+      this._lastColor = color;
       this.chip.hidden = false;
       this.chip.style.background = color;
       this.chipName.style.color = chipTextColor(color);
       this.chipName.textContent = this.roster.nameOf(line.speaker);
       if (this.dot) this.dot.style.background = color;
+      if (this._climax) this.root.style.borderColor = color; // climax 字幕条签名色描边（02 §7.6）
     } else {
       this.chip.hidden = true; // 非对话单条字幕无说话人 chip
       if (this.dot) this.dot.style.background = '';
     }
     this.text.textContent = line.text; // 只写 text_display 出站文本（红线 7）
     this.meta.textContent = metaText(line, seg);
+  }
+
+  /** climax 进出：字幕条签名色描边开关（T-LTV-05）。 */
+  setClimax(on) {
+    this._climax = on;
+    this.root.style.borderColor = on && this._lastColor ? this._lastColor : '';
   }
 
   hide() {
