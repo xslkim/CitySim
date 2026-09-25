@@ -1,4 +1,8 @@
-/** 占位页（05 T-WEB-08 脚手架）；实现归后续页面任务。 */
+/** /location/:id 地点详情页（05 T-WEB-15；03 §1.2 行）。主体实现见 AgentPage.tsx 的 LocationPageBody。 */
+import { useParams } from 'react-router-dom';
+import { LocationPageBody } from './AgentPage';
+
 export default function LocationPage() {
-  return <div className="card text-text-1">LocationPage（占位，页面任务交付后替换）</div>;
+  const { id = '' } = useParams();
+  return <LocationPageBody id={decodeURIComponent(id)} />;
 }
