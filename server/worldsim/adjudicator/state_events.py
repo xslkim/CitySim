@@ -46,10 +46,13 @@ class StateAggregator:
     """每 tick 聚合器：收集本 tick 全部 needs/关系变更，flush 合并落 ≤2 条事件。
 
     单实例可跨 tick 复用（flush 清空缓冲）；写入仅发生在裁决协程内（00 §4 红线 10 串行前提）。
+    `grader`（T-ADJ-07/T-DIR-04）：非空时 flush 落库同写 `ui.grade` 初值（全事件覆盖口径，
+    04 §6.6 同事务语义延伸——聚合事件无预申报信号，按 R1/R4 实参即时判定）。
     """
 
-    def __init__(self, pool: Any) -> None:
+    def __init__(self, pool: Any, grader: Any = None) -> None:
         self._pool = pool
+        self._grader = grader
         self._needs_changes: list[dict[str, Any]] = []
         self._rel_changes: list[dict[str, Any]] = []
 
@@ -162,14 +165,26 @@ class StateAggregator:
             if not changes:
                 continue
             actors = sorted({c.get("agent_id") for c in changes if c.get("agent_id")} | {x for c in changes for x in (c.get("a_id"), c.get("b_id")) if x})
+            payload = {"changes": changes}
+            ui: dict[str, Any] | None = None
+            if self._grader is not None:
+                # 聚合事件 grade 初值：R1=卷入并集、R4=cause 链接存在（04 §6.6 即时判定口径）
+                ui = {"grade": await self._grader.grade(
+                    type_=type_, actors=actors, payload=payload, sim_now=sim_now,
+                    rel_hit=type_ == "relation.changed",
+                    mood_hit=any(c.get("need") == "mood" and abs(float(c.get("delta", 0))) >= self._grader.r3_min
+                                 for c in changes),
+                    followups=True,
+                )}
             seq = await self._pool.fetchval(
                 """
-                INSERT INTO events (tick, sim_time, type, source, trigger, actors, rng_seed, visibility, payload)
-                VALUES ($1, $2, $3, 'system', $4, $5, $6, 'internal', $7::jsonb)
+                INSERT INTO events (tick, sim_time, type, source, trigger, actors, rng_seed, visibility, payload, ui)
+                VALUES ($1, $2, $3, 'system', $4, $5, $6, 'internal', $7::jsonb, $8::jsonb)
                 RETURNING seq
                 """,
                 tick, sim_now, type_, trigger, actors, rng_seed,
-                json.dumps({"changes": changes}, ensure_ascii=False),
+                json.dumps(payload, ensure_ascii=False),
+                json.dumps(ui, ensure_ascii=False) if ui else None,
             )
             seqs.append(seq)
             log.debug("%s 落库：tick=%d changes=%d", type_, tick, len(changes))

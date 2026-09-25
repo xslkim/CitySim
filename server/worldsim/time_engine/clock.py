@@ -317,16 +317,25 @@ class TimeEngine:
 
     # ---- 事件 ----------------------------------------------------------
 
+    def set_grader(self, grader: Any) -> None:
+        """挂接 grade 初值打分器（T-DIR-04 全事件覆盖口径：time.* 系统事件同写 ui.grade）。"""
+        self._grader = grader
+
     async def emit_time_event(self, type_: str, payload: dict[str, Any]) -> int:
         """落 time.* 系统事件（source/trigger=system、visibility=internal，06 §1.2 注册表口径）。"""
         sim_now = self.now_sim()
+        ui: dict[str, Any] | None = None
+        grader = getattr(self, "_grader", None)
+        if grader is not None:
+            ui = {"grade": await grader.grade(type_=type_, actors=[], payload=payload, sim_now=sim_now)}
         return await self._pool.fetchval(
             """
-            INSERT INTO events (tick, sim_time, type, source, trigger, visibility, payload)
-            VALUES ($1, $2, $3, 'system', 'system', 'internal', $4::jsonb)
+            INSERT INTO events (tick, sim_time, type, source, trigger, visibility, payload, ui)
+            VALUES ($1, $2, $3, 'system', 'system', 'internal', $4::jsonb, $5::jsonb)
             RETURNING seq
             """,
             self.tick_of(sim_now), sim_now, type_, json.dumps(payload, ensure_ascii=False),
+            json.dumps(ui, ensure_ascii=False) if ui else None,
         )
 
     # ---- tick 主循环（04 §2.2 clock.run） ---------------------------------

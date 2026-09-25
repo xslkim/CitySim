@@ -39,16 +39,18 @@ class FakeClock:
 
 async def make_engine(dsn: str, now: dt.datetime, *, with_agg: bool = True,
                       with_grader: bool = False) -> tuple[CalendarEngine, FakeClock, Any, Any]:
-    """装配 (CalendarEngine, FakeClock, pool, agg)；agg=None 当 with_agg=False。"""
+    """装配 (CalendarEngine, FakeClock, pool, agg)；agg=None 当 with_agg=False。
+    grader 以 world.yaml director.grade 阈值段构造（T-DIR-04 配置链路）。"""
     pool = await asyncpg.create_pool(dsn, min_size=1, max_size=4)
     clock = FakeClock(now)
-    agg = StateAggregator(pool) if with_agg else None
+    cfg = load_world_config()
     grader = None
     if with_grader:
         from worldsim.adjudicator.grade import Grader
 
-        grader = Grader(pool)
-    cal = CalendarEngine(pool, load_world_config(), clock, agg=agg, grader=grader)
+        grader = Grader(pool, thresholds=(cfg.get("director") or {}).get("grade"))
+    agg = StateAggregator(pool, grader=grader) if with_agg else None
+    cal = CalendarEngine(pool, cfg, clock, agg=agg, grader=grader)
     return cal, clock, pool, agg
 
 

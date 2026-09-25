@@ -34,6 +34,7 @@ from ..relations.cooldown import CooldownEngine
 from ..relations.needs import NeedsEngine
 from ..relations.relations import RelationEngine
 from ..scheduler.residence import ResidenceEngine, enterable_for_tenant
+from .grade import REL_HIT_AFFINITY_MIN  # 04 §6.6 R2 阈工程默认镜像（配置载体 = world.yaml director.grade，T-DIR-04）
 from .state_events import StateAggregator
 
 log = logging.getLogger(__name__)
@@ -523,7 +524,7 @@ class ActionValidator:
                                  actors=[obs.agent_id, target], location_id=obs.position,
                                  visibility="public", rng_seed=rng_seed,
                                  payload={"from": obs.agent_id, "to": target, "tier": tier, "amount_cents": -amount},
-                                 rel_hit=abs(int(deltas["delta_affinity"]) + bonus) >= 5, followups=True)
+                                 rel_hit=abs(int(deltas["delta_affinity"]) + bonus) >= (self._grader.r2_min if self._grader else REL_HIT_AFFINITY_MIN), followups=True)
         cause = store.caused_by(seq)
         await self._agg.apply_relation_delta(a_id=obs.agent_id, b_id=target,
                                              delta_affinity=int(deltas["delta_affinity"]) + bonus,
@@ -588,7 +589,7 @@ class ActionValidator:
                                  payload={"participants": [obs.agent_id, target],
                                           "reason_hint": str(args.get("reason_hint") or decision.intent[:20]),
                                           "lines": [], "witnesses": []},
-                                 rel_hit=abs(int(arg_row["delta_affinity"])) >= 5, followups=True)
+                                 rel_hit=abs(int(arg_row["delta_affinity"])) >= (self._grader.r2_min if self._grader else REL_HIT_AFFINITY_MIN), followups=True)
         cause = store.caused_by(seq)
         await self._relations.settle(self._agg, kind=kind, a_id=obs.agent_id, b_id=target, cause=cause)
         await self._relations.settle(self._agg, kind=kind, a_id=target, b_id=obs.agent_id, cause=cause)

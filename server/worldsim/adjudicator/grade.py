@@ -31,15 +31,35 @@ from typing import Any
 log = logging.getLogger(__name__)
 
 GRADE_LEVELS = ("A", "B", "C")
+# 以下为 01 §6.4 判定的工程默认镜像；配置载体 = world.yaml `director.grade` 段（04 T-DIR-04
+# 追加，唯一配置源），Grader(thresholds=...) 注入后优先生效，缺省回落本常量。
 REL_HIT_AFFINITY_MIN = 5    # R2：|Δaffinity| ≥5 或标签增删（04 §6.6 规则②）
 MOOD_HIT_MIN = 15.0         # R3：情绪摆动 ≥15（04 §6.6 规则③）
+R1_MIN_ACTORS = 2           # R1：卷入 ≥2 名 Agent（04 §6.6 规则①）
+LEVEL_MAP = {"A": 3, "B": 2}  # 命中数定级（≥3/2/0~1 → A/B/C，04 §6.6）
 
 
 class Grader:
-    """grade 初值打分器。`pool` 仅用于 R1 的 cites 波及者解析（读，不写）。"""
+    """grade 初值打分器。`pool` 仅用于 R1 的 cites 波及者解析（读，不写）。
 
-    def __init__(self, pool: Any) -> None:
+    `thresholds` = world.yaml `director.grade` 段（T-DIR-04 配置化；None = 工程默认镜像）。
+    预申报方（validators/dialogue）经 `grader.r2_min`/`grader.r3_min` 读同一份阈值，
+    保证 R2/R3 判定与本模块定级同源（04 §6.6）。
+    """
+
+    def __init__(self, pool: Any, thresholds: dict[str, Any] | None = None) -> None:
         self._pool = pool
+        th = thresholds or {}
+        self.r1_min = int(th.get("r1_min_actors", R1_MIN_ACTORS))
+        self.r2_min = int(th.get("r2_min_abs_affinity", REL_HIT_AFFINITY_MIN))
+        self.r3_min = float(th.get("r3_min_mood_swing", MOOD_HIT_MIN))
+        lm = th.get("level_map") or LEVEL_MAP
+        self._level_a = int(lm.get("A", LEVEL_MAP["A"]))
+        self._level_b = int(lm.get("B", LEVEL_MAP["B"]))
+
+    def level_of(self, hits: int) -> str:
+        """命中数定级（映射读配置段，01 §6.4）。"""
+        return "A" if hits >= self._level_a else ("B" if hits >= self._level_b else "C")
 
     async def grade(
         self,
@@ -54,10 +74,10 @@ class Grader:
     ) -> str:
         """4 条规则命中数定级。信号口径见模块头（D30）。返回 'A'/'B'/'C'。"""
         involved = await self.involved_actors(actors=actors, payload=payload)
-        r1 = len(involved) >= 2
+        r1 = len(involved) >= self.r1_min
         r4 = bool(payload.get("caused_by")) or followups
         hits = int(r1) + int(rel_hit) + int(mood_hit) + int(r4)
-        grade = "A" if hits >= 3 else ("B" if hits == 2 else "C")
+        grade = self.level_of(hits)
         log.debug("grade 初值：type=%s hits=[R1=%s R2=%s R3=%s R4=%s] → %s", type_, r1, rel_hit, mood_hit, r4, grade)
         return grade
 

@@ -32,7 +32,6 @@ from ..relations.cooldown import CooldownEngine
 from ..relations.needs import NeedsEngine
 from ..relations.relations import RelationEngine
 from ..relations.topics import TopicSystem, Topic
-from .grade import MOOD_HIT_MIN
 from .state_events import StateAggregator
 
 log = logging.getLogger(__name__)
@@ -153,7 +152,7 @@ class DialogueEngine:
             ui = {"grade": await self._grader.grade(
                 type_="dialogue.chat", actors=[a_id, b_id], payload=payload, sim_now=sim_now,
                 rel_hit=False,  # chat 矩阵 ±3/±1（04 §6.6 R2 阈 |Δaffinity|≥5 不达）
-                mood_hit=(band == "enjoyable" and mood_gain >= MOOD_HIT_MIN),
+                mood_hit=(band == "enjoyable" and mood_gain >= self._grader.r3_min),
                 followups=True,  # 敷衍 → 冷却 / 对象唤醒入队（04 §6.6 R4）
             )}
         seq = await self._pool.fetchval(

@@ -202,3 +202,14 @@ triggers:                                          # 01 §6.1/§1.6/§11.2 触�
   landlord_raise:                                  # 房东涨租（01 §11.2 发生器 2）：仅留配置位，不实现调度（04 §2 defer）
     enabled: false
     range_pct: [5, 10]                             # 房租 +5~10%（项目周期内永不触发，仅配置位）
+
+# ===================== 04 T-DIR-04 追加段（director.grade 阈值；既有段 diff 为零） =====================
+
+director:
+  grade:                  # grade 初值打分阈值（判定标准唯一持有方 = 01 §6.4；本段为部署镜像；消费方 = 02 T-ADJ-07 adjudicator/grade.py）
+    r1_min_actors: 2      # R1 卷入 ≥2 名 Agent（actors+witnesses+gossip cites 波及者并集）
+    r2_min_abs_affinity: 5  # R2 关系边 |Δaffinity| ≥5 或标签增删
+    r3_min_mood_swing: 15   # R3 情绪摆动 ≥15
+    level_map: { A: 3, B: 2 }  # 命中数定级：≥3→候选 A、2→B、0~1→C（01 §6.4）
+  revise:                 # K3 复核（01 §6.4；T-DIR-05 消费）
+    daily_up_cap: 2       # 每日上调 B→A ≤2 个（保稀缺性）

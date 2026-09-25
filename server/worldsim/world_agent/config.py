@@ -17,7 +17,7 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ValidationError, field_validator, model_validator
 
-SERVER_ROOT = Path(__file__).resolve().parents[1]
+SERVER_ROOT = Path(__file__).resolve().parents[2]
 
 _HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$|^24:00$")
 _MM_DD = re.compile(r"^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$")
@@ -98,7 +98,7 @@ class HolidayEntry(BaseModel):
 
 
 class WorldConfig(BaseModel):
-    """world.yaml 全量 schema。既有段逐段承接（01 T-CFG-03），追加段承接（04 T-WA-01）。"""
+    """world.yaml 全量 schema。既有段逐段承接（01 T-CFG-03），追加段承接（04 T-WA-01/T-DIR-04）。"""
 
     locations: dict[str, Any]
     company: dict[str, Any]
@@ -107,6 +107,7 @@ class WorldConfig(BaseModel):
     schedule: dict[str, Any]
     holidays: dict[str, Any]
     triggers: dict[str, Any]
+    director: dict[str, Any] | None = None   # 04 T-DIR-04 追加段（grade 阈值 + K3 复核配置）
 
     @model_validator(mode="after")
     def _validate_all(self) -> "WorldConfig":
@@ -116,6 +117,8 @@ class WorldConfig(BaseModel):
         _validate_schedule(self.schedule)
         _validate_holidays(self.holidays)
         _validate_triggers(self.triggers)
+        if self.director is not None:
+            _validate_director(self.director)
         return self
 
 
@@ -206,6 +209,22 @@ def _validate_triggers(triggers: dict[str, Any]) -> None:
     promo = triggers.get("promotion_window") or {}
     if int(promo.get("slots_per_dept", 0)) < 1:
         raise WorldConfigError("triggers.promotion_window.slots_per_dept 须 ≥1（01 §11.2 发生器 1）")
+
+
+def _validate_director(director: dict[str, Any]) -> None:
+    """director.grade 阈值段结构校验（T-DIR-04；数值持有方 = 01 §6.4，此处只验结构）。"""
+    grade = director.get("grade") or {}
+    for key in ("r1_min_actors", "r2_min_abs_affinity", "r3_min_mood_swing"):
+        if key not in grade:
+            raise WorldConfigError(f"director.grade 缺 {key}（01 §6.4 镜像）")
+        if float(grade[key]) <= 0:
+            raise WorldConfigError(f"director.grade.{key} 须为正")
+    level_map = grade.get("level_map") or {}
+    if not ("A" in level_map and "B" in level_map and int(level_map["A"]) > int(level_map["B"]) >= 1):
+        raise WorldConfigError("director.grade.level_map 须含 A/B 且 A>B≥1（命中数定级映射，01 §6.4）")
+    revise = director.get("revise") or {}
+    if int(revise.get("daily_up_cap", 0)) < 1:
+        raise WorldConfigError("director.revise.daily_up_cap 须 ≥1（01 §6.4 每日上调上限）")
 
 
 # ---- 加载入口 -----------------------------------------------------------------

@@ -176,7 +176,11 @@ async def _run(args: argparse.Namespace) -> int:
             gateway = LLMGateway(pool, models_cfg, providers={"mock": MockProvider()}, default_provider="mock")
         # 波次 2a 接线：聚合器（04 §6.5）/ 检索（T-MEM-01）/ 反思（T-MEM-02）/ 治理（T-MEM-03）/
         # 需求衰减（T-REL-01）/ 关系（T-REL-02）/ 目标（T-REL-03）/ 冷却（T-REL-04）
-        agg = StateAggregator(pool)
+        # T-DIR-04：grade 阈值从 world.yaml director.grade 段注入（01 §6.4 部署镜像），
+        # Grader/聚合器/时钟共用同一份阈值（全事件 ui.grade 覆盖口径）
+        grader = Grader(pool, thresholds=(world_cfg.get("director") or {}).get("grade"))
+        clock.set_grader(grader)
+        agg = StateAggregator(pool, grader=grader)
         reflector = Reflector(
             pool, gateway,
             threshold=int(models_cfg.get("thresholds", {}).get("reflection", {}).get("importance_acc", 20)),
@@ -206,7 +210,7 @@ async def _run(args: argparse.Namespace) -> int:
 
         # T-ADJ-03：19 动作校验器 + step5 结算总线（含 debts 写入/核销；通用规则表五条）
         residence = ResidenceEngine(pool, world_cfg)
-        grader = Grader(pool)  # T-ADJ-07：grade 初值唯一实现（全库只此一处写 ui.grade 初值）
+        # grader 已在上方以 director.grade 阈值段构造（T-DIR-04）；全库只此一处写 ui.grade 初值
         invite_machine = InviteMachine(
             pool, gateway, relations_cfg,
             agg=agg, cooldown=cooldown_engine, relations=relation_engine, tick_of=clock.tick_of,

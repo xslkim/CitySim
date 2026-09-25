@@ -45,10 +45,10 @@ def _leaf_keys(node: Any) -> list[str]:
 
 
 def test_frozen_four_sections() -> None:
-    # 既有四段归本任务（01 T-CFG-03）冻结；schedule/holidays/triggers 为 04 T-WA-01 追加段
-    # （00 §2 段划界裁定）；director 段由 04 T-DIR-04 追加时同步放行。
+    # 既有四段归本任务（01 T-CFG-03）冻结；schedule/holidays/triggers 为 04 T-WA-01 追加段、
+    # director 为 04 T-DIR-04 追加段（00 §2 段划界裁定），逐一显式放行。
     assert set(_load().keys()) == {
-        "locations", "company", "stocks", "economy", "schedule", "holidays", "triggers",
+        "locations", "company", "stocks", "economy", "schedule", "holidays", "triggers", "director",
     }
 
 
