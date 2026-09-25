@@ -45,7 +45,11 @@ def _leaf_keys(node: Any) -> list[str]:
 
 
 def test_frozen_four_sections() -> None:
-    assert set(_load().keys()) == {"locations", "company", "stocks", "economy"}
+    # 既有四段归本任务（01 T-CFG-03）冻结；schedule/holidays/triggers 为 04 T-WA-01 追加段
+    # （00 §2 段划界裁定）；director 段由 04 T-DIR-04 追加时同步放行。
+    assert set(_load().keys()) == {
+        "locations", "company", "stocks", "economy", "schedule", "holidays", "triggers",
+    }
 
 
 def test_dept_headcount_sums_40() -> None:

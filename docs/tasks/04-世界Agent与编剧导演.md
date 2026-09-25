@@ -401,3 +401,6 @@ M3「世界 Agent 与编剧」全部规则化模块（04 §2.1 `world_agent/` + 
 | D-19 | K3 复核时点设计仅「每日批量 1 次」 | 默认凌晨 batch 段结算后对刚结束模拟日执行（T-DIR-05）；已登记（本文偏差表） |
 | D-20 | 任务简报所标「01 §3.2 经济数值（薪资/房租/账单）」（01 旧名）与 01 实际结构不符：薪资/房租/账单持有方为 01 §1.5，01 §3.2/§4 仅持债务还款期限与逾期关系行（数值见持有方，与 06 §3 登记一致） | 本文档按 01 §1.5 引用薪资/房租/账单、按 01 §3.2/§4 引用债务口径；提请修订简报口径，实现不受影响 |
 | D-21 | 已销项：设计文档 04 §5.3 已统一为 `WSIM_REPLAY_MODE`（R1 §A.13，已入 00 §2 附表） | 本文档行文统一用 `WSIM_REPLAY_MODE`；不再是偏差，销项留档 |
+| D-22 | 节假日表的具体日期（MM-DD）设计未给（01 §6.1 只有名称/天数） | 工程默认按 2026 自然年实历映射（春节 02-17/中秋 09-25 等），落 `world.yaml` `holidays.table`（T-WA-01）；已登记（本文偏差表） |
+| D-23 | `world.disturb.illness` 的 severity→请假天数设计未给 | 工程默认：severity 1→1~2 天、2→2~4 天，配置镜像 `triggers.disturb.illness_severity_days`（T-WA-01/09）；已登记（本文偏差表） |
+| D-24 | `world.overtime` 的 `reason` 与 `world.team_building` 的 `activity` 文案池设计未枚举 | 工程默认模板池落配置（`triggers.overtime.reasons`/`triggers.team_building.activities`，T-WA-01/08）；编剧/弧线可传参指定；已登记（本文偏差表） |

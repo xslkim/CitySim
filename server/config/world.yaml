@@ -121,3 +121,84 @@ economy:                                          # 01 §1.5 经济参数（金�
       regular: { min_cents: 400000,  max_cents: 1500000 }   # 普通 ¥4,000~15,000（3~12 月）
       new:     { min_cents: 200000,  max_cents: 800000 }    # 新住户 ¥2,000~8,000（<1 月）
     tenancy_rule: { senior_gt_months: 12, regular_gte_months: 3, new_lt_months: 1 }
+
+# ===================== 以下为 04 T-WA-01 追加段（既有段 diff 为零；数值唯一持有方 = 01 对应节） =====================
+
+schedule:                                          # 01 §1.4 作息日历（追加段一）
+  workday:                                         # 工作日（周一至周五）
+    morning: ["06:30", "08:30"]                    # 起床、早餐、通勤（健身房/厨房活跃）
+    work_am: ["09:00", "12:00"]                    # 工作（必须位于公司节点，请假/外出事件除外）
+    lunch: ["12:00", "13:30"]                      # 午休（闲聊高发）
+    work_pm: ["13:30", "18:00"]                    # 工作（会议室事件高发）
+    evening: ["18:00", "24:00"]                    # 晚间自由 = 黄金档主内容时段（01 §1.6）
+    sleep: ["00:30", "06:30"]                      # 强制回房；0:30 后只批处理不演出
+  weekend_free: true                               # 周末与节假日无强制工作约束
+  sunday_bias: "家务/补觉/emo 权重上调"             # 周日倾向（02 文档决策侧消费）
+
+holidays:                                          # 01 §6.1 节假日表（追加段二；日期为模拟日历 MM-DD 工程默认，04 §6 D-22）
+  rules:                                           # 节假日生效规则（01 §6.1 末行）
+    market_closed: true                            # 股票休市（04 T-WA-05 消费）
+    work_events_suspended: true                    # 工作事件停发（04 T-WA-07/08 消费）
+    social_invite_weight: 1.5                      # 社交/邀约权重 ×1.5（02 文档决策侧消费）
+  table:
+    - { name: 元旦,   start: "01-01", days: 1 }
+    - { name: 春节,   start: "02-17", days: 3 }                        # 轻量事件组阶段 1 defer（01 §6.1 v1.2 注，04 §2）
+    - { name: 情人节, start: "02-14", days: 1, confess_weight: 2.0 }   # 表白权重 ×2
+    - { name: 清明,   start: "04-05", days: 1 }
+    - { name: 五一,   start: "05-01", days: 3 }
+    - { name: 端午,   start: "06-19", days: 1 }
+    - { name: 七夕,   start: "08-19", days: 1, confess_weight: 1.5 }   # 表白权重 ×1.5
+    - { name: 中秋,   start: "09-25", days: 1 }
+    - { name: 国庆,   start: "10-01", days: 3 }
+    - { name: 圣诞,   start: "12-25", days: 1 }
+
+triggers:                                          # 01 §6.1/§1.6/§11.2 触发规则参数（追加段三）
+  stock:
+    settle_time: "09:30"                           # economy.stock.tick 每模拟日 9:30 结算（01 §6.1）
+    weekend_closed: true                           # 周末休市（工程默认对齐现实市场，04 §6 D-07 已登记）
+    shock_range_pct: [3, 8]                        # world.announce stock_shock 一次性冲击 ±3%~8%（01 §1.5）
+  layoff_rumor:                                    # 规则触发裁员传闻（trigger='world' 不占干预率，01 §6.1）
+    symbol: XLKJ                                   # 星澜科技
+    drop_pct_threshold: 3.0                        # 单日跌幅 >3%（≈1.7σ）
+    trigger_time: "09:30"                          # 次日 9:30 生成
+    scope: company
+    gossip_weight_multiplier: 2                    # 全公司 gossip 意图权重 ×2（02 文档决策侧消费）
+    gossip_window_days: 2                          # 持续 2 模拟日
+    achievement_delta: -3                          # 成就需求全员 -3（落 state.needs_delta）
+  disturb:                                         # 四类随机扰动（01 §6.1 概率列；每日判定，骰子 rng_seed 入库）
+    illness_prob: 0.008                            # 每人每模拟日 0.8%
+    illness_severity_days:                         # severity → 请假天数区间（设计未给天数，工程默认，04 §6 D-23）
+      "1": [1, 2]
+      "2": [2, 4]
+    weather_prob: 0.15                             # 每模拟日 15%
+    weather_kinds: [暴雨, 大雪, 高温]               # 01 §6.1 kind 枚举
+    complaint_prob: 0.02                           # 每模拟日 2%（另有编剧 L0 入口）
+    complaint_issues: [噪音, 漏水, 快递]            # 01 §6.1 issue 枚举
+    lucky_prob: 0.03                               # 每模拟日 3%
+    lucky_kinds: [中奖, 捡到, 退税]
+    lucky_amount_cents: { min: 2000, max: 20000 }  # ¥20~200（01 §6.1，P2-10 补定义）
+    lucky_mood_delta: 8                            # 情绪 +8
+  overtime:                                        # 加班夜 world.overtime（01 §6.1/§1.6）
+    per_dept_per_week: [1, 2]                      # 每部门每周 1~2 次
+    window: ["18:30", "21:00"]                     # 工作日 18:30~21:00（黄金档前半）
+    reasons: [版本冲刺, 客户紧急需求, 上线值守, 季度复盘]  # reason 模板池（工程默认，04 §6 D-24；编剧/弧线可指定）
+  team_building:                                   # 晚间团建（01 §6.1/§1.6）
+    monthly_nth: 2                                 # 每月第 2 个
+    weekday: 5                                     # 周六（Python weekday 口径）
+    window: ["19:00", "22:00"]
+    activities: [火锅局, 桌游夜, 江边烧烤]           # 活动模板池（工程默认，04 §6 D-24）
+    charge_cents: 0                                # 收费开关：0=不收费；>0 时 amount_cents 必有且打 economy 审计标记（06 §1.2）
+  promotion_window:                                # 晋升窗口（01 §6.1；01 §11.2 发生器 1）
+    quarterly_months: [1, 4, 7, 10]                # 每季度首月
+    day: 1                                         # 1 日触发
+    slots_per_dept: 1                              # 每部门 P1→P2 名额仅 1 个（候选人 ≥2 即开战）
+    defense: { nth: 3, weekday: 5, time: "19:00" } # 答辩 = 窗口月第 3 个周六 19:00（01 §1.6；经 world.announce body 承载，D-01）
+  perf_review:                                     # 绩效评审（01 §6.1）
+    monthly_last_weekday: 4                        # 每月最后一个周五（Python weekday 口径）
+    time: "16:00"
+    c_mood_delta: -15                              # C 级情绪 -15
+    consecutive_c_for_pool: 2                      # 连续 2C 进裁员候选池（01 §1.5）
+    grade_weights: { attendance: 1.0, on_time_work: 1.0, overtime_join: 1.0 }  # S~C 评分加权（设计未定义，工程默认 D-10 等权）
+  landlord_raise:                                  # 房东涨租（01 §11.2 发生器 2）：仅留配置位，不实现调度（04 §2 defer）
+    enabled: false
+    range_pct: [5, 10]                             # 房租 +5~10%（项目周期内永不触发，仅配置位）
