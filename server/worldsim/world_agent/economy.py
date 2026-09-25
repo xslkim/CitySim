@@ -396,3 +396,96 @@ def register_economy_jobs(cal: CalendarEngine, *, on_shortfall: OnShortfall | No
     cal.register_job("economy.payroll", "10:00", lambda d: d.day == payday, _payroll)
     cal.register_job("economy.bill.rent", "09:00", lambda d: d.day == rent_day, _rent)
     cal.register_job("economy.bill.utility", "09:00", lambda d: d.day == util_day, _utility)
+
+
+# ---- 股价随机游走（T-WA-05；01 §1.5 股票系统/§6.1 触发日历；06 §1.2 economy.stock.tick） ----
+
+STOCK_STATE_PREFIX = "stock."            # world_state 键：stock.<symbol> = {"price_cents": int}
+STOCK_SHOCK_PREFIX = "stock.shock."      # 待结算冲击：stock.shock.<symbol> = pct（% 数值，一次性并入 r）
+
+
+def _sample_r(mu: float, sigma: float, rng: random.Random) -> float:
+    """日收益率抽样 r ~ N(μ, σ)（01 §1.5；参数读 world.yaml stocks.random_walk）。"""
+    return round(rng.gauss(mu, sigma), 6)
+
+
+async def queue_stock_shock(cal: CalendarEngine, pct: float, *, symbol: str | None = None) -> None:
+    """`world.announce` 携带 `stock_shock` 的登记口（幅度 ±3%~8% 口径见 01 §1.5，配置镜像校验）：
+    写入待结算冲击，下一 `economy.stock.tick` 并入 r 一次性生效（T-WA-05 验收 4）。
+    `symbol=None` = 星澜科技（01 §1.5 冲击对象口径；triggers.layoff_rumor.symbol 同标）。"""
+    lo, hi = (float(x) for x in cal.cfg["triggers"]["stock"]["shock_range_pct"])
+    if not lo <= abs(float(pct)) <= hi:
+        raise ValueError(f"stock_shock 幅度 {pct}% 超出 ±{lo}%~{hi}%（01 §1.5）")
+    sym = symbol or str(cal.cfg["triggers"]["layoff_rumor"]["symbol"])
+    cur = await cal.get_state(f"{STOCK_SHOCK_PREFIX}{sym}")
+    await cal.set_state(f"{STOCK_SHOCK_PREFIX}{sym}", round(float(cur or 0.0) + float(pct), 6))
+
+
+async def _stock_price(cal: CalendarEngine, symbol: str, initial: int) -> int:
+    state = await cal.get_state(f"{STOCK_STATE_PREFIX}{symbol}")
+    return int(state["price_cents"]) if state else initial
+
+
+async def settle_stock_tick(cal: CalendarEngine, fire_time: dt.datetime) -> list[int]:
+    """每模拟日开盘结算（01 §6.1 9:30）：全部标的各落一条 `economy.stock.tick`
+    （payload `{symbol, open, close, r, seed}` 逐字 06 §1.2；**不写 amount_cents**，不进守恒求和）。
+
+    seed = 内核骰子序列（tick 序号派生），同写 `events.rng_seed` 列与 `payload.seed`（04 §5.3）；
+    `WSIM_REPLAY_MODE=replay` 重放从既有事件 `rng_seed` 取数且不再落新条（04 §5.3 语义）。
+    """
+    import os
+
+    replay = os.environ.get("WSIM_REPLAY_MODE", "off") == "replay"
+    stocks = cal.cfg["stocks"]
+    mu, sigma = float(stocks["random_walk"]["mu"]), float(stocks["random_walk"]["sigma"])
+    seed = cal.clock.tick_of(fire_time)
+    seqs: list[int] = []
+    for sym in stocks["symbols"]:
+        sid, initial = sym["id"], int(sym["initial_price_cents"])
+        if replay:
+            # 重放：从既有事件取数（04 §5.3），同日期同标的已有 tick 即复用、零新骰子零新条
+            row = await cal.pool.fetchrow(
+                """
+                SELECT payload FROM events WHERE type='economy.stock.tick'
+                  AND payload->>'symbol'=$1 AND sim_time::date = $2
+                ORDER BY seq DESC LIMIT 1
+                """, sid, fire_time.date())
+            if row is not None:
+                continue
+            raise RuntimeError(
+                f"replay 模式缺 {sid} @ {fire_time.date()} 的 economy.stock.tick 源事件（04 §5.3：重放从 rng_seed 取数）")
+        rng = random.Random(f"{seed}|stock|{sid}")
+        r = _sample_r(mu, sigma, rng)
+        shock = await cal.get_state(f"{STOCK_SHOCK_PREFIX}{sid}")
+        if shock:  # 待结算冲击一次性并入 r（T-WA-05 验收 4：仅生效一次）
+            r = round(r + float(shock) / 100.0, 6)
+            await cal.set_state(f"{STOCK_SHOCK_PREFIX}{sid}", 0.0)
+        open_ = await _stock_price(cal, sid, initial)
+        close = max(1, int(round(open_ * (1 + r))))
+        seq = await cal.insert_event(
+            type_="economy.stock.tick",
+            payload={"symbol": sid, "open": open_, "close": close, "r": r, "seed": seed},
+            sim_time=fire_time, rng_seed=seed,
+        )
+        await cal.set_state(f"{STOCK_STATE_PREFIX}{sid}", {"price_cents": close})
+        seqs.append(seq)
+    return seqs
+
+
+def stock_market_open(cal: CalendarEngine, d: dt.date) -> bool:
+    """交易日判定：节假日休市（01 §6.1）+ 周末休市（工程默认，D-07 已登记）。"""
+    if cal.holiday_flags(d)["market_closed"]:
+        return False
+    if cal.cfg["triggers"]["stock"].get("weekend_closed", True) and cal.is_weekend(d):
+        return False
+    return True
+
+
+def register_stock_jobs(cal: CalendarEngine) -> None:
+    """注册股价日结算（结算时点读 triggers.stock.settle_time，01 §6.1 镜像）。"""
+    settle_time = str(cal.cfg["triggers"]["stock"]["settle_time"])
+
+    async def _tick(c: CalendarEngine, t: dt.datetime) -> None:
+        await settle_stock_tick(c, t)
+
+    cal.register_job("economy.stock.tick", settle_time, lambda d: stock_market_open(cal, d), _tick)
