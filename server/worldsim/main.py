@@ -180,7 +180,6 @@ async def _run(args: argparse.Namespace) -> int:
             from .llm_gateway.router import ModelRouter
 
             router = ModelRouter(models_cfg, path=models_path)
-            router.install_sighup()
             failover_breaker = FailoverBreaker()
             embed_cfg = models_cfg.get("providers", {}).get("local_embed", {})
             gateway = LLMGateway(
@@ -400,6 +399,22 @@ async def _run(args: argparse.Namespace) -> int:
             await drive_invite_due(invite_machine, tick=tick, sim_now=sim_now)
             # T-DIR-01：弧线状态机每 tick 评估（谓词只读 DB；钩子经 T-DIR-03 唯一入口）
             await arc_engine.tick(sim_now)
+
+        # T-OPS-07 统一 SIGHUP 热更（04 §12.4）：speed_table 段边界生效 + models.yaml
+        # 路由/熔断阈值重读；health_thresholds.yaml 读即生效（metrics.load_thresholds 无缓存）；
+        # 校验失败保留旧配置 + WARN（各 reload 内部保证）；DSN/token 不参与热更
+        def _on_sighup() -> None:
+            log.info("SIGHUP 热更触发（04 §12.4）")
+            reloader.request_reload()  # 变速表：下一个段边界生效（04 §3.1）
+            try:
+                fresh = _load_yaml(None, "WSIM_MODELS_CONFIG", "models.yaml")
+                cost_breaker.reload_thresholds(fresh.get("thresholds", {}))
+                if args.llm == "routed":
+                    router.reload()
+            except Exception as e:  # noqa: BLE001 - 校验失败保留旧配置
+                log.warning("SIGHUP 热更失败，保留旧配置：%s", e)
+
+        loop.add_signal_handler(signal.SIGHUP, _on_sighup)
 
         # ---- 波次 2a：batch 段钩子（唯一挂载点，02 T-TIME-03） --------------------------
         hygiene = MemoryHygiene(pool, gateway)

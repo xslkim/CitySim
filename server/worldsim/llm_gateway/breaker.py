@@ -228,6 +228,23 @@ class CostBreaker:
 
     # ---- 判级 ---------------------------------------------------------------
 
+    def reload_thresholds(self, thresholds: dict[str, Any]) -> bool:
+        """SIGHUP 热更（04 §12.4）：熔断比率重读；校验失败保留旧配置 + WARN。"""
+        try:
+            cb = (thresholds or {}).get("cost_breaker", {})
+            alarm = float(cb.get("alarm_ratio", self._alarm_ratio))
+            throttle = float(cb.get("throttle_ratio", self._throttle_ratio))
+            recover = float(cb.get("recover_ratio", self._recover_ratio))
+            if not (0 < recover < alarm < throttle):
+                raise ValueError(f"比率序非法 recover<alarm<throttle：{recover}/{alarm}/{throttle}")
+        except (TypeError, ValueError) as e:
+            log.warning("cost_breaker 阈值热更校验失败，保留旧配置：%s（04 §12.4）", e)
+            return False
+        self._alarm_ratio, self._throttle_ratio, self._recover_ratio = alarm, throttle, recover
+        log.info("cost_breaker 阈值热更生效：alarm=%.3f throttle=%.3f recover=%.3f",
+                 alarm, throttle, recover)
+        return True
+
     async def evaluate(
         self,
         cny_per_simday: float,
