@@ -91,12 +91,16 @@ def create_app(pool: Any = None, token_db_path: str | None = None) -> FastAPI:
         """门禁④度量（03 §5.1）：访问日志 token×自然日聚合（管理鉴权 = 有效 token，M4 开发期口径）。"""
         return await ok_envelope(_pool, usage_by_day(from_, to, db_path=app.state.token_db_path), kind="usage")
 
-    # 随任务挂载的 REST/WS 路由（T-WEB-03~07；模块未交付时静默缺省）
+    # 随任务挂载的 REST/WS 路由（T-WEB-03~07；模块未交付时静默缺省）；
+    # static（T-ART-03）另持 mount() 挂载静态目录（/assets、/stream）
     for modname in ("rest_snapshot", "rest_agents", "rest_events", "rest_ripple",
-                    "rest_relations", "rest_health", "ws"):
+                    "rest_relations", "rest_health", "ws", "static"):
         with contextlib.suppress(ImportError):
             mod = __import__(f"worldsim.observe.{modname}", fromlist=["router"])
-            app.include_router(mod.router)
+            if hasattr(mod, "router"):
+                app.include_router(mod.router)
+            if hasattr(mod, "mount"):
+                mod.mount(app)
 
     return app
 
