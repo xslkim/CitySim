@@ -8,3 +8,7 @@ node_modules/
 dist/
 # 运行期产物（00 §2 布局）
 var/
+
+# M6 演练证据与报告（T-SYN-11/T-OPS-05 运行产物）
+server/scripts/sync_drill_evidence/
+server/scripts/sync_drill_evidence_full.log
