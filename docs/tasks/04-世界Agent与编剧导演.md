@@ -405,3 +405,5 @@ M3「世界 Agent 与编剧」全部规则化模块（04 §2.1 `world_agent/` + 
 | D-23 | `world.disturb.illness` 的 severity→请假天数设计未给 | 工程默认：severity 1→1~2 天、2→2~4 天，配置镜像 `triggers.disturb.illness_severity_days`（T-WA-01/09）；已登记（本文偏差表） |
 | D-24 | `world.overtime` 的 `reason` 与 `world.team_building` 的 `activity` 文案池设计未枚举 | 工程默认模板池落配置（`triggers.overtime.reasons`/`triggers.team_building.activities`，T-WA-01/08）；编剧/弧线可传参指定；已登记（本文偏差表） |
 | D-25 | 挂账期间"余额充足自动补扣清账"的部分补扣设计未定义 | 工程默认：足额才扣（余额 < 挂账额不动，防半清状态歧义）；每日 09:30 扫描（`economy.overdue.daily`，时点为工程默认）；已登记（本文偏差表） |
+| D-26 | 8 人小世界（seed_8）无部门经理 NPC（M 级全为 16 名 NPC，01 §1.3），`world.perf_review.manager_id` 无真实人可指 | 工程默认：无经理时 `manager_id=null`（键保留）；40 人 seed 起指真实经理；已登记（本文偏差表） |
+| D-27 | `world.promotion_window`/`world.perf_review` 的触发时点（日内 HH:MM）01 §6.1 只给日期规则 | 工程默认：promotion_window 10:00、perf_review 16:00（01 §6.1 模板行注明 16:00；晋升窗口取公告时段）；落配置 `triggers.*`；已登记（本文偏差表） |

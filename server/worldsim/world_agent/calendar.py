@@ -382,3 +382,191 @@ def register_layoff_rumor_job(cal: "CalendarEngine") -> None:
         await settle_layoff_rumor(c, t)
 
     cal.register_job("world.layoff_rumor", trigger_time, lambda d: True, _judge)
+
+
+# ---- 职场日历（T-WA-07；01 §6.1/§1.3/§1.5/§1.6；06 §1.2 world.promotion_window/world.perf_review） ----
+
+LAYOFF_POOL_KEY = "layoff_pool"        # world_state：连续 2C 裁员候选池（编剧弧线 A2/A6 读取，01 §1.5）
+STREAK_C_KEY = "perf_review.streak_c"  # world_state：连续 C 计数 {agent_id: n}
+
+
+def _nth_weekday_of_month(year: int, month: int, weekday: int, nth: int) -> dt.date:
+    """某月第 nth 个 weekday（Python weekday 口径）。"""
+    d = dt.date(year, month, 1)
+    while d.weekday() != weekday:
+        d += dt.timedelta(days=1)
+    return d + dt.timedelta(days=7 * (nth - 1))
+
+
+def _last_weekday_of_month(year: int, month: int, weekday: int) -> dt.date:
+    if month == 12:
+        d = dt.date(year, 12, 31)
+    else:
+        d = dt.date(year, month + 1, 1) - dt.timedelta(days=1)
+    while d.weekday() != weekday:
+        d -= dt.timedelta(days=1)
+    return d
+
+
+async def settle_promotion_window(cal: "CalendarEngine", fire_time: dt.datetime) -> list[int]:
+    """`world.promotion_window`：每部门恰一条，payload `{dept, slots, candidates[]}` 逐字 06 §1.2
+    （无 defense_at 键，D-01 转正）；candidates = 该部门全体 P1（设计未定义，工程默认 D-09）；
+    答辩排期（窗口月第 3 个周六 19:00，01 §1.6）经 `world.announce` body 承载。"""
+    cfg = cal.cfg["triggers"]["promotion_window"]
+    slots = int(cfg["slots_per_dept"])
+    defense_at = _nth_weekday_of_month(
+        fire_time.year, fire_time.month, int(cfg["defense"]["weekday"]), int(cfg["defense"]["nth"]))
+    defense_time = str(cfg["defense"]["time"])
+    seqs: list[int] = []
+    for dept in cal.cfg["company"]["departments"]:
+        candidates = [
+            r["id"] for r in await cal.pool.fetch(
+                "SELECT id FROM agents WHERE department=$1 AND job_title='P1' ORDER BY id", dept["name"])
+        ]
+        seq = await cal.insert_event(
+            type_="world.promotion_window",
+            payload={"dept": dept["name"], "slots": slots, "candidates": candidates},
+            sim_time=fire_time, actors=list(candidates), rng_seed=cal.clock.tick_of(fire_time),
+        )
+        seqs.append(seq)
+    # 答辩排期公告（world.announce body 承载，D-01；弧线钩子由 T-DIR-01 A2 消费）
+    seqs.append(await cal.insert_event(
+        type_="world.announce",
+        payload={"title": "晋升评审季", "scope": "company",
+                 "body": f"本季度晋升窗口开启，公开答辩定于 {defense_at.isoformat()} {defense_time}（黄金档）。",
+                 "text_display": f"晋升窗口开启，答辩 {defense_at.isoformat()} {defense_time}"},
+        sim_time=fire_time, rng_seed=cal.clock.tick_of(fire_time),
+    ))
+    log.info("晋升窗口开启：%d 部门，答辩 %s %s", len(seqs) - 1, defense_at, defense_time)
+    return seqs
+
+
+async def _compute_perf_grades(cal: "CalendarEngine", fire_time: dt.datetime) -> dict[str, str]:
+    """S~C 评分（设计未定义，工程默认 D-10）：期间系统指标（出勤/工作事件按期/加班参与）
+    加权 → 部门内分层映射（z-score：≥1 → S，≥0.3 → A，≤-1 → C，其余 B；权重读
+    triggers.perf_review.grade_weights 镜像）。参评范围默认全员。"""
+    w = {k: float(v) for k, v in cal.cfg["triggers"]["perf_review"]["grade_weights"].items()}
+    since = fire_time - dt.timedelta(days=30)
+    rows = await cal.pool.fetch("SELECT id, department FROM agents ORDER BY id")
+    scores: dict[str, float] = {}
+    depts: dict[str, str] = {}
+    for r in rows:
+        aid, depts[aid] = r["id"], r["department"] or ""
+        # 出勤率：attendance.<date> 标记（T-WA-02 打卡内部结算）
+        marks = await cal.pool.fetch(
+            "SELECT key, value FROM world_state WHERE key LIKE 'attendance.%'")
+        present = total = 0
+        for m in marks:
+            day = dt.date.fromisoformat(m["key"].split(".", 1)[1])
+            if not (since.date() <= day <= fire_time.date()):
+                continue
+            v = m["value"] if isinstance(m["value"], dict) else json.loads(m["value"])
+            if aid in v:
+                total += 1
+                present += int(v[aid] == "present")
+        attendance = present / total if total else 0.0
+        work_cnt = await cal.pool.fetchval(
+            """
+            SELECT count(*) FROM events WHERE type='agent.work' AND $1 = ANY(actors)
+              AND sim_time BETWEEN $2 AND $3
+            """, aid, since, fire_time)
+        ot_cnt = await cal.pool.fetchval(
+            """
+            SELECT count(*) FROM events WHERE type='world.overtime'
+              AND payload->'participants' ? $1 AND sim_time BETWEEN $2 AND $3
+            """, aid, since, fire_time)
+        scores[aid] = w["attendance"] * attendance + w["on_time_work"] * min(float(work_cnt), 20.0) / 20.0 \
+            + w["overtime_join"] * min(float(ot_cnt), 4.0) / 4.0
+    grades: dict[str, str] = {}
+    by_dept: dict[str, list[str]] = {}
+    for aid, dept in depts.items():
+        by_dept.setdefault(dept, []).append(aid)
+    for dept, aids in by_dept.items():
+        vals = [scores[a] for a in aids]
+        mean = sum(vals) / len(vals)
+        var = sum((v - mean) ** 2 for v in vals) / len(vals)
+        std = var ** 0.5
+        for aid in aids:
+            z = (scores[aid] - mean) / std if std > 1e-9 else 0.0
+            grades[aid] = "S" if z >= 1.0 else ("A" if z >= 0.3 else ("C" if z <= -1.0 else "B"))
+    return grades
+
+
+async def settle_perf_review(cal: "CalendarEngine", fire_time: dt.datetime,
+                             *, grades: dict[str, str] | None = None) -> list[int]:
+    """`world.perf_review`：全员各一条，payload `{agent_id, manager_id, grade, delta_salary?}` 逐字
+    06 §1.2（delta_salary = BIGINT 分、月薪差额绝对值 = 01 §1.5 百分比档 × 当前月薪，D-11 销项口径）；
+    涨薪更新月薪状态（world_state economy.salary，D-06），实际入账经下个发薪日 economy.payroll；
+    C 级情绪变更落 state.needs_delta；连续 2C 进裁员候选池（world_state，01 §1.5）。"""
+    cfg = cal.cfg["triggers"]["perf_review"]
+    raise_pct = {k: float(v) for k, v in cal.cfg["economy"]["perf_review_raise_pct"].items()}
+    salary_table = dict(await cal.get_state("economy.salary", {}) or {})
+    streak_c: dict[str, int] = dict(await cal.get_state(STREAK_C_KEY, {}) or {})
+    pool_: list[str] = list(await cal.get_state(LAYOFF_POOL_KEY, []) or [])
+    grades = grades if grades is not None else await _compute_perf_grades(cal, fire_time)
+    rows = await cal.pool.fetch("SELECT id, department FROM agents ORDER BY id")
+    seqs: list[int] = []
+    for r in rows:
+        aid = r["id"]
+        grade = grades.get(aid, "B")
+        manager = await cal.pool.fetchval(
+            "SELECT id FROM agents WHERE department=$1 AND job_title='M' ORDER BY id LIMIT 1", r["department"])
+        # manager_id = 部门经理 NPC（01 §1.3）；8 人小世界无 NPC 经理 → null（工程默认，D-26）
+        payload: dict[str, Any] = {"agent_id": aid, "manager_id": manager, "grade": grade}
+        pct = raise_pct.get(grade, 0.0)
+        if pct > 0:
+            cur = int(salary_table[aid])
+            delta = int(round(cur * pct / 100.0))
+            payload["delta_salary"] = delta
+            salary_table[aid] = cur + delta  # 月薪状态更新，下个发薪日生效（06 §1.2 注释口径）
+        seq = await cal.insert_event(
+            type_="world.perf_review", payload=payload,
+            sim_time=fire_time, actors=[aid], rng_seed=cal.clock.tick_of(fire_time),
+            grade_signals={"mood_hit": grade == "C"})
+        seqs.append(seq)
+        if grade == "C":
+            await _apply_needs_c(cal, aid, float(cfg["c_mood_delta"]), str(seq))
+            streak_c[aid] = int(streak_c.get(aid, 0)) + 1
+            if streak_c[aid] >= int(cfg["consecutive_c_for_pool"]) and aid not in pool_:
+                pool_.append(aid)
+                log.warning("%s 连续 %dC 进裁员候选池", aid, streak_c[aid])
+        else:
+            streak_c[aid] = 0
+    await cal.set_state("economy.salary", salary_table)
+    await cal.set_state(STREAK_C_KEY, streak_c)
+    await cal.set_state(LAYOFF_POOL_KEY, pool_)
+    log.info("绩效评审完成：%d 人（S=%d A=%d B=%d C=%d）", len(seqs),
+             sum(1 for g in grades.values() if g == "S"), sum(1 for g in grades.values() if g == "A"),
+             sum(1 for g in grades.values() if g == "B"), sum(1 for g in grades.values() if g == "C"))
+    return seqs
+
+
+async def _apply_needs_c(cal: "CalendarEngine", agent_id: str, mood_delta: float, cause: str) -> None:
+    if cal.agg is not None and mood_delta:
+        await cal.agg.apply_needs_delta(agent_id=agent_id, need="mood", delta=mood_delta, cause=cause)
+
+
+def register_career_jobs(cal: "CalendarEngine") -> None:
+    """注册职场日历排程（T-WA-07）：晋升窗口（季度首月 1 日）+ 绩效评审（每月最后一个周五 16:00）。
+    节假日停发工作事件（01 §6.1，T-WA-02 标记消费）。"""
+    promo = cal.cfg["triggers"]["promotion_window"]
+    perf = cal.cfg["triggers"]["perf_review"]
+    quarter_months = {int(m) for m in promo["quarterly_months"]}
+    promo_day = int(promo["day"])
+    perf_wd = int(perf["monthly_last_weekday"])
+
+    def _promo_on(d: dt.date) -> bool:
+        return d.month in quarter_months and d.day == promo_day and not cal.holiday_flags(d)["work_events_suspended"]
+
+    def _perf_on(d: dt.date) -> bool:
+        return d == _last_weekday_of_month(d.year, d.month, perf_wd) \
+            and not cal.holiday_flags(d)["work_events_suspended"]
+
+    async def _promo(c: "CalendarEngine", t: dt.datetime) -> None:
+        await settle_promotion_window(c, t)
+
+    async def _perf(c: "CalendarEngine", t: dt.datetime) -> None:
+        await settle_perf_review(c, t)
+
+    cal.register_job("world.promotion_window", "10:00", _promo_on, _promo)
+    cal.register_job("world.perf_review", str(perf["time"]), _perf_on, _perf)
