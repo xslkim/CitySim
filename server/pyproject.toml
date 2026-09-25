@@ -11,6 +11,7 @@ dependencies = [
     "httpx==0.28.1",
     "pyyaml==6.0.2",
     "pydantic==2.10.4",
+    "sentence-transformers>=6.1.0",
 ]
 
 [dependency-groups]
@@ -30,7 +31,11 @@ packages = ["worldsim"]
 
 [tool.pytest.ini_options]
 # pytest import 模式钉版（配合"测试文件 basename 全库唯一"纪律，00 §7 DoD 7 / round2 §A.3）
-addopts = "--import-mode=importlib"
+# live 标记：真 LLM 联网用例（T-LLM-03 起），默认 deselect，显式 `-m live` 才跑
+addopts = "--import-mode=importlib -m 'not live'"
+markers = [
+    "live: 真 LLM 联网冒烟（默认跳过；cd server && uv run pytest -m live 显式跑）",
+]
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
