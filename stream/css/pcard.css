@@ -1,0 +1,22 @@
+/* T-LTV-04 人物特写浮层（结构类名沿用原型 .pcard；06 §7 B4 收起延迟 3s 由 pcard-view.js 持有） */
+
+.pcard { --sig:var(--neutral); --sigtext:var(--bg-0); position:absolute; width:120px; padding:7px 7px 10px;
+  background:var(--bg-1); border:2px solid var(--sig); border-radius:14px;
+  box-shadow:0 4px 16px rgba(0,0,0,.45), 0 0 12px color-mix(in srgb, var(--sig) 32%, transparent);
+  animation:pcard-in .45s ease-out both }
+.pcard img { display:block; width:100%; aspect-ratio:1/1; border-radius:9px; background:var(--bg-2) }
+/* 缺特写资产兜底：签名色圆底 + 姓名首字（ui/web-lite .av 口径） */
+.pcard .pcard-initial { display:flex; align-items:center; justify-content:center;
+  width:100%; aspect-ratio:1/1; border-radius:9px; background:var(--bg-2) }
+.pcard .pcard-initial i { display:flex; align-items:center; justify-content:center;
+  width:74%; aspect-ratio:1/1; border-radius:50%; font-style:normal;
+  font-size:40px; font-weight:700 }
+.pcard figcaption { position:absolute; left:50%; bottom:-9px; transform:translateX(-50%);
+  background:var(--sig); color:var(--sigtext); font-size:11px; font-weight:700;
+  padding:2px 12px; border-radius:9px; white-space:nowrap;
+  border:2px solid rgba(14,17,22,.9) }
+
+/* normal 形态单人位（原型 left:12 top:44；宽度由 .pcard width:120 持有） */
+.pcard-single { left:12px; top:44px }
+
+@keyframes pcard-in { from { opacity:0; transform:translateY(10px) scale(.95) } to { opacity:1; transform:none } }

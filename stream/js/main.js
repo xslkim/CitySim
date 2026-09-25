@@ -9,6 +9,7 @@
 import { loadRoster } from './lib/roster.js';
 import { SubtitleQueue } from './lib/subtitle.js';
 import { SubtitleView } from './ui/subtitle-view.js';
+import { PcardView } from './ui/pcard-view.js';
 import { StreamWsClient } from './lib/ws-client.js';
 
 const params = new URLSearchParams(location.search);
@@ -75,16 +76,28 @@ async function bootstrap() {
 }
 
 async function main() {
+  if (params.get('anim') === '0') document.documentElement.classList.add('noanim');
   await bootstrap();
   // T-LTV-03 字幕引擎接线：事件 → 队列（逐句 ÷倍率）→ 字幕条 DOM
   const subView = new SubtitleView(document.getElementById('subtitle'), ctx.roster);
+  // T-LTV-04 特写浮层：dialogue 开播弹说话人卡，speaker 切换换人，播完 +3s 收起（B4）
+  const pcard = new PcardView(document.getElementById('pcard-mount'), ctx.roster, {
+    getMode: () => ctx.mode?.current ?? 'normal', // T-LTV-05 mode 模块注入前恒 normal
+  });
   const queue = new SubtitleQueue({
-    onLine: (line, seg) => subView.showLine(line, seg),
-    onSegmentEnd: () => subView.hide(),
+    onLine: (line, seg) => {
+      subView.showLine(line, seg);
+      if (seg.kind === 'dialogue') pcard.setSpeaker(line.speaker);
+    },
+    onSegmentStart: (seg) => { if (seg.kind === 'dialogue') pcard.begin(seg); },
+    onSegmentEnd: (seg) => {
+      subView.hide();
+      if (seg.kind === 'dialogue') pcard.end();
+    },
   });
   ctx.subtitleQueue = queue;
   ctx.handlers = [(_c, ev) => queue.push(ev)];
-  if (params.get('mock') === '1') {
+  if (params.get('mock')) {
     const { runMock } = await import('./mock.js');
     runMock(ctx);
     return;
