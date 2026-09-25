@@ -342,13 +342,24 @@ async def _run(args: argparse.Namespace) -> int:
 
         # ---- 波次 2a：tick 收尾驱动（需求衰减/聚合 flush/每日兜底反思） ------------------
         last_decay: dict[str, dt.datetime] = {}
-        # residence 已在上方构造（T-ADJ-03 复用；T-LOD-04 校外 NPC 驻留规则，零 LLM）
+        trial_snap = {"last_day": sim_start.date()}  # T-WEB-20：试跑模式日界快照（见下 D25 注）
 
         async def after_tick(tick: int, sim_now: dt.datetime) -> None:
             # T-LOD-04：驻留规则每 tick 评估（不占认知循环；移位落 agent.move trigger='system'）
             await residence.evaluate(tick=tick, sim_now=sim_now, rng_seed=tick)
             # T-WA-02：日历引擎连续段驱动（日界/排程项结算；产 needs_delta 先入 agg 缓冲）
             await calendar.tick(sim_now)
+            # T-WEB-20（05 文档 D25）：试跑模式不进 batch 段（02 文档口径），快照在试跑模式
+            # 改由日界翻转时点直调同一 dump_snapshot 实现（batch 段挂载点语义不变；paced 模式仍走 batch 钩子）
+            if trial and sim_now.date() != trial_snap["last_day"]:
+                from .snapshot.dump import dump_snapshot
+                ended_day = trial_snap["last_day"]
+                trial_snap["last_day"] = sim_now.date()
+                await dump_snapshot(
+                    pool, sim_day=ended_day, out_dir=REPO_ROOT / "var" / "snapshot",
+                    tick=tick, sim_now=sim_now,
+                    compression_ratio=clock.ratio, schedule=needs_cfg.get("schedule"),
+                )
             # T-REL-01：全员六需求被动衰减（只读 sim_time；cause = 本裁决点前最后一事件 seq，工程口径 D22）
             cause = str(await pool.fetchval("SELECT coalesce(max(seq), 0) FROM events"))
             for aid in agent_ids:

@@ -8,10 +8,9 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { apiGet } from '../api/client';
 import Avatar from '../components/common/Avatar';
 import { rippleDataSchema, rippleTodaySchema, type RippleData } from '../proto/ripple';
-import { renderEvent } from '../lib/eventText';
 import { useAgentsStore } from '../stores/agentsStore';
 import LiteShell from './LiteShell';
-import { distortionPhrase } from './narrativeMap';
+import { distortionPhrase, narrateEvent } from './narrativeMap';
 
 export default function LiteStoryPage() {
   const [params] = useSearchParams();
@@ -29,9 +28,7 @@ export default function LiteStoryPage() {
       apiGet(`/api/ripple/${seq}`, rippleDataSchema)
         .then((r) => {
           setData(r.data);
-          setTitle(renderEvent(r.data.followups[0] ?? ({
-            type: 'dialogue.gossip', payload: { text_display: '' }, ui: null,
-          } as never), nameOf).text || '一件事传开了');
+          setTitle(r.data.source ? narrateEvent(r.data.source, nameOf).text : '一件事传开了');
         })
         .catch(() => setEmpty(true));
     if (e && /^\d+$/.test(e)) {

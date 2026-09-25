@@ -77,12 +77,12 @@ async def read_full_state(pool: Any) -> dict[str, Any]:
             if isinstance(row.get(k), str):
                 row[k] = json.loads(row[k])
         row["created_at"] = row["created_at"].isoformat()
+        if row.get("next_due_sim") is not None:
+            row["next_due_sim"] = row["next_due_sim"].isoformat()
         agents.append(row)
     relations = [dict(r) for r in await pool.fetch(
         "SELECT a_id, b_id, affinity, tension, labels, one_line, last_event_seq FROM relations ORDER BY a_id, b_id"
     )]
-    for r in relations:
-        r["labels"] = sorted(r["labels"] or [])
     goals = [dict(r) for r in await pool.fetch(
         "SELECT id, agent_id, sim_week, goal, blocked_count, status, frustration FROM goals ORDER BY id"
     )]

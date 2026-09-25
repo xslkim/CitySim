@@ -11,7 +11,7 @@ import { agentDetailSchema, agentStateSchema, reflectionsSchema,
   type AgentDetail, type AgentState } from '../proto/agents';
 import { envelopeEventsSchema } from '../proto';
 import type { ObsEvent } from '../proto/event';
-import { locationName } from '../lib/mapLayout';
+import { loadMapLayout, locationName } from '../lib/mapLayout';
 import { useAgentsStore } from '../stores/agentsStore';
 import { useWorldStore } from '../stores/worldStore';
 import LiteShell from './LiteShell';
@@ -28,8 +28,10 @@ export default function LiteAgentPage() {
   const [thoughts, setThoughts] = useState<string[]>([]);
   const [events, setEvents] = useState<ObsEvent[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+  const [, setLayoutReady] = useState(false);
 
   useEffect(() => {
+    loadMapLayout().then(() => setLayoutReady(true));
     if (!id) return;
     apiGet(`/api/agents/${id}`, agentDetailSchema).then((r) => setDetail(r.data)).catch(() => undefined);
     apiGet(`/api/agents/${id}/state`, agentStateSchema).then((r) => setState(r.data)).catch(() => undefined);

@@ -432,6 +432,13 @@
 | 历史快照重建响应时间 | T-WEB-04 | 03 §9.2 行备注 | 目标 ≤2s（03 §4.2 边界 4） |
 | 端到端延迟 p95 / 首屏 / 帧率 / 8h 内存 | T-WEB-20/13 | 03 §9.2 表备注 + 00 §5 M4 出口记录 | p95 ≤5s 为 M4 出口线 |
 
+**M4 实测回填（2026-09-25，主库 worldsim 真栈：内核 mock + obs-api + vite）**：
+
+- 端到端延迟（事件落库 wall_time → WS 收帧，`scripts/e2e_latency_probe.py`，内核试跑 burst 30 模拟小时/171 事件窗口）：**n=161，p50=250.6ms，p95=489.2ms，max=509.5ms，p95 ≤5s 达标**（00 §5 M4 出口线）。
+- 环缓冲复核：M2 实测事件量（06 §3 回填行）按 mock 765 事件/模拟日（M1）与真跑 2,125 事件/21.6 模拟小时（T-LLM-12 干净库）两口径，服务端 10,000 环缓冲 ≈ 4.7~13 模拟日 ≥ 03 §5.2 的 4~6.7 日设计区间下沿，**达标不改数**；前端 timelineStore 3,000 ≈ 1.4~4 模拟日，覆盖 03 §6.3 的 1.2~2 日区间，**达标不改数**。
+- 历史快照重建：合并 + 逐日 diff 自检（`snapshot_diff_check.py`）在 3 个连续模拟日快照上字段级一致（退出码 0）；单点查询为毫秒级（8 人量级），≤2s 目标余量充足；40 人/长时段口径待 M6 复测。
+- 夜班段项（断网 5min/2h 演练的 2h 档、8h 内存长跑、首屏 Lighthouse 4G、55fps 性能面板）未在日间段执行：断线 5min 档已由 `tests/observe/test_e2e.py::test_resume_after_obs_api_restart`（obs-api 重启 + last_seq resume 不重不漏）等价覆盖；2h 档缺口超环缓冲路径由 `test_resync_required_on_large_gap` 覆盖；8h 内存与帧率留 M5 长挂段一并实测（登记 03 §9.2 待回填行）。
+
 风险（按优先级）：
 
 1. **快照合并 diff 失败** = 事件落库完整性问题，阻塞 M4 出口（03 §4.2 自检定位即回归测试）；优先级最高，T-WEB-04 不绿不进页面联调。
@@ -468,3 +475,6 @@
 - **D22（已登记（本文偏差表））**：`/api/snapshot` 的 `sim_day` 落为**日序整数**（03 §5.1 示例 `"sim_day": 12` 形态）：obs 层无内核 `world_state` 时钟键，epoch 取 `obs.events` 最早 `sim_time` 本地日期 = Day 1。
 - **D23（已登记（本文偏差表））**：事件序列化（`observe/serde.py`）把出站白名单**列** `location_id`/`actors` 并入 `payload` 同名键下发（05 §3.1 列清单本就含此两列；03 §5.1 示例的 `payload.location_id` 同构；`actors` 供 promoted/demoted 等文案取行动方，03 §5.3 模板 `{name}` 数据源）。不改白名单键语义、不新增内容。
 - **D24（已登记（本文偏差表））**：vite dev server 以中间件直托 `/assets/*` → `ui/assets/*`（头像开发期取用；06 T-ART-03 的 obs-api 静态三挂载属 M5，生产 nginx 直托入 deploy/ 属 M5/M6）。
+- **D25（已登记（本文偏差表）/ 02 文档口径细化）**：试跑模式（`--sim-hours`）不进 batch 段（02 文档 T-TIME-03 口径），`kernel.snapshot` 批次钩子在试跑中永不触发——M4 联调需要日界快照，main.py 试跑模式改为日界翻转时点直调同一 `dump_snapshot` 实现（T-ADJ-09 实现唯一，挂载点语义不变；paced 持续模式仍走 batch 钩子）。顺带修复 `dump.read_full_state` 漏转 `agents.next_due_sim` datetime 导致 canonical 序列化失败（此前 batch 钩子从未真跑过，未暴露）。
+- **D26（已登记（本文偏差表））**：`/api/ripple/:eventId` 响应补 `source` 键（源事件序列化本体）——03 §3.4 渲染结构首行"源事件卡"（含文案/时间/A 级徽标）需要源事件本体，03 §5.1 未列入响应包；proto `rippleDataSchema.source` 可空兼容。
+- **D27（已登记（本文偏差表））**：调试态开关补 `?debug=1` URL 参数（与 d 键等价）——headless 截图/直链验收可达性（03 §3.6 键盘开关之外的入口，导航显隐规则不变）。

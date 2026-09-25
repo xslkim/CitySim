@@ -53,12 +53,18 @@ export default function RipplePage() {
 
   if (error) return <div className="card text-negative">涟漪查询失败：{error}</div>;
   if (!data) return <div className="card text-text-1">加载中…</div>;
-  const sourceText = renderEvent(data.followups[0] ?? ({ type: 'dialogue.gossip', payload: {}, ui: null } as never), nameOf).text;
+  const sourceText = data.source ? renderEvent(data.source, nameOf).text : '';
+  const sourceGrade = (data.source?.ui?.grade as string) ?? null;
 
   return (
     <div data-testid="ripple-page">
       <div className="card mb-2 flex items-center gap-2">
-        <span className="text-title text-text-0">源事件 e{data.source_seq}</span>
+        <span className="text-title text-text-0">
+          源事件 e{data.source_seq}
+          {sourceText && <span className="ml-2 text-body font-normal">「{sourceText}」</span>}
+          {data.source && <span className="ml-2 text-aux text-text-1">{data.source.sim_time.slice(0, 16).replace('T', ' ')}</span>}
+          {sourceGrade === 'A' && <span className="ml-1 text-warn">★A级</span>}
+        </span>
         <button type="button" className="ml-auto rounded bg-bg-2 px-2 py-1 text-aux text-accent"
           onClick={() => {
             navigator.clipboard?.writeText(exportCardText(data, sourceText));
@@ -72,7 +78,7 @@ export default function RipplePage() {
         {(data.stats.max_distortion * 100).toFixed(0)}% · {data.stats.followup_count} 条后续事件
       </div>
       <div className="card mb-2">
-        <RippleDag data={data} sourceGrade={null} />
+        <RippleDag data={data} sourceGrade={sourceGrade} />
       </div>
       {/* 投影列表（当事/目击标注） */}
       <div className="card mb-2">

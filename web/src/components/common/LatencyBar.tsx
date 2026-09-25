@@ -32,7 +32,7 @@ export default function LatencyBar() {
   const watermarkTick = useWorldStore((s) => s.watermarkTick);
   const latestTick = useTimelineStore((s) => s.latestTick);
   const ratio = useWorldStore((s) => s.snapshot?.compression_ratio ?? 1);
-  const lag = lagSeconds(watermarkTick, latestTick, ratio || 1);
+  const lag = latestTick > 0 ? lagSeconds(watermarkTick, latestTick, ratio || 1) : 0;
   const level = latencyLevel(lag);
   return (
     <span data-testid="latency-bar" className={COLOR[level]}>

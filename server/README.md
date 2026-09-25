@@ -109,3 +109,18 @@ bash server/scripts/schema_freeze_check.sh                          # 06 §4.5 �
 - world_state 初始键：`clock.anchor`（2026-10-12 周一 00:00+08 冷启动占位，内核首启重锚）、
   `economy.stocks`（3 标的初值）、`economy.salary`（每人月薪抽定，M3 payroll 读取）。
 - 测试库：pytest fixture 自动建/毁 `worldsim_test` / `worldsim_seed8` / `worldsim_seed40`（socket trust）。
+
+## M4 观察端（obs-api + web/）
+
+```bash
+bash deploy/start_local.sh        # 一条命令起全栈：PG + 内核 + obs_refresh 常驻 + obs-api(:8080) + web dev(:5173)
+cd server && uv run python -m worldsim.observe.tokens_cli issue --label <name>   # 签发访问 token（03 §8.3）
+# admin: http://127.0.0.1:5173/map?token=<token> · lite: http://127.0.0.1:5173/lite/home?token=<token>
+```
+
+- obs-api（`worldsim/observe/`）：REST（snapshot/agents/events/ripple/relations/health/usage）+ WS `/ws`
+  （hello/subscribe/resume-from-seq/resync/ping-pong）；鉴权 = SQLite token 表（10 行容量）+ 访问日志。
+- web/（React 观察端）：admin 7 路由 + lite `/lite/*` 3 页；`pnpm dev|build|test|proto:check`
+  （prebuild 强制 tsc --noEmit + vitest run，03 §8.2）。
+- 自检脚本：`scripts/snapshot_diff_check.py`（03 §4.2 合并 diff）、`scripts/e2e_latency_probe.py`
+  （端到端 p95 ≤5s）、`web/scripts/proto_check.mjs`（响应过 zod，09 §8 step④）。

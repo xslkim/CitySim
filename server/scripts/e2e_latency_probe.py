@@ -38,23 +38,36 @@ async def run_probe(url: str, token: str, dsn: str, duration_s: float, min_sampl
             assert welcome["op"] == "welcome", welcome
             await ws.send(json.dumps({"op": "subscribe", "channels": [
                 {"name": "events", "filter": {"types": [], "actors": [], "locations": [], "grades": []}}]}))
+
+            async def pinger() -> None:  # 03 §5.2：客户端 30s ping（看门狗 90s 无帧断开）
+                while True:
+                    await asyncio.sleep(25)
+                    try:
+                        await ws.send(json.dumps({"op": "ping"}))
+                    except Exception:
+                        return
+
+            ping_task = asyncio.create_task(pinger())
             deadline = asyncio.get_event_loop().time() + duration_s
-            while asyncio.get_event_loop().time() < deadline or len(latencies) < min_samples:
-                try:
-                    raw = await asyncio.wait_for(ws.recv(), timeout=2.0)
-                except TimeoutError:
-                    if asyncio.get_event_loop().time() >= deadline and len(latencies) >= min_samples:
+            try:
+                while asyncio.get_event_loop().time() < deadline and len(latencies) < 10_000:
+                    try:
+                        raw = await asyncio.wait_for(ws.recv(), timeout=2.0)
+                    except TimeoutError:
+                        continue
+                    except websockets.exceptions.ConnectionClosed:
                         break
-                    continue
-                recv_wall = dt.datetime.now(dt.timezone.utc)
-                frame = json.loads(raw)
-                if frame.get("op") != "event":
-                    continue
-                seq = frame["seq"]
-                wall = await pool.fetchval("SELECT wall_time FROM obs.events WHERE seq = $1", seq)
-                if wall is None:
-                    continue
-                latencies.append((recv_wall - wall).total_seconds() * 1000)
+                    recv_wall = dt.datetime.now(dt.timezone.utc)
+                    frame = json.loads(raw)
+                    if frame.get("op") != "event":
+                        continue
+                    seq = frame["seq"]
+                    wall = await pool.fetchval("SELECT wall_time FROM obs.events WHERE seq = $1", seq)
+                    if wall is None:
+                        continue
+                    latencies.append((recv_wall - wall).total_seconds() * 1000)
+            finally:
+                ping_task.cancel()
     finally:
         await pool.close()
     latencies.sort()

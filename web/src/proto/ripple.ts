@@ -48,6 +48,7 @@ export const rippleStatsSchema = z.object({
 export const rippleDataSchema = z
   .object({
     source_seq: z.number().int(),
+    source: eventSchema.optional(), // 源事件本体（03 §3.4 源事件卡）
     projections: z.array(rippleProjectionSchema),
     chain: z.array(rippleChainEdgeSchema),
     followups: z.array(eventSchema),

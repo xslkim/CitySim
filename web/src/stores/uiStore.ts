@@ -20,7 +20,7 @@ interface UiState {
 }
 
 export const useUiStore = create<UiState>((set) => ({
-  debug: false,
+  debug: new URLSearchParams(window.location.search).has('debug'), // 调试态：d 键或 ?debug=1（截图/直链）
   playbackRate: 1,
   selectedAgent: null,
   selectedLocation: null,

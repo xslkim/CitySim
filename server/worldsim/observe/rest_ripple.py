@@ -85,8 +85,10 @@ async def ripple_five_sections(pool: Any, e0: int) -> dict[str, Any]:
     max_hop = max((int(c["hop"]) for c in chain), default=0)
     max_dist = max((float(c["distortion"]) for c in chain if c["distortion"] is not None), default=0.0)
     import json as _json
+    src_row = await pool.fetchrow("SELECT * FROM obs.events WHERE seq = $1", e0)
     return {
         "source_seq": e0,
+        "source": serialize_event(src_row),  # 源事件卡数据源（03 §3.4 渲染结构首行）
         "projections": [{
             "agent_id": p["agent_id"], "memory_id": int(p["memory_id"]),
             "importance": p["importance"], "is_witness": p["is_witness"],

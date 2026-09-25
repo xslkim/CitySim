@@ -126,5 +126,6 @@ GRANT SELECT ON obs.payload_key_whitelist TO obs_ro;
 -- obs_refresh.py（常驻重算脚本）写入账号 = 内核应用角色 worldsim：仅三实体表可写，视图/主库侧仍按其既有授权
 -- （obs-api 只读账号 obs_ro 授权不变——"应用角色对 obs 只读"红线指观察端服务账号，05 §5）
 GRANT USAGE ON SCHEMA obs TO worldsim;
-GRANT SELECT ON obs.events, obs.memory_projection, obs.relation_change_log, obs.payload_key_whitelist TO worldsim;
+GRANT SELECT ON obs.events, obs.memory_projection, obs.relation_change_log, obs.payload_key_whitelist,
+  obs.event_grade_view, obs.health_daily TO worldsim;
 GRANT SELECT, INSERT, UPDATE, DELETE ON obs.world_state_snapshot, obs.relation_daily, obs.ripple_edge TO worldsim;
