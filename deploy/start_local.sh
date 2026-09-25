@@ -38,7 +38,8 @@ fi
 # 2) 内核（mock provider 默认；真跑 GLM 加 --llm routed，00 §1 A9）
 if ! pgrep -f "worldsim.main" >/dev/null; then
   log "启动内核（mock）…"
-  HF_HUB_OFFLINE=1 PYTHONUNBUFFERED=1 nohup uv run python -m worldsim.main ${SIM_HOURS:+--sim-hours $SIM_HOURS} \
+  HF_HUB_OFFLINE=1 PYTHONUNBUFFERED=1 nohup uv run python -m worldsim.main \
+    ${SIM_HOURS:+--sim-hours $SIM_HOURS} ${WSIM_RATIO:+--ratio $WSIM_RATIO} \
     >>"$LOG_DIR/kernel.log" 2>&1 &
 else
   log "内核 already running"
@@ -81,5 +82,44 @@ else
 fi
 ready "web dev server" "http://127.0.0.1:$WEB_PORT/map"
 
+# 6) 摄入 API（08 T-OPS-05 增补段，R1 §A.9；绑定 WSIM_INGEST_BIND，07 T-SYN-04 登记）
+INGEST_BIND="${WSIM_INGEST_BIND:-127.0.0.1:9100}"
+if ! pgrep -f "uvicorn worldsim.ingest" >/dev/null; then
+  log "启动摄入 API $INGEST_BIND…"
+  nohup uv run uvicorn worldsim.ingest:app --host "${INGEST_BIND%:*}" --port "${INGEST_BIND##*:}" \
+    >>"$LOG_DIR/ingest.log" 2>&1 &
+  echo $! > "$LOG_DIR/ingest.pid"
+else
+  log "摄入 API already running"
+fi
+for _ in $(seq 1 60); do
+  code=$(curl -s -o /dev/null -w '%{http_code}' "http://${INGEST_BIND}/v1/health" || true)
+  [ "$code" = "401" ] || [ "$code" = "200" ] && { log "摄入 API 就绪（HTTP $code）"; break; }
+  sleep 1
+done
+
+# 7) 派生 worker（07 T-SYN-07/08 登记起停参数：uv run python -m worldsim.ingest.derived.worker）
+if ! pgrep -f "worldsim.ingest.derived.worker" >/dev/null; then
+  log "启动派生 worker…"
+  nohup uv run python -m worldsim.ingest.derived.worker >>"$LOG_DIR/derived_worker.log" 2>&1 &
+  echo $! > "$LOG_DIR/derived_worker.pid"
+else
+  log "派生 worker already running"
+fi
+
+# 8) stream 直播页就绪检查（M5 遗留 B11 需求条目；obs-api 三挂载托管，06 T-ART-03）
+stream_ready=0
+for _ in $(seq 1 30); do
+  if curl -sf -o /dev/null "http://127.0.0.1:$OBS_PORT/stream/"; then stream_ready=1; break; fi
+  sleep 1
+done
+if [ "$stream_ready" = "1" ]; then
+  log "stream 直播页就绪（http://127.0.0.1:$OBS_PORT/stream/）"
+else
+  log "WARN: stream 直播页未就绪（obs-api /stream/ 挂载检查，06 T-ART-03）"
+fi
+
 log "全栈就绪：admin http://127.0.0.1:$WEB_PORT/map · lite http://127.0.0.1:$WEB_PORT/lite/home · obs-api :$OBS_PORT"
-log "停止：pkill -f 'worldsim.main|obs_refresh_loop|uvicorn worldsim.observe|vite'；另见 README"
+log "stream 直播页：http://127.0.0.1:$OBS_PORT/stream/?token=<dev token>（token 签发：cd server && uv run python -m worldsim.observe.tokens_cli issue --label <name>）"
+log "摄入 API：http://$INGEST_BIND/v1/health（Bearer 鉴权，04 §9.1）· 派生 worker 常驻"
+log "停止：pkill -f 'worldsim.main|obs_refresh_loop|uvicorn worldsim.observe|uvicorn worldsim.ingest|worldsim.ingest.derived.worker|vite'；另见 README"

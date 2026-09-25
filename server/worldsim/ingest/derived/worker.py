@@ -165,3 +165,31 @@ async def run_forever(pool: Any, *, poll_s: float = 1.0) -> None:  # pragma: no 
         except Exception:  # noqa: BLE001
             log.exception("derived worker 轮询异常")
         await asyncio.sleep(poll_s)
+
+
+def main() -> None:  # pragma: no cover - 进程入口（起停编排归 08 T-OPS-05 start_local.sh 增补段）
+    """`uv run python -m worldsim.ingest.derived.worker`（DSN 读 WSIM_REPLICA_PG_DSN）。"""
+    import os
+
+    import asyncpg
+
+    from ... import logconf
+    from .. import replica_dsn  # ingest 包 DSN 解析（07 D2）
+
+    async def _run() -> None:
+        logconf.setup()
+        pool = await asyncpg.create_pool(replica_dsn(), min_size=1, max_size=4)
+        try:
+            log.info("derived worker 启动（DSN=WSIM_REPLICA_PG_DSN）")
+            await run_forever(pool)
+        finally:
+            await pool.close()
+
+    if not os.environ.get("WSIM_REPLICA_PG_DSN"):
+        raise SystemExit("缺 WSIM_REPLICA_PG_DSN（07 D2）")
+    asyncio.run(_run())
+
+
+if __name__ == "__main__":  # pragma: no cover
+    main()
+
