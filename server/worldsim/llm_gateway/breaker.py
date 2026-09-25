@@ -77,11 +77,13 @@ class FailoverBreaker:
     # ---- 数据流输入（T-LLM-05 调用记录流） ---------------------------------
 
     def record_attempt(self, provider: str, *, kind: str, latency_ms: int, rpm_limit: int | None = None,
-                       p95_trip_ms: int | None = None) -> str | None:
+                       p95_trip_ms: int | None = None, rpm_usage_trip_pct: int | None = None) -> str | None:
         """记录一次尝试并做撞墙判定；命中三条件之一 → trip 并返回 reason，否则 None。
 
-        `p95_trip_ms`：条件③阈值条目级覆盖（models.yaml 模型条目 `p95_trip_ms`；缺省 8s = 04 §8.2 口径。
-        开发期免费档 reasoning 模型固有延迟超 8s，条目级阈见 03 §6 D42）。
+        `p95_trip_ms`：条件③阈值条目级覆盖（models.yaml 模型条目 `p95_trip_ms`；缺省 8s = 04 §8.2 口径；
+        **0 = 条目级停用条件③**（免费档延迟抖动为服务端排队所致，误 trip 实见 2026-09-25，03 §6 D42）。
+        `rpm_usage_trip_pct`：条件②阈值条目级覆盖（百分数；缺省 90 = 04 §8.2 口径；**0 = 条目级停用
+        条件②**——桶容量即提供方实测上限时，打满桶是限流器本职非提供方撞墙，03 §6 D42）。
         """
         now = self._clock.now()
         w = self._window.setdefault(provider, deque())
@@ -94,22 +96,26 @@ class FailoverBreaker:
             self._consec_wall[provider] = self._consec_wall.get(provider, 0) + 1
         elif kind == "ok":
             self._consec_wall[provider] = 0
-        reason = self._check_trip(provider, rpm_limit, p95_trip_ms=p95_trip_ms)
+        reason = self._check_trip(provider, rpm_limit, p95_trip_ms=p95_trip_ms, rpm_usage_trip_pct=rpm_usage_trip_pct)
         if reason:
             self._tripped_at[provider] = now
         return reason
 
-    def _check_trip(self, provider: str, rpm_limit: int | None, *, p95_trip_ms: int | None = None) -> str | None:
+    def _check_trip(self, provider: str, rpm_limit: int | None, *, p95_trip_ms: int | None = None,
+                    rpm_usage_trip_pct: int | None = None) -> str | None:
         if self._consec_wall.get(provider, 0) >= TRIP_CONSECUTIVE_ERRORS:
             return "consecutive_429_5xx"  # 条件①
         w = self._window.get(provider)
         if not w:
             return None
-        if rpm_limit:  # 条件②：窗口 RPM 使用率 >90%
+        usage_trip = RPM_USAGE_TRIP if rpm_usage_trip_pct is None else rpm_usage_trip_pct / 100.0
+        if rpm_limit and usage_trip > 0:  # 条件②：窗口 RPM 使用率 >90%（0 = 条目级停用，03 §6 D42）
             usage = len(w) / (rpm_limit * WINDOW_S / 60.0)
-            if usage > RPM_USAGE_TRIP:
+            if usage > usage_trip:
                 return "rpm_usage_over_90pct"
-        p95_limit = p95_trip_ms or P95_LATENCY_TRIP_MS
+        if p95_trip_ms == 0:
+            return None  # 条目级停用条件③（D42）
+        p95_limit = p95_trip_ms if p95_trip_ms is not None else P95_LATENCY_TRIP_MS
         lat = sorted(lat for _, _, lat in w)
         p95 = lat[min(len(lat) - 1, int(len(lat) * 0.95))]
         if len(lat) >= 2 and p95 > p95_limit:  # 条件③：窗口 p95 超阈（04 §8.2；条目级覆盖 D42）

@@ -150,6 +150,19 @@ class RateLimitedClient:
         *,
         seed: int | None = None,
     ) -> ChatResult | WallSignal:
+        outcome, _ = await self.call_tracked(task_type, messages, gen_params, seed=seed)
+        return outcome
+
+    async def call_tracked(
+        self,
+        task_type: str,
+        messages: list[Message],
+        gen_params: dict[str, Any] | None = None,
+        *,
+        seed: int | None = None,
+    ) -> tuple[ChatResult | WallSignal, list[AttemptRecord]]:
+        """call + 本次调用自己的尝试清单（并发共享客户端时不得从共享 records 切片——
+        他调用的记录会混入导致重复落库，2026-09-25 真跑实发）。"""
         await self._acquire(PRIORITY.get(task_type, DEFAULT_PRIORITY))
         attempts: list[AttemptRecord] = []
         for attempt in range(MAX_RETRIES + 1):
@@ -174,10 +187,10 @@ class RateLimitedClient:
             else:
                 attempts.append(AttemptRecord(status="ok", latency_ms=self._elapsed(started)))
                 self.records.extend(attempts)
-                return result
+                return result, list(attempts)
         self.records.extend(attempts)
         last = attempts[-1]
-        return WallSignal(reason=last.error or "retries exhausted", attempts=tuple(attempts))
+        return WallSignal(reason=last.error or "retries exhausted", attempts=tuple(attempts)), list(attempts)
 
     # ---- 内部 -----------------------------------------------------------
 

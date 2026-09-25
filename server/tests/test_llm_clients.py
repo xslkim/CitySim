@@ -150,6 +150,27 @@ async def test_backoff_sequence_and_retry_after() -> None:
     assert len(p.call_times) == 4, f"最多 3 次重试（总尝试 4 次），实测 {len(p.call_times)}"
 
 
+async def test_concurrent_tracking_no_cross_contamination() -> None:
+    """回归：并发调用共享客户端时，逐调用 attempts 归属不得串档（2026-09-25 真跑实发：
+    从共享 records 切片导致重复落库/重复计量；call_tracked 按调用返回私有清单）。"""
+    clock = AutoClock()
+
+    class _Slow:
+        name = "slow"
+
+        async def chat(self, task_type, messages, gen_params=None, *, seed=None) -> ChatResult:
+            await asyncio.sleep(0)  # 让出制造交错
+            return ChatResult(text="ok", prompt_tokens=1, completion_tokens=1,
+                              latency_ms=1, request_id="r", provider="slow", model="m")
+
+    c = RateLimitedClient(_Slow(), rpm_limit=10**6, clock=clock)
+    results = await asyncio.gather(*[c.call_tracked("secondary", [{"role": "user", "content": "x"}]) for _ in range(20)])
+    for outcome, attempts in results:
+        assert not isinstance(outcome, WallSignal)
+        assert len(attempts) == 1 and attempts[0].status == "ok", "并发下 attempts 串档"
+    assert len(c.records) == 20
+
+
 async def test_every_attempt_recorded() -> None:
     """3 次重试产生 3 条 status=retry 记录 + 终态 1 条（03 验收 4；04 §5.2 status 枚举）。"""
     clock = AutoClock()

@@ -12,18 +12,20 @@ providers:
         tier: free
         reasoning: true                         # reasoning 模型：响应只取 content 字段（provider 实现归 03）
         thinking: disabled                      # 开发期关 reasoning（03 §6 D44：实测 2026-09-25 延迟 50s→2s、配额消耗 ~12 倍→1×）
-        rpm_limit: 30                           # 实测（2026-09-25，T-LLM-12，§5 R2 收口）：并发上限≈2（超出即 429 码1302），桶保守取 30
+        rpm_limit: 50                           # 实测（2026-09-25，T-LLM-12，§5 R2 收口）：持续 ~41 次/分无 429；并发上限≈2（超出即 429 码1302）
         concurrency: 2                          # 在飞并发闸（实测并发 2 全过、并发 3 触发 1302）
-        p95_trip_ms: 15000                      # 撞墙条件③条目级阈（03 §6 D42；thinking disabled 后实测 ~2s）
+        p95_trip_ms: 0                           # 条件③条目级停用（03 §6 D42：免费档延迟抖动为服务端排队，实测 p95 冲 115s 误 trip）
+        rpm_usage_trip_pct: 0                     # 条件②条目级停用（03 §6 D42：unthrottled 试跑打满桶是限流器本职非提供方撞墙；paced 生产恢复 90% 口径）
         input_price: 0                          # 免费档实测 ¥0（2026-09-25，T-LLM-12，§5 R1 收口）
         output_price: 0
         price_status: measured_free_tier_w2
       - id: glm-4-flash                         # 免费档（00 §1 A9 实测）：次要/背景摘要/安全档
         tier: free
         reasoning: false
-        rpm_limit: 60                           # 实测（2026-09-25）：并发 10 全过、间隔 2s 顺序连发无 429
+        rpm_limit: 90                           # 实测（2026-09-25）：并发 10 全过、持续 ~10 次/分无 429
         concurrency: 5
-        p95_trip_ms: 15000                      # 撞墙条件③条目级阈（03 §6 D42）；实测 p50≈1s，留足头部空间
+        p95_trip_ms: 0                           # 条件③条目级停用（03 §6 D42 同口径）
+        rpm_usage_trip_pct: 0                     # 条件②条目级停用（03 §6 D42 同口径）
         input_price: 0
         output_price: 0
         price_status: measured_free_tier_w2

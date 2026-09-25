@@ -168,6 +168,10 @@ async def _run(args: argparse.Namespace) -> int:
                 router=router, breaker=FailoverBreaker(),
             )
             log.info("LLM 供给 = routed（models.yaml 路由真接入；embed=本地 bge-m3）")
+            # 预热本地 embedding 模型（bge-m3 首次加载 ~30s CPU，避免启动段阻塞事件循环
+            # 抬高 chat 端到端延迟触发撞墙条件③误判，03 §6 D42/D45）
+            await gateway.embed(["预热"], seed=0)
+            log.info("本地 embedding 模型预热完成")
         else:
             gateway = LLMGateway(pool, models_cfg, providers={"mock": MockProvider()}, default_provider="mock")
         # 波次 2a 接线：聚合器（04 §6.5）/ 检索（T-MEM-01）/ 反思（T-MEM-02）/ 治理（T-MEM-03）/

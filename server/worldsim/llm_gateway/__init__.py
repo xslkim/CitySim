@@ -256,20 +256,31 @@ class LLMGateway:
                     tick=tick, sim_time=sim_time, rng_seed=seed or 0,
                 )
             client = self._client_for(hop.provider, impl, model=hop.model)
-            before = len(client.records)
-            outcome = await client.call(task_type, messages, gen, seed=seed)
-            attempts = client.records[before:]
+            outcome, attempts = await client.call_tracked(task_type, messages, gen, seed=seed)
             if isinstance(outcome, ChatResult):
+                reason: str | None = None
                 for rec in attempts[:-1]:  # 中间失败尝试逐条留痕（终态行由下方 ok/fallback 行承载）
                     await self._record_attempt(task_type, agent_id, hop, rec, sim_time, prompt_hash, fallback_from)
-                    self._breaker_feed(hop, rec)
-                self._breaker_feed_ok(hop, attempts[-1] if attempts else None)
+                    r = self._breaker_feed(hop, rec)
+                    reason = reason or r
+                r = self._breaker_feed_ok(hop, attempts[-1] if attempts else None)
+                reason = reason or r
                 await self._record(
                     task_type, agent_id, outcome.provider or hop.provider, outcome.model or hop.model,
                     outcome.prompt_tokens, outcome.completion_tokens, outcome.latency_ms,
                     "fallback" if fallback_from else "ok", sim_time, prompt_hash, outcome.latency_ms,
                     request_id=outcome.request_id, fallback_from=fallback_from,
                 )
+                if reason and self._breaker is not None:
+                    # 成功路径上的窗口条件（②③）撞墙：本次调用成功但端点已 trip——切换事件必须落库
+                    # （04 §8.2"切换与恢复各写 events"，06 §1.2），下一跳从降级链取
+                    nxt = next((h for h in hops[i + 1:] if not h.is_special), None)
+                    self._degraded_to[task_type] = nxt.provider if nxt else "chain_end"
+                    await self._breaker.emit_failover(
+                        self._db, task_type=task_type, from_provider=hop.provider,
+                        to_provider=nxt.provider if nxt else "chain_end", reason=reason,
+                        tick=tick, sim_time=sim_time, rng_seed=seed or 0,
+                    )
                 return outcome
             # 撞墙：逐尝试喂 breaker（04 §8.2 三条件窗口数据流）
             reason: str | None = None
@@ -320,12 +331,14 @@ class LLMGateway:
                         return dict(m)
         return {}
 
-    def _model_limits(self, provider: str, model: str) -> tuple[int, int, int | None]:
-        """(rpm_limit, concurrency, p95_trip_ms)：优先读模型条目（providers.<alias>.chat[]/embedding[]），
-        缺省回落 provider 级 rpm_limit，再缺省工程默认（03 §6 D35/D41/D42）。"""
+    def _model_limits(self, provider: str, model: str) -> tuple[int, int, int | None, int | None]:
+        """(rpm_limit, concurrency, p95_trip_ms, rpm_usage_trip_pct)：优先读模型条目
+        （providers.<alias>.chat[]/embedding[]），缺省回落 provider 级 rpm_limit，再缺省工程默认
+        （03 §6 D35/D41/D42；p95_trip_ms / rpm_usage_trip_pct = 0 表示条目级停用对应撞墙条件）。"""
         rpm: int | None = None
         conc: int | None = None
         p95: int | None = None
+        usage_pct: int | None = None
         if self._router:
             pcfg = self._router.provider_config(provider)
             for section in ("chat", "embedding"):
@@ -333,9 +346,12 @@ class LLMGateway:
                     if m.get("id") == model:
                         rpm = m.get("rpm_limit") or rpm
                         conc = m.get("concurrency") or conc
-                        p95 = m.get("p95_trip_ms") or p95
+                        if m.get("p95_trip_ms") is not None:
+                            p95 = m["p95_trip_ms"]  # 0 = 停用条件③（D42），不能被 or 吞掉
+                        if m.get("rpm_usage_trip_pct") is not None:
+                            usage_pct = m["rpm_usage_trip_pct"]  # 0 = 停用条件②（D42）
             rpm = rpm or pcfg.get("rpm_limit")
-        return rpm or DEFAULT_RPM_LIMIT, conc or DEFAULT_MAX_CONCURRENCY, p95
+        return rpm or DEFAULT_RPM_LIMIT, conc or DEFAULT_MAX_CONCURRENCY, p95, usage_pct
 
     def _client_for(self, provider: str, impl: Any, *, model: str = "") -> Any:
         """每 (provider, model) 一个 RateLimitedClient（令牌桶容量 = models.yaml rpm_limit，04 §8.5）。"""
@@ -344,7 +360,7 @@ class LLMGateway:
         key = f"{provider}/{model}"
         client = self._clients.get(key)
         if client is None:
-            rpm, conc, _ = self._model_limits(provider, model)
+            rpm, conc, _, _ = self._model_limits(provider, model)
             client = RateLimitedClient(impl, rpm_limit=rpm, clock=self._clock, max_concurrency=conc)
             self._clients[key] = client
         return client
@@ -353,14 +369,20 @@ class LLMGateway:
         if self._breaker is None:
             return None
         kind = "ok" if rec.status == "ok" else ("429" if rec.retry_after_s is not None or "429" in (rec.error or "") else "5xx")
-        rpm, _, p95 = self._model_limits(hop.provider, hop.model)
+        rpm, _, p95, usage_pct = self._model_limits(hop.provider, hop.model)
         return self._breaker.record_attempt(
-            f"{hop.provider}/{hop.model}", kind=kind, latency_ms=rec.latency_ms, rpm_limit=rpm, p95_trip_ms=p95,
+            f"{hop.provider}/{hop.model}", kind=kind, latency_ms=rec.latency_ms, rpm_limit=rpm,
+            p95_trip_ms=p95, rpm_usage_trip_pct=usage_pct,
         )
 
-    def _breaker_feed_ok(self, hop: Any, rec: Any) -> None:
-        if self._breaker is not None:
-            self._breaker.record_attempt(f"{hop.provider}/{hop.model}", kind="ok", latency_ms=rec.latency_ms if rec else 0)
+    def _breaker_feed_ok(self, hop: Any, rec: Any) -> str | None:
+        if self._breaker is None:
+            return None
+        _, _, p95, usage_pct = self._model_limits(hop.provider, hop.model)  # 与 _breaker_feed 同口径（D42 条目级阈）
+        return self._breaker.record_attempt(
+            f"{hop.provider}/{hop.model}", kind="ok", latency_ms=rec.latency_ms if rec else 0,
+            p95_trip_ms=p95, rpm_usage_trip_pct=usage_pct,
+        )
 
     async def _record_attempt(self, task_type: str, agent_id: str | None, hop: Any, rec: Any, sim_time: Any, prompt_hash: str, fallback_from: str | None) -> None:
         """中间失败尝试留痕（04 §8.3 全量记录含重试；tokens 未知记 0，成本 0）。"""
