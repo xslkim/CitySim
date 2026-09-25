@@ -216,7 +216,9 @@ class CostBreaker:
         self._clock = clock or RealClock()
         if baseline_cny is None:
             raw = os.environ.get(COST_LIMIT_ENV)
-            baseline_cny = float(raw) if raw else None
+            # 容错：.env 行内注释/空白（dotenv 朴素解析不剥注释，工程口径）
+            token = (raw or "").split("#", 1)[0].strip()
+            baseline_cny = float(token) if token else None
         self._baseline = baseline_cny
         self._reflection_base = reflection_base
         self.state = ThrottleState(reflection_threshold=reflection_base)
@@ -306,4 +308,35 @@ class CostBreaker:
             payload={"level": target, "ratio": round(ratio, 4)},  # payload 仅两键（06 §1.2）
             rng_seed=rng_seed,
         )
+        # 告警接线（08 T-OPS-02 → T-OPS-01 通道）：迁移（含恢复）逐次落行；
+        # throttle = 告警升级 ERROR 立即（04 §8.4 动作⑤/§12.1），alarm/recover = WARN 聚合
+        from ..audit.alerts import alert
+        if target == "throttle":
+            alert("ERROR", "cost.throttle", f"成本熔断进入降速档（ratio={ratio:.3f}，04 §8.4）",
+                  {"level": target, "ratio": round(ratio, 4)})
+        else:
+            alert("WARN", f"cost.{target}",
+                  f"成本熔断迁移 → {target}（ratio={ratio:.3f}）",
+                  {"level": target, "ratio": round(ratio, 4)})
         log.warning("成本熔断级别迁移 → %s（ratio=%.3f，04 §8.4）", target, ratio)
+
+
+class BreakerThrottleView:
+    """`ThrottleState`（memory.reflect Protocol）的判级器适配器（08 T-OPS-02 接线件）。
+
+    未降速档一律回默认（协议语义）；降速档回 04 §8.4 降速值（反射阈 35/对话 cap ×60%/编剧减半）。
+    """
+
+    def __init__(self, state: ThrottleState) -> None:
+        self._s = state
+
+    def reflection_threshold(self, default: int) -> int:
+        return self._s.reflection_threshold if self._s.level == "throttle" else default
+
+    def dialogue_daily_cap(self, default: int) -> int:
+        return int(default * self._s.dialogue_daily_cap_factor) \
+            if self._s.level == "throttle" else default
+
+    def director_call_factor(self) -> float:
+        """动作②读取点（review.py call_factor 回调）。"""
+        return self._s.director_call_factor if self._s.level == "throttle" else 1.0

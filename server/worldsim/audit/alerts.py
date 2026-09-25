@@ -65,6 +65,8 @@ def flush_warnings() -> int:
 def alert(level: str, key: str, message: str, context: dict[str, Any] | None = None) -> None:
     """统一告警入口：ERROR 立即落行；WARN 同 key 15 分钟聚合（flush_warnings 落盘）。"""
     level = level.upper()
+    if level in ("ERROR", "CRITICAL"):
+        flush_warnings()  # 时序保持：立即落行前先落聚合 WARN（04 §12.1 分级并存）
     if level == "WARN":
         with _lock:
             agg = _warn_pending.setdefault(key, {"count": 0, "message": message,

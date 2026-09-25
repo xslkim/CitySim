@@ -144,6 +144,28 @@ async def _run(args: argparse.Namespace) -> int:
 
         models_path = args.models_config or os.environ.get("WSIM_MODELS_CONFIG") or str(SERVER_ROOT / "config" / "models.yaml")
         models_cfg = _load_yaml(args.models_config, "WSIM_MODELS_CONFIG", "models.yaml")
+
+        # T-OPS-02 降速动作消费接线（判级器唯一归 03 T-LLM-08，R1 §A.5）：本处只把
+        # ThrottleState 接到读取点（反思阈/对话 cap/director 减半）+ 日界判级驱动（batch 钩子）
+        from .llm_gateway.breaker import BreakerThrottleView, CostBreaker
+        from .llm_gateway.ledger import cny_per_simday_rolling
+
+        cost_breaker = CostBreaker(pool, models_cfg.get("thresholds", {}))
+        throttle_view = BreakerThrottleView(cost_breaker.state)
+        _cost_pause_fired = {"v": False}
+
+        async def cost_breaker_daily(ctx: Any) -> None:
+            """日界判级（batch 段）：滚动 ¥/模拟日 → evaluate；24 真实小时未恢复 → clock.pause（T-OPS-03）。"""
+            sim_now = ctx.clock.now_sim()
+            level = await cost_breaker.evaluate(
+                await cny_per_simday_rolling(pool), sim_now=sim_now,
+                tick=ctx.clock.current_tick, rng_seed=ctx.clock.current_tick)
+            if level != "throttle":
+                _cost_pause_fired["v"] = False
+            if not _cost_pause_fired["v"]:
+                from .audit.probe import consume_throttle_escalation
+                _cost_pause_fired["v"] = await consume_throttle_escalation(
+                    cost_breaker.state, ctx.clock.pause)
         from .world_agent.config import load_world_config  # T-WA-01：全量校验，失败拒绝启动
 
         world_cfg = load_world_config(args.world_config or os.environ.get("WSIM_WORLD_CONFIG") or None)
@@ -159,6 +181,7 @@ async def _run(args: argparse.Namespace) -> int:
 
             router = ModelRouter(models_cfg, path=models_path)
             router.install_sighup()
+            failover_breaker = FailoverBreaker()
             embed_cfg = models_cfg.get("providers", {}).get("local_embed", {})
             gateway = LLMGateway(
                 pool, models_cfg,
@@ -167,7 +190,7 @@ async def _run(args: argparse.Namespace) -> int:
                     "local_embed": LocalEmbedProvider(model=embed_cfg.get("model", "BAAI/bge-m3")),
                     "mock": MockProvider(),
                 },
-                router=router, breaker=FailoverBreaker(),
+                router=router, breaker=failover_breaker,
             )
             log.info("LLM 供给 = routed（models.yaml 路由真接入；embed=本地 bge-m3）")
             # 预热本地 embedding 模型（bge-m3 首次加载 ~30s CPU，避免启动段阻塞事件循环
@@ -187,6 +210,7 @@ async def _run(args: argparse.Namespace) -> int:
             pool, gateway,
             threshold=int(models_cfg.get("thresholds", {}).get("reflection", {}).get("importance_acc", 20)),
             tick_of=clock.tick_of, grader=grader,
+            throttle=throttle_view,  # T-OPS-02 降速读取点④接线
         )
         needs_engine = NeedsEngine(needs_cfg)
         relation_engine = RelationEngine(pool, relations_cfg)
@@ -228,6 +252,7 @@ async def _run(args: argparse.Namespace) -> int:
             needs_engine=needs_engine, agg=agg,
             default_daily_cap=int(models_cfg.get("thresholds", {}).get("dialogue", {}).get("daily_cap", 42)),
             grader=grader,
+            throttle=throttle_view,  # T-OPS-02 降速读取点③接线
         )
         action_validator = ActionValidator(
             pool, world=world_cfg, needs_engine=needs_engine, cooldown=cooldown_engine,
@@ -276,7 +301,7 @@ async def _run(args: argparse.Namespace) -> int:
         review_engine = ReviewEngine(
             pool, gateway, clock, revise_cfg=world_cfg.get("director", {}).get("revise", {}),
             registry=PromptRegistry.load(),
-            call_factor=lambda: 1.0,  # 降速读取点 seam：ThrottleState.director_call_factor 接线归 08 T-OPS-02
+            call_factor=throttle_view.director_call_factor,  # T-OPS-02 降速读取点②接线（04 §8.4）
             grader=grader,
         )
 
@@ -413,6 +438,21 @@ async def _run(args: argparse.Namespace) -> int:
 
         register_batch_hook("kernel.rotation", kernel_rotation_hook)
 
+        # T-OPS-02：成本判级日界驱动（batch 段唯一挂载点；判级器实现归 03 T-LLM-08）
+        register_batch_hook("kernel.cost_breaker", cost_breaker_daily)
+
+        # T-AUD-01/08 收口（M3 遗留挂接点，04 §2.2/§10.1/§10.2）：batch 段后跑日审计 +
+        # 健康度日聚合（写 health_daily 与 world_state health.cost_daily——05 §3.5 快照流数据源）
+        from .audit.daily import audit_and_maybe_pause
+        from .audit.metrics import write_health_daily
+
+        async def kernel_audit_hook(ctx: Any) -> None:
+            sim_now = ctx.clock.now_sim()
+            await audit_and_maybe_pause(pool, sim_now=sim_now, pause_cb=ctx.clock.pause)
+            await write_health_daily(pool, sim_now)
+
+        register_batch_hook("kernel.audit_daily", kernel_audit_hook)
+
         # T-ADJ-09：每模拟日 world_state 全量快照落盘（模拟日界 00:00，05 §3.6；挂 batch 段注册表唯一挂载点）
         from .snapshot.dump import dump_snapshot
 
@@ -466,6 +506,20 @@ async def _run(args: argparse.Namespace) -> int:
                 sync_client = SyncClient(pool)
                 tg.create_task(sync_client.run_forever(stop=stop))
                 log.info("出站同步协程已启动 → %s", sync_client.url)
+            # T-OPS-03 致命故障探测（主库/全 provider 熔断/磁盘满 → clock.pause 路径，04 §3.2）
+            from .audit.probe import FatalProbe
+
+            probe = FatalProbe(
+                pool,
+                pause_cb=lambda r: clock.pause(r),
+                resume_cb=lambda r: clock.resume(r),
+                providers_ok=None,  # mock 档无 provider 维度；routed 档由网关 breaker 注入（下方）
+                disk_pause_free_pct=float(models_cfg.get("thresholds", {}).get(
+                    "disk", {}).get("pause_free_pct", 5.0)),
+            )
+            if args.llm == "routed":
+                probe._providers_ok = lambda: "zhipu" not in failover_breaker.tripped_providers()
+            tg.create_task(probe.run(stop))
             # audit/rotation 协程挂接点（M3/T-LOD-03 接，04 §2.2 伪码行）
 
         sim_end = clock.now_sim()
