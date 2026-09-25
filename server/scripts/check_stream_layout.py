@@ -134,7 +134,8 @@ def main() -> int:
 
     # ── A7 / 零依赖 grep（T-LTV-01 验收 3/4；T-LTV-06 同口径复跑）──
     for p in sorted(STREAM.rglob("*")):
-        if not p.is_file() or p.suffix in (".png", ".svg"):
+        # .md 文档允许出现禁词（禁令本身的文字说明）；页面/代码零命中才是红线
+        if not p.is_file() or p.suffix in (".png", ".svg", ".md"):
             continue
         text = p.read_text(encoding="utf-8")
         for line in text.splitlines():

@@ -81,7 +81,16 @@ export class SubtitleQueue {
     this.env = { ...DEFAULT_ENV, ...(env || {}) };
     this.queue = [];
     this.playing = null;
-    this._timers = [];
+    this._timers = new Set(); // 触发即摘除（长挂防积压，09 §6 E5）
+  }
+
+  _after(ms, fn) {
+    const id = this.env.setTimeout(() => {
+      this._timers.delete(id);
+      fn();
+    }, ms);
+    this._timers.add(id);
+    return id;
   }
 
   /** 当前倍率：积压 >3 段 ×1.5 追平，否则 1.0（段开播时刻取值）。 */
@@ -114,20 +123,20 @@ export class SubtitleQueue {
     this.onSegmentStart(seg, rate);
     for (const line of scheduleSegment(seg, startAt, rate)) {
       const delayMs = Math.max(0, (line.at - this.env.now()) * 1000);
-      this._timers.push(this.env.setTimeout(() => this.onLine(line, seg), delayMs));
+      this._after(delayMs, () => this.onLine(line, seg));
     }
     const endMs = segmentDuration(seg, rate) * 1000;
-    this._timers.push(this.env.setTimeout(() => {
+    this._after(Math.max(0, startAt * 1000 + endMs - this.env.now() * 1000), () => {
       this.playing = null;
       this.onSegmentEnd(seg);
       this._playNext();
-    }, Math.max(0, startAt * 1000 + endMs - this.env.now() * 1000)));
+    });
   }
 
   /** 清空（resync 等场景；B9 缺口段不入队故正常不会触发）。 */
   clear() {
     for (const t of this._timers) this.env.clearTimeout(t);
-    this._timers = [];
+    this._timers.clear();
     this.queue = [];
     this.playing = null;
   }

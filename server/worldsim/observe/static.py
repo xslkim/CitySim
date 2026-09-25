@@ -25,11 +25,18 @@ router = APIRouter()
 
 
 class NoCacheHtmlStaticFiles(StaticFiles):
-    """StaticFiles + `.html` 响应 `no-cache`（03 §8.1；带 hash 资源 immutable 一档本仓无构建产物，不适用）。"""
+    """StaticFiles + 缓存头（03 §8.1）：`.html` 恒 `no-cache`；`no_cache_all=True`（stream/ 无构建
+    hash 资源，开发期全量 no-cache）时所有响应 `no-cache`。带 hash 资源 immutable 一档本仓不适用。"""
+
+    def __init__(self, *args, no_cache_all: bool = False, **kwargs):  # noqa: ANN002, ANN003
+        super().__init__(*args, **kwargs)
+        self._no_cache_all = no_cache_all
 
     async def get_response(self, path: str, scope):  # noqa: ANN001, ANN202 - starlette 签名
         resp = await super().get_response(path, scope)
-        if resp.status_code == 200 and resp.headers.get("content-type", "").startswith("text/html"):
+        if resp.status_code == 200 and (
+            self._no_cache_all or resp.headers.get("content-type", "").startswith("text/html")
+        ):
             resp.headers["Cache-Control"] = "no-cache"
         return resp
 
@@ -44,4 +51,5 @@ async def map_layout() -> FileResponse:
 def mount(app) -> None:  # noqa: ANN001, ANN202 - FastAPI
     """静态目录挂载（app.py 装配循环调用；挂载顺序在 API/WS 路由之后）。"""
     app.mount("/assets", NoCacheHtmlStaticFiles(directory=str(ASSETS_DIR)), name="assets")
-    app.mount("/stream", NoCacheHtmlStaticFiles(directory=str(STREAM_DIR), html=True), name="stream")
+    app.mount("/stream", NoCacheHtmlStaticFiles(directory=str(STREAM_DIR), html=True,
+                                                no_cache_all=True), name="stream")

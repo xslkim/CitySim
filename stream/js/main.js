@@ -34,6 +34,13 @@ async function fetchJson(url) {
   return resp.json();
 }
 
+/** 模拟墙钟 HH:MM（Asia/Shanghai +08，time_engine/clock.py LOCAL_TZ 口径；出站 sim_time 为 UTC ISO）。 */
+export function fmtSimHHMM(simTime) {
+  const d = new Date(simTime);
+  if (Number.isNaN(d.getTime())) return String(simTime).slice(11, 16);
+  return new Date(d.getTime() + 8 * 3600_000).toISOString().slice(11, 16);
+}
+
 /** 左上标签：`"<地点中文名> · Day <n> · HH:MM"`（原型形态）。 */
 export function renderTag() {
   const locEl = document.getElementById('tag-loc');
@@ -43,7 +50,7 @@ export function renderTag() {
   }
   if (timeEl) {
     const day = ctx.simDay != null ? `Day ${ctx.simDay}` : 'Day –';
-    const hhmm = ctx.lastSimTime ? ctx.lastSimTime.slice(11, 16) : '--:--';
+    const hhmm = ctx.lastSimTime ? fmtSimHHMM(ctx.lastSimTime) : '--:--';
     timeEl.textContent = `${day} · ${hhmm}`;
   }
 }
@@ -90,6 +97,8 @@ async function main() {
     onLine: (line, seg) => {
       subView.showLine(line, seg);
       if (seg.kind === 'dialogue') pcard.setSpeaker(line.speaker);
+      // 逐句节拍留痕（T-LTV-03 验收 2：实测节奏对拍 at_offset_s）
+      console.log(`[stream] line ${line.index + 1}/${line.total} @${(performance.now() / 1000).toFixed(2)}s seq=${seg.seq}`);
     },
     onSegmentStart: (seg) => { if (seg.kind === 'dialogue') pcard.begin(seg); },
     onSegmentEnd: (seg) => {
@@ -152,7 +161,21 @@ async function main() {
     },
     onStateChange: (s) => console.log('[stream] ws state:', s),
   });
+  // ?from=<seq> 验收钩子：hello 携带 last_seq 起补推（T-LTV-02 resume 语义，03 §5.2）
+  const from = Number(params.get('from'));
+  if (Number.isFinite(from) && from > 0) client.lastSeq = from;
   client.connect();
+  ctx.wsClient = client;
+
+  // ?soak=1 长挂打点（T-LTV-07 验收 6 / 09 §6 E5）：每 30s 输出 heap 与事件计数
+  if (params.get('soak') === '1') {
+    let events = 0;
+    ctx.handlers.push(() => { events += 1; });
+    setInterval(() => {
+      const heap = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1024) : -1;
+      console.log(`[soak] heapKB=${heap} events=${events} queue=${queue.queue.length} playing=${queue.playing ? 1 : 0}`);
+    }, 30_000);
+  }
 }
 
 main().catch((e) => console.error('[stream] 启动失败：', e));
