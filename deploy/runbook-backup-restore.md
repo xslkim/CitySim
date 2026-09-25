@@ -48,4 +48,17 @@ uv run python scripts/digest_check.py && uv run python scripts/audit_run.py --on
 
 ## 演练记录（实操留痕，T-OPS-06 验收 1~3）
 
-<!-- 演练后回填：时间戳 / 命令 / 关键输出摘要 / 实测恢复耗时（R6） -->
+**演练一（dump 恢复，2026-09-26 03:17）**：`bash deploy/backup.sh worldsim` →
+`worldsim-20260926-031738.dump`（13MB，pg_restore --list 可读）；恢复至侧库
+`worldsim_bk_restore`（先建 vector/pg_partman 扩展）耗时 **3.3s**（2468 事件小库；R6 回填：
+RPO ≤1 真实日在当前数据量级可达成，大库需按量复测）；恢复后 `events` count/max(seq)
+2468/2468 与主库一致，`audit_run.py --dsn <侧库>` 六项全绿 exit=0。
+
+**演练二（副本回捞，2026-09-26 04:2x，scratch 对 worldsim_drill/_replica）**：
+断网演练完成后两端一致（max(seq)=35320）；模拟"主库丢失最近 100 事件"
+（scratch 库 superuser `SET session_replication_role='replica'` 绕过 append-only 触发器删除）
+→ 副本 `\copy` 导出缺口段（100 行）→ 主库同会话 SET+copy 回灌 → 两端
+max(seq)=35320 恢复一致，审计①余额守恒绿。
+已知口径注记：① 回灌段 payload 为同步规范形（无 text_raw 等内部键，灾难恢复的有损边界）；
+② 演练库事件为合成负载（绕过结算总线直插），审计⑥缓存对账在该库红 3867 条属
+合成数据伪差（非产品缺陷——内核写入路径全自动结算，06 项在真跑库绿）。
