@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "world_copy 输出（世界文案：{title, body}）",
+  "type": "object",
+  "required": ["title", "body"],
+  "additionalProperties": true,
+  "properties": {
+    "title": {"type": "string", "minLength": 1},
+    "body": {"type": "string", "minLength": 1}
+  }
+}

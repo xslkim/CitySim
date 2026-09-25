@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "director 输出（编剧干预决策；M2 最小契约 {note, actions[]}，actions 元素结构随 M3 T-DIR 细化）",
+  "type": "object",
+  "required": ["note", "actions"],
+  "additionalProperties": true,
+  "properties": {
+    "note": {"type": "string"},
+    "actions": {"type": "array"}
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "secondary 输出（04 §4.3 次要层输出段：{intent ≤30字, emotion_delta, action, gossip}）",
+  "type": "object",
+  "required": ["intent", "emotion_delta", "action", "gossip"],
+  "additionalProperties": true,
+  "properties": {
+    "intent": {"type": "string", "minLength": 1, "maxLength": 30},
+    "emotion_delta": {"type": "object"},
+    "action": {
+      "type": "object",
+      "required": ["type", "args"],
+      "properties": {
+        "type": {"enum": ["move", "chat", "send_message", "invite", "work", "rest", "eat", "shop", "trade_stock", "think", "give_gift", "help", "borrow_money", "repay_money", "argue", "gossip", "refuse", "confess", "apologize"]},
+        "args": {"type": "object"}
+      }
+    },
+    "gossip": {"type": ["string", "null"]}
+  }
+}

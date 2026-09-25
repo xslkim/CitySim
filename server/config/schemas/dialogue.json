@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dialogue 输出（01 §7：{lines:[{speaker,text}], opening_fact, self_eval, quotable_lines}；lines 轮数上下界为 chat/argue/send_message 全族并集 1~8——chat 6~8 轮口径见源方案 §3.4/§4.7、argue 2~4 轮见 01 §4.1，细分约束在模板与裁决器侧）",
+  "type": "object",
+  "required": ["lines", "opening_fact", "self_eval", "quotable_lines"],
+  "additionalProperties": true,
+  "properties": {
+    "lines": {
+      "type": "array", "minItems": 1, "maxItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["speaker", "text"],
+        "properties": {
+          "speaker": {"type": "string", "minLength": 1},
+          "text": {"type": "string", "minLength": 1, "maxLength": 40}
+        }
+      }
+    },
+    "opening_fact": {
+      "type": "object",
+      "required": ["type", "ref"],
+      "properties": {
+        "type": {"enum": ["memory", "scene", "state"]},
+        "ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "self_eval": {
+      "type": "object",
+      "required": ["a_enjoy", "b_enjoy", "basis"],
+      "properties": {
+        "a_enjoy": {"type": "integer", "minimum": 0, "maximum": 10},
+        "b_enjoy": {"type": "integer", "minimum": 0, "maximum": 10},
+        "basis": {"type": "string"}
+      }
+    },
+    "quotable_lines": {"type": "array", "maxItems": 2, "items": {"type": "string"}}
+  }
+}

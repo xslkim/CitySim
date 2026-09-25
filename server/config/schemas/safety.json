@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "safety 输出（04 §11.1 标签 {pass, soft, block}）",
+  "type": "object",
+  "required": ["label"],
+  "additionalProperties": true,
+  "properties": {
+    "label": {"enum": ["pass", "soft", "block"]}
+  }
+}

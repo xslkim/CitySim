@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "star_decision 输出（04 §6.1 step3：{intent, action:{type 枚举, args}, say?, emotion_delta}）",
+  "type": "object",
+  "required": ["intent", "action", "emotion_delta"],
+  "additionalProperties": true,
+  "properties": {
+    "intent": {"type": "string", "minLength": 1},
+    "action": {
+      "type": "object",
+      "required": ["type", "args"],
+      "properties": {
+        "type": {"enum": ["move", "chat", "send_message", "invite", "work", "rest", "eat", "shop", "trade_stock", "think", "give_gift", "help", "borrow_money", "repay_money", "argue", "gossip", "refuse", "confess", "apologize"]},
+        "args": {"type": "object"}
+      }
+    },
+    "say": {"type": ["string", "null"]},
+    "emotion_delta": {"type": "object"}
+  }
+}

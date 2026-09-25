@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "bgsummary 输出（04 §4.3 背景层输出段：{diary ≤120字, needs_delta, mood, tomorrow_plan ≤40字}）",
+  "type": "object",
+  "required": ["diary", "needs_delta", "mood", "tomorrow_plan"],
+  "additionalProperties": true,
+  "properties": {
+    "diary": {"type": "string", "minLength": 1, "maxLength": 120},
+    "needs_delta": {"type": "object"},
+    "mood": {"type": "string", "minLength": 1},
+    "tomorrow_plan": {"type": "string", "maxLength": 40}
+  }
+}
