@@ -443,6 +443,19 @@ async def test_e6_rates_and_metrics(m3_db, m3_db_phase_b) -> None:
                                  "active_conflict_edges"}
         row = await pool.fetchrow("SELECT * FROM health_daily ORDER BY sim_day DESC LIMIT 1")
         assert row is not None and row["intervention_rate"] == pytest.approx(rate)
+        # A 级事件间隔在段 A（连续 7 模拟日）窗口内评估：mock K3 每日复核上调 → 每日 ≥1 个有效 A
+        # → 间隔均值落 01 §9 预警带内（mock 首日无候选可审，工程口径；健康区 ≤1 为真 LLM 世界目标，
+        # 实测回填 m3_measurements.json 留档）
+        from datetime import datetime as _dt
+        from worldsim.time_engine.clock import LOCAL_TZ as _TZ
+
+        seg_a_end = _dt(2026, 10, 19, 0, 0, tzinfo=_TZ)
+        gap = await M.a_grade_gap_days(pool, seg_a_end)
+        th = M.load_thresholds()
+        spec = next(m for m in th["metrics"] if m["metric"] == "a_grade_event_interval_days")
+        warning_max = float(spec["warning"]["max"])
+        assert gap <= warning_max, f"段 A A 级间隔 {gap} 超预警上界（01 §9）"
+        assert M.classify("a_grade_event_interval_days", gap, th) in ("healthy", "warning")
     finally:
         await pool.close()
 
