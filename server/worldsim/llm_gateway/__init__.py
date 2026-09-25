@@ -14,11 +14,9 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import os
 import time
-import uuid
 from typing import Any
 
 from .providers.base import (
@@ -40,12 +38,16 @@ __all__ = [
     "ReplayViolation",
     "UnknownTaskType",
     "ProviderUnavailable",
+    "ChainExhausted",
     "Message",
 ]
 
 log = logging.getLogger(__name__)
 
 REPLAY_ENV = "WSIM_REPLAY_MODE"
+
+# rpm_limit 未回填期（T-LLM-12 实测回填前）路由模式的保守工程默认（03 §6 偏差表登记）
+DEFAULT_RPM_LIMIT = 60
 
 
 class ReplayViolation(RuntimeError):
@@ -58,6 +60,18 @@ class UnknownTaskType(ValueError):
 
 class ProviderUnavailable(RuntimeError):
     """路由解析不到可用 provider（M1：未注册；M2 起由 router/降级链接管）。"""
+
+
+class ChainExhausted(RuntimeError):
+    """降级链走尽，末端特殊动作上抛（04 §8.1：pause_clock/queue_retry/pause_publish_channel）。
+
+    消费接线：明星档 pause_clock 经裁决器接口（M3/08 接线）；本异常携带 `special` 供读取。
+    """
+
+    def __init__(self, task_type: str, special: str) -> None:
+        super().__init__(f"task_type={task_type!r} 降级链走尽 → 末端动作 {special}（04 §8.1）")
+        self.task_type = task_type
+        self.special = special
 
 
 def _check_task_type(task_type: str) -> None:
@@ -91,12 +105,24 @@ class LLMGateway:
         providers: dict[str, ChatProvider | EmbedProvider] | None = None,
         default_provider: str | None = None,
         record_calls: bool = True,
+        router: Any = None,
+        breaker: Any = None,
+        clock: Any = None,
     ) -> None:
         self._db = db
         self._cfg = models_config or {}
         self._providers: dict[str, ChatProvider | EmbedProvider] = dict(providers or {})
         self._default_provider = default_provider
         self._record_calls = record_calls
+        # M2 路由模式（T-LLM-04/05/06 接线）：router 非空时 chat 走降级链（桶/退避/撞墙切换）
+        self._router = router
+        self._breaker = breaker
+        self._clock = clock
+        self._clients: dict[str, Any] = {}
+        self._degraded_to: dict[str, str] = {}  # task_type → 当前降级到的 provider 别名（恢复事件 from 侧）
+        from .ledger import Ledger
+
+        self._ledger = Ledger(db, self._cfg)
 
     # ---- 装配 -----------------------------------------------------------
 
@@ -128,9 +154,12 @@ class LLMGateway:
         seed: int | None = None,
         agent_id: str | None = None,
         sim_time: Any = None,
+        tick: int = 0,
     ) -> ChatResult:
         self._guard_replay()
         _check_task_type(task_type)
+        if self._router is not None and provider is None:
+            return await self._chat_routed(task_type, messages, gen_params, seed=seed, agent_id=agent_id, sim_time=sim_time, tick=tick)
         name, impl = self._resolve(task_type, provider, want="chat")
         started = time.perf_counter()
         try:
@@ -181,6 +210,131 @@ class LLMGateway:
 
     # ---- 内部 -----------------------------------------------------------
 
+    async def _chat_routed(
+        self,
+        task_type: str,
+        messages: list[Message],
+        gen_params: dict[str, Any] | None,
+        *,
+        seed: int | None,
+        agent_id: str | None,
+        sim_time: Any,
+        tick: int,
+    ) -> ChatResult:
+        """M2 降级链执行（T-LLM-06 增量；04 §8.1/§8.2）：沿 `task_routes[task_type]` 链逐跳调用，
+        撞墙（breaker 三条件）即切下一跳并落 `system.llm.failover`；链尽抛 `ChainExhausted`。
+        降级期所有调用行 `llm_calls.fallback_from` = 原 provider 别名（04 §8.2 留痕口径）。"""
+        gen = gen_params or self._router.gen_params(task_type)
+        prompt_hash = _prompt_hash(messages)
+        fallback_from: str | None = None
+        saw_hop = False
+        hops = self._router.chain(task_type)
+        for i, hop in enumerate(hops):
+            if hop.is_special:
+                raise ChainExhausted(task_type, hop.special)
+            impl = self._providers.get(hop.provider)
+            if impl is None or not isinstance(impl, ChatProvider):
+                continue  # 未注册/占位跳（enabled:false 已在 router.chain 过滤）
+            saw_hop = True
+            if self._breaker is not None and self._breaker.is_tripped(hop.provider):
+                fallback_from = fallback_from or hop.provider  # 降级期留痕（04 §8.2）
+                if not self._breaker.due_for_probe(hop.provider):
+                    continue
+                # 冷却 30 分钟满 → 单请求探测（04 §8.2）
+                if not await self._probe(hop, impl, task_type, messages, gen, seed=seed):
+                    continue
+                recovered_from = self._degraded_to.pop(task_type, hop.provider)
+                fallback_from = None  # 探测成功即切回：本跳即原 provider，恢复后行 fallback_from 为 NULL
+                await self._breaker.emit_failover(
+                    self._db, task_type=task_type, from_provider=recovered_from,
+                    to_provider=hop.provider, reason="recovered",
+                    tick=tick, sim_time=sim_time, rng_seed=seed or 0,
+                )
+            client = self._client_for(hop.provider, impl)
+            before = len(client.records)
+            outcome = await client.call(task_type, messages, gen, seed=seed)
+            attempts = client.records[before:]
+            if isinstance(outcome, ChatResult):
+                for rec in attempts[:-1]:  # 中间失败尝试逐条留痕（终态行由下方 ok/fallback 行承载）
+                    await self._record_attempt(task_type, agent_id, hop, rec, sim_time, prompt_hash, fallback_from)
+                    self._breaker_feed(hop, rec)
+                self._breaker_feed_ok(hop, attempts[-1] if attempts else None)
+                await self._record(
+                    task_type, agent_id, outcome.provider or hop.provider, outcome.model or hop.model,
+                    outcome.prompt_tokens, outcome.completion_tokens, outcome.latency_ms,
+                    "fallback" if fallback_from else "ok", sim_time, prompt_hash, outcome.latency_ms,
+                    request_id=outcome.request_id, fallback_from=fallback_from,
+                )
+                return outcome
+            # 撞墙：逐尝试喂 breaker（04 §8.2 三条件窗口数据流）
+            reason: str | None = None
+            for rec in outcome.attempts:
+                await self._record_attempt(task_type, agent_id, hop, rec, sim_time, prompt_hash, fallback_from)
+                r = self._breaker_feed(hop, rec)
+                reason = reason or r
+            fallback_from = fallback_from or hop.provider
+            nxt = next((h for h in hops[i + 1:] if not h.is_special), None)
+            if reason and self._breaker is not None:
+                self._degraded_to[task_type] = nxt.provider if nxt else "chain_end"
+                await self._breaker.emit_failover(
+                    self._db, task_type=task_type, from_provider=hop.provider,
+                    to_provider=nxt.provider if nxt else "chain_end", reason=reason,
+                    tick=tick, sim_time=sim_time, rng_seed=seed or 0,
+                )
+        if not saw_hop and self._default_provider:
+            impl = self._providers.get(self._default_provider)
+            if impl is not None:
+                result = await impl.chat(task_type, messages, gen, seed=seed)  # type: ignore[union-attr]
+                await self._record(
+                    task_type, agent_id, result.provider or self._default_provider, result.model or "unknown",
+                    result.prompt_tokens, result.completion_tokens, result.latency_ms, "ok", sim_time,
+                    prompt_hash, result.latency_ms, request_id=result.request_id,
+                )
+                return result
+        raise ProviderUnavailable(f"task_type={task_type!r} 降级链无可用 provider（{[h.provider or h.special for h in hops]}）")
+
+    async def _probe(self, hop: Any, impl: Any, task_type: str, messages: list[Message], gen: dict[str, Any], *, seed: int | None) -> bool:
+        """单请求探测（04 §8.2 冷却恢复）；结果回报 breaker，探测行照常留痕。"""
+        started = time.perf_counter()
+        try:
+            await impl.chat(task_type, messages, gen, seed=seed)
+        except Exception:
+            self._breaker.probe_result(hop.provider, ok=False)
+            return False
+        self._breaker.probe_result(hop.provider, ok=True)
+        log.info("LLM 降级恢复探测成功：%s（冷却满单请求探测，04 §8.2）；探测耗时 %dms", hop.provider, int((time.perf_counter() - started) * 1000))
+        return True
+
+    def _client_for(self, provider: str, impl: Any) -> Any:
+        """每 provider 一个 RateLimitedClient（令牌桶容量 = models.yaml rpm_limit，04 §8.5）。"""
+        from .clients import RateLimitedClient
+
+        client = self._clients.get(provider)
+        if client is None:
+            rpm = (self._router.provider_config(provider).get("rpm_limit") if self._router else None) or DEFAULT_RPM_LIMIT
+            client = RateLimitedClient(impl, rpm_limit=rpm, clock=self._clock)
+            self._clients[provider] = client
+        return client
+
+    def _breaker_feed(self, hop: Any, rec: Any) -> str | None:
+        if self._breaker is None:
+            return None
+        kind = "ok" if rec.status == "ok" else ("429" if rec.retry_after_s is not None or "429" in (rec.error or "") else "5xx")
+        rpm = (self._router.provider_config(hop.provider).get("rpm_limit") if self._router else None) or DEFAULT_RPM_LIMIT
+        return self._breaker.record_attempt(hop.provider, kind=kind, latency_ms=rec.latency_ms, rpm_limit=rpm)
+
+    def _breaker_feed_ok(self, hop: Any, rec: Any) -> None:
+        if self._breaker is not None:
+            self._breaker.record_attempt(hop.provider, kind="ok", latency_ms=rec.latency_ms if rec else 0)
+
+    async def _record_attempt(self, task_type: str, agent_id: str | None, hop: Any, rec: Any, sim_time: Any, prompt_hash: str, fallback_from: str | None) -> None:
+        """中间失败尝试留痕（04 §8.3 全量记录含重试；tokens 未知记 0，成本 0）。"""
+        await self._record(
+            task_type, agent_id, hop.provider, hop.model or "unknown",
+            0, 0, rec.latency_ms, rec.status, sim_time, prompt_hash, rec.latency_ms,
+            fallback_from=fallback_from,
+        )
+
     def _resolve(self, task_type: str, provider: str | None, *, want: str) -> tuple[str, Any]:
         candidates: list[str] = []
         if provider is not None:
@@ -218,26 +372,16 @@ class LLMGateway:
         prompt_hash: str,
         latency_fallback_ms: int,
         request_id: str | None = None,
+        fallback_from: str | None = None,
     ) -> None:
-        """M1 期直写 llm_calls（mock 记 cost 0；replay 模式在守卫层已抛，绝不会走到这里）。
-
-        T-LLM-07（M2）接管全量计量与写库开关后本方法收敛为其客户端；成本单价表未回填前一律 0。
-        """
+        """全量计量落库（T-LLM-07 ledger 接管：成本按 models.yaml 价格表算，未回填/mock/本地记 0；
+        replay 模式在守卫层已抛，绝不会走到这里）。"""
         if not self._record_calls or self._db is None:
             return
-        try:
-            await self._db.execute(
-                """
-                INSERT INTO llm_calls
-                    (sim_time, task_type, agent_id, provider, model,
-                     prompt_tokens, completion_tokens, cost_micro_cny,
-                     latency_ms, status, request_id, prompt_hash)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10, $11)
-                """,
-                sim_time, task_type, agent_id, provider, model,
-                prompt_tokens, completion_tokens,
-                latency_ms or latency_fallback_ms, status,
-                request_id or uuid.uuid4().hex, prompt_hash,
-            )
-        except Exception:  # 留痕失败不阻断主调用（计量归账问题走日志，04 §12.1）
-            log.warning("llm_calls 留痕写入失败（task_type=%s provider=%s）", task_type, provider, exc_info=True)
+        await self._ledger.record(
+            task_type=task_type, agent_id=agent_id, provider=provider, model=model,
+            prompt_tokens=prompt_tokens, completion_tokens=completion_tokens,
+            latency_ms=latency_ms or latency_fallback_ms, status=status,
+            sim_time=sim_time, prompt_hash=prompt_hash,
+            fallback_from=fallback_from, request_id=request_id,
+        )
