@@ -1,0 +1,6 @@
+{
+  "name": "worldsim-stream",
+  "private": true,
+  "type": "module",
+  "description": "stream/ 零依赖直播画面页：type=module 仅为 node --test 跑 ESM 纯逻辑测试（无任何 npm 依赖，06 T-LTV）"
+}
