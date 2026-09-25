@@ -134,10 +134,12 @@ async def test_daily_judgement(rumor_dsn) -> None:
     try:
         register_layoff_rumor_job(cal)
         cfg = cal.cfg["triggers"]["layoff_rumor"]
-        # 消费标记对齐到本用例起点前最后一笔 tick（防止前序用例的过线 tick 在本窗口重复触发）
-        last_tick_seq = await pool.fetchval(
-            "SELECT coalesce(max(seq), 0) FROM events WHERE type='economy.stock.tick'")
-        await cal.set_state("layoff_rumor.consumed", int(last_tick_seq))
+        # 消费标记对齐到本用例起点前最后一笔 tick（sim_time 口径；防止前序用例的过线 tick 重复触发）
+        last_tick = await pool.fetchrow(
+            "SELECT seq, sim_time FROM events WHERE type='economy.stock.tick' ORDER BY sim_time DESC LIMIT 1")
+        if last_tick:
+            await cal.set_state("layoff_rumor.consumed",
+                                {"tick_sim": last_tick["sim_time"].isoformat(), "seq": int(last_tick["seq"])})
         await cal.mark_settled(clock.now_sim())
         seq0 = await pool.fetchval("SELECT coalesce(max(seq), 0) FROM events")
         for i, day in enumerate((dt.date(2027, 1, 18), dt.date(2027, 1, 19))):

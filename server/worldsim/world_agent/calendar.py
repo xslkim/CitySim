@@ -238,11 +238,18 @@ class CalendarEngine:
         return self._last_settled
 
     async def _emit_day_summary(self, fire_time: dt.datetime) -> int:
-        """日界翻转恰一条 time.day_summary（D-04；payload 仅 {day}，06 §1.2）。"""
+        """日界翻转恰一条 time.day_summary（D-04；payload 仅 {day}，06 §1.2）。
+
+        D-04 细化（M3 演练实测，replay 窗口相容）：sim_time 取翻界前最后 tick 格
+        （23:55 档，00 §4 红线 10 tick=5min），`day` = **刚结束日**的自纪元模拟日序号——
+        日总结归属被总结的一天，且落在「恰为第 N 模拟日」实跑的对账窗口内（04 §5.3/02 T-ADJ-08）。
+        """
         epoch = await self._ensure_epoch(fire_time)
-        day = (fire_time.date() - epoch).days + 1
+        ended = fire_time.date() - dt.timedelta(days=1)
+        day = (ended - epoch).days + 1
         return await self.insert_event(
-            type_="time.day_summary", payload={"day": day}, sim_time=fire_time,
+            type_="time.day_summary", payload={"day": day},
+            sim_time=fire_time - dt.timedelta(seconds=300),
             source="system", trigger="system", visibility="internal",
         )
 
@@ -340,13 +347,14 @@ async def settle_layoff_rumor(cal: "CalendarEngine", fire_time: dt.datetime) -> 
     symbol = str(cfg["symbol"])
     row = await cal.pool.fetchrow(
         """
-        SELECT seq, payload FROM events WHERE type='economy.stock.tick' AND payload->>'symbol'=$1
-          AND sim_time < $2 ORDER BY seq DESC LIMIT 1
+        SELECT seq, sim_time, payload FROM events WHERE type='economy.stock.tick' AND payload->>'symbol'=$1
+          AND sim_time < $2 ORDER BY sim_time DESC, seq DESC LIMIT 1
         """, symbol, fire_time)
     if row is None:
         return None
+    # 消费标记按 tick 的 sim_time 口径（seq 序与 sim 序在构造注入/补录场景可能不一致，M3 实测）
     consumed = await cal.get_state(RUMOR_CONSUMED_KEY)
-    if consumed is not None and int(consumed) >= int(row["seq"]):
+    if consumed and dt.datetime.fromisoformat(str(consumed["tick_sim"])) >= row["sim_time"]:
         return None  # 该跌幅已出过传闻（跨周末/连续扫描不重复；D-08 口径=每个过线交易日一条）
     payload = row["payload"]
     r = float((json.loads(payload) if isinstance(payload, str) else dict(payload))["r"])
@@ -360,7 +368,7 @@ async def settle_layoff_rumor(cal: "CalendarEngine", fire_time: dt.datetime) -> 
                  "text_display": f"{symbol} 单日大跌 {drop_pct}%，裁员传闻四起"},
         sim_time=fire_time, rng_seed=cal.clock.tick_of(fire_time),
     )
-    await cal.set_state(RUMOR_CONSUMED_KEY, int(row["seq"]))
+    await cal.set_state(RUMOR_CONSUMED_KEY, {"tick_sim": row["sim_time"].isoformat(), "seq": int(row["seq"])})
     # gossip 意图权重上调标记（持续时长配置化；02 文档决策侧消费）
     until = fire_time.date() + dt.timedelta(days=int(cfg["gossip_window_days"]))
     await cal.set_state(RUMOR_BOOST_KEY, {
