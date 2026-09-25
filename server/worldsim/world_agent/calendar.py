@@ -56,12 +56,13 @@ class CalendarEngine:
     """模拟日历判定与跨日结算。`clock` 鸭子类型取 TimeEngine 能力（now_sim/tick_of/current_tick）。"""
 
     def __init__(self, pool: Any, world_cfg: dict[str, Any], clock: Any, *,
-                 agg: Any = None, grader: Any = None) -> None:
+                 agg: Any = None, grader: Any = None, gateway: Any = None) -> None:
         self._pool = pool
         self._cfg = world_cfg
         self._clock = clock
         self._agg = agg
         self._grader = grader
+        self._gateway = gateway
         self._jobs: list[CalendarJob] = []
         self._last_settled: dt.datetime | None = None
         self._holidays = self._expand_holidays(world_cfg.get("holidays", {}))
@@ -82,6 +83,10 @@ class CalendarEngine:
     @property
     def agg(self) -> Any:
         return self._agg
+
+    @property
+    def gateway(self) -> Any:
+        return self._gateway
 
     # ---- 内部：节假日展开 ---------------------------------------------------
 

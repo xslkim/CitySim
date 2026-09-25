@@ -169,11 +169,216 @@ async def _utility_amount(cal: CalendarEngine, rng: random.Random) -> int:
     return amount
 
 
+# ---- 欠费链路（T-WA-04；01 §1.5 欠租/欠费结算规则表；06 §1.2 v1.2） -----------------
+
+OVERDUE_KEY_PREFIX = "overdue."          # world_state 挂账键：overdue.<agent_id>（D-06，不计复利）
+OVERDUE_SCAN_TIME = "09:30"              # 每日欠费/债务扫描时点（工程默认，账单 9:00 之后）
+
+OnCrisis = Callable[[CalendarEngine, dt.datetime, str, int], Awaitable[int]]
+"""退租危机回调（无空房时）：生产接线 = T-DIR-03 intervene L1（唯一入口，01 §6.3 计干预率）。"""
+
+
+async def _get_overdue(cal: CalendarEngine, agent_id: str) -> dict[str, Any]:
+    return dict(await cal.get_state(f"{OVERDUE_KEY_PREFIX}{agent_id}", {}) or {})
+
+
+async def _set_overdue(cal: CalendarEngine, agent_id: str, state: dict[str, Any]) -> None:
+    if state:
+        await cal.set_state(f"{OVERDUE_KEY_PREFIX}{agent_id}", state)
+    else:  # 结清清空（挂账归零 = 空对象，不删键，append-only 语义延伸）
+        await cal.set_state(f"{OVERDUE_KEY_PREFIX}{agent_id}", {})
+
+
+async def settle_bill_shortfall(cal: CalendarEngine, fire_time: dt.datetime, agent_row: dict[str, Any],
+                                kind: str, amount: int, balance: int, period: str) -> int:
+    """账单日余额不足（01 §1.5 硬规则）：实扣至余额归 0，差额挂账（不计复利），落
+    `economy.bill.<kind>.overdue`（payload 三键逐字 06 §1.2）；情绪/财富变更（on_overdue 镜像）。"""
+    aid = agent_row["id"]
+    overdue_cents = amount - balance
+    seq = await cal.insert_event(
+        type_=f"economy.bill.{kind}.overdue",
+        payload={"agent_id": aid, "amount_cents": -balance if balance else 0,
+                 "overdue_cents": overdue_cents, "period": period},
+        sim_time=fire_time, actors=[aid], rng_seed=cal.clock.tick_of(fire_time),
+    )
+    if balance > 0:
+        await cal.pool.execute("UPDATE agents SET balance_cents = 0 WHERE id=$1", aid)
+    on_ov = cal.cfg["economy"]["overdue"]["on_overdue"]
+    await _apply_needs(cal, agent_id=aid, deltas={
+        "mood": float(on_ov["mood_delta"]), "wealth": float(on_ov["wealth_delta"]),
+    }, cause=str(seq))
+    # 挂账持久化（world_state KV，D-06；periods 计数供 notice/强制搬迁阶梯判定）
+    state = await _get_overdue(cal, aid)
+    entry = state.setdefault(kind, {"owed_cents": 0, "periods": []})
+    entry["owed_cents"] = int(entry["owed_cents"]) + overdue_cents
+    if period not in entry["periods"]:
+        entry["periods"].append(period)
+    await _set_overdue(cal, aid, state)
+    log.warning("%s %s 账单余额不足：实扣 %d 挂账 %d（period=%s）", aid, kind, balance, overdue_cents, period)
+    return seq
+
+
+async def try_settle_overdue(cal: CalendarEngine, fire_time: dt.datetime) -> list[int]:
+    """结清扫描：余额充足自动补扣清账（同类型负额结算事件，不新增 payload 键；不还负不计复利）。"""
+    rows = await cal.pool.fetch("SELECT id, balance_cents FROM agents ORDER BY id")
+    seqs: list[int] = []
+    for r in rows:
+        aid = r["id"]
+        state = await _get_overdue(cal, aid)
+        if not state:
+            continue
+        balance = int(r["balance_cents"])
+        changed = False
+        for kind in ("rent", "utility"):
+            entry = state.get(kind)
+            if not entry or int(entry["owed_cents"]) <= 0:
+                continue
+            owed = int(entry["owed_cents"])
+            if balance < owed:
+                continue  # 不够不清（部分补扣设计未定义，工程默认足额才扣，D-25）
+            seq = await cal.insert_event(
+                type_=f"economy.bill.{kind}",
+                payload={"agent_id": aid, "amount_cents": -owed, "due": f"{fire_time.date().day}日"},
+                sim_time=fire_time, actors=[aid], rng_seed=cal.clock.tick_of(fire_time),
+            )
+            await cal.pool.execute(
+                "UPDATE agents SET balance_cents = balance_cents - $2 WHERE id=$1", aid, owed)
+            balance -= owed
+            del state[kind]
+            changed = True
+            seqs.append(seq)
+            log.info("%s %s 挂账结清：补扣 %d", aid, kind, owed)
+        if changed:
+            await _set_overdue(cal, aid, state)
+    return seqs
+
+
+async def settle_overdue_escalation(cal: CalendarEngine, fire_time: dt.datetime, *,
+                                    on_crisis: OnCrisis | None = None) -> list[int]:
+    """账单周期升级阶梯（仅 rent 链，01 §1.5；utility 链止于 overdue/结清，D-02 销项口径）：
+    下个账单周期未结清 → `economy.bill.rent.notice`（快照无新结算，情绪/挫败值变更）；
+    连续 2 个账单周期未结清 → 强制搬迁最低价位空房；无空房 → `on_crisis`（T-DIR-03 L1 退租危机）。
+    本函数在房租账单日、逐人新账单结算**之前**调用（register 顺序保证）。"""
+    cfg = cal.cfg["economy"]
+    npu = cfg["overdue"]["next_period_unpaid"]
+    period = _month_of(fire_time.date())
+    rows = await cal.pool.fetch("SELECT id, room_no FROM agents ORDER BY id")
+    seqs: list[int] = []
+    for r in rows:
+        aid = r["id"]
+        state = await _get_overdue(cal, aid)
+        entry = state.get("rent")
+        if not entry or int(entry["owed_cents"]) <= 0:
+            continue
+        unpaid = len(entry["periods"])  # 已挂账周期数（含首欠周期）
+        if unpaid >= 2:
+            # 连续 2 个账单周期未结清（01 §1.5 末行）
+            moved = await _force_move(cal, fire_time, aid)
+            if not moved:
+                if on_crisis is None:
+                    raise RuntimeError("退租危机需要 T-DIR-03 L1 入口（on_crisis 未接线）")
+                seqs.append(await on_crisis(cal, fire_time, aid, int(entry["owed_cents"])))
+            continue
+        # 下个账单周期未结清 → notice（无新结算，overdue_cents = 挂账快照）
+        seq = await cal.insert_event(
+            type_="economy.bill.rent.notice",
+            payload={"agent_id": aid, "overdue_cents": int(entry["owed_cents"]), "period": period},
+            sim_time=fire_time, actors=[aid], rng_seed=cal.clock.tick_of(fire_time),
+        )
+        await _apply_needs(cal, agent_id=aid, deltas={"mood": float(npu["mood_delta"])}, cause=str(seq))
+        # 挫败值 +8（tension 无对象可挂 → 挫败值，01 §1.5/§3.3）：落 goals.frustration（持久化位）
+        await cal.pool.execute(
+            "UPDATE goals SET frustration = frustration + $2 WHERE agent_id=$1 AND status='active'",
+            aid, int(npu["frustration_delta"]))
+        entry["periods"].append(period)
+        await _set_overdue(cal, aid, state)
+        seqs.append(seq)
+        log.warning("%s 欠租约谈通知（period=%s 挂账 %d）", aid, period, entry["owed_cents"])
+    return seqs
+
+
+async def find_vacant_room(cal: CalendarEngine) -> tuple[int, str] | None:
+    """最低价位空房查找（01 §1.5 强制搬迁目标；独立函数便于测试替换无空房分支）。"""
+    rooms_cfg = cal.cfg["locations"]["apartment"]["rooms"]
+    rent_tiers = sorted(cal.cfg["economy"]["rent"]["by_floor"].values(), key=lambda t: int(t["amount_cents"]))
+    occupied = {r["room_no"] for r in await cal.pool.fetch("SELECT room_no FROM agents WHERE room_no IS NOT NULL")}
+    for tier in rent_tiers:  # 低价位优先
+        for floor in sorted(int(f) for f in tier["floors"]):
+            for suffix in sorted(int(s) for s in rooms_cfg["rooms_per_floor"]):
+                room_no = f"{floor}{suffix:02d}"
+                if room_no not in occupied:
+                    return floor, room_no
+    return None
+
+
+async def _force_move(cal: CalendarEngine, fire_time: dt.datetime, agent_id: str) -> bool:
+    """强制搬迁至最低价位空房（01 §1.5）；成功改 room_no/position 并写记忆（有 gateway 时）。返回是否有空房。"""
+    target = await find_vacant_room(cal)
+    if target is None:
+        return False
+    floor, room_no = target
+    await cal.pool.execute(
+        "UPDATE agents SET room_no=$2, position=$3 WHERE id=$1",
+        agent_id, room_no, f"apt.L{floor}.{room_no}")
+    log.warning("%s 连续 2 周期欠租：强制搬迁至 %s", agent_id, room_no)
+    if cal.gateway is not None:
+        from ..memory.store import insert_memory
+
+        await insert_memory(
+            cal.pool, cal.gateway, agent_id=agent_id, sim_time=fire_time, kind="event",
+            content=f"因连续欠租被房东要求搬到 {room_no}（低价位房）。", importance=7,
+            rng_seed=cal.clock.tick_of(fire_time))
+    return True
+
+
+async def settle_debt_overdue(cal: CalendarEngine, fire_time: dt.datetime, *,
+                              relations_cfg: dict[str, Any]) -> None:
+    """债务逾期日结算（04 §6.2）：扫 `debts` 逾期未结清，按 01 §3.2 逾期行逐日
+    （数值读 relations.yaml `lend_overdue_daily` 镜像）落 relation.changed；还清即止。"""
+    rule = relations_cfg["matrix"]["lend_overdue_daily"]
+    rows = await cal.pool.fetch(
+        "SELECT id, a_id, b_id FROM debts WHERE due_sim < $1 AND repaid_cents < amount_cents ORDER BY id",
+        fire_time)
+    if not rows:
+        return
+    cause = str(await cal.pool.fetchval("SELECT coalesce(max(seq), 0) FROM events"))
+    for r in rows:
+        if cal.agg is not None:
+            # a_id=债主 / b_id=欠款人（round2 §A.18 口径）：债主对欠款人逐日 -2/+2
+            await cal.agg.apply_relation_delta(
+                a_id=r["a_id"], b_id=r["b_id"],
+                delta_affinity=int(rule["delta_affinity"]), delta_tension=int(rule["delta_tension"]),
+                cause=cause)
+
+
+def register_overdue_jobs(cal: CalendarEngine, *, relations_cfg: dict[str, Any],
+                          on_crisis: OnCrisis | None = None) -> None:
+    """欠费链路排程注册（T-WA-04）：
+    - 房租账单日先跑升级阶梯（notice/搬迁/危机）再结新账（注册序保证）；
+    - 每日扫描：结清补扣 + 债务逾期日结算。"""
+    rent_day = int(cal.cfg["economy"]["rent"]["bill_day"])
+
+    async def _escalation(c: CalendarEngine, t: dt.datetime) -> None:
+        await settle_overdue_escalation(c, t, on_crisis=on_crisis)
+
+    async def _daily(c: CalendarEngine, t: dt.datetime) -> None:
+        await try_settle_overdue(c, t)
+        await settle_debt_overdue(c, t, relations_cfg=relations_cfg)
+
+    cal.register_job("economy.bill.rent.escalation", "08:55", lambda d: d.day == rent_day, _escalation)
+    cal.register_job("economy.overdue.daily", OVERDUE_SCAN_TIME, lambda d: True, _daily)
+
+
 # ---- 注册 ---------------------------------------------------------------------
 
 
 def register_economy_jobs(cal: CalendarEngine, *, on_shortfall: OnShortfall | None = None) -> None:
-    """注册三类固定日历经济事件进 T-WA-02 回调表（触发日历全部读配置，01 §6.1）。"""
+    """注册三类固定日历经济事件进 T-WA-02 回调表（触发日历全部读配置，01 §6.1）。
+
+    `on_shortfall` 缺省 = `settle_bill_shortfall`（T-WA-04 欠费链路）；显式传 None 表示
+    不接欠费链（余额不足即报错，仅测试隔离口径）。"""
+    if on_shortfall is None:
+        on_shortfall = settle_bill_shortfall
     cfg = cal.cfg["economy"]
     payday = int(cfg["salary"]["payday"])
     rent_day = int(cfg["rent"]["bill_day"])

@@ -404,3 +404,4 @@ M3「世界 Agent 与编剧」全部规则化模块（04 §2.1 `world_agent/` + 
 | D-22 | 节假日表的具体日期（MM-DD）设计未给（01 §6.1 只有名称/天数） | 工程默认按 2026 自然年实历映射（春节 02-17/中秋 09-25 等），落 `world.yaml` `holidays.table`（T-WA-01）；已登记（本文偏差表） |
 | D-23 | `world.disturb.illness` 的 severity→请假天数设计未给 | 工程默认：severity 1→1~2 天、2→2~4 天，配置镜像 `triggers.disturb.illness_severity_days`（T-WA-01/09）；已登记（本文偏差表） |
 | D-24 | `world.overtime` 的 `reason` 与 `world.team_building` 的 `activity` 文案池设计未枚举 | 工程默认模板池落配置（`triggers.overtime.reasons`/`triggers.team_building.activities`，T-WA-01/08）；编剧/弧线可传参指定；已登记（本文偏差表） |
+| D-25 | 挂账期间"余额充足自动补扣清账"的部分补扣设计未定义 | 工程默认：足额才扣（余额 < 挂账额不动，防半清状态歧义）；每日 09:30 扫描（`economy.overdue.daily`，时点为工程默认）；已登记（本文偏差表） |
