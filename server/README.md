@@ -39,6 +39,23 @@ M0 族（speed_table/models/agents/world/event_types/payload_whitelist/health_th
 - 邀约/话题（T-REL-05/06）交付为引擎 + 函数接口（`worldsim/invite/`、`worldsim/relations/topics.py`），
   管道动作侧接线归波次 2b（T-ADJ-03/04）。
 
+## 波次 2b 已接线的内核件（M1 收口）
+
+- LOD 调度（T-LOD-01~04）：`scheduler/lod.py`（三层统一接口 + `LodScheduler.collect_due` 时钟兜底写回
+  `agents.next_due_sim`）；`scheduler/rotation.py`（路径二事件驱动升格 ≤16+LRU 挤出 + 路径一基尼轮换
+  席位互换 + 升星追赶反思）；`scheduler/residence.py`（校外 NPC 驻留规则引擎，零 LLM，after_tick 评估）。
+- 19 动作校验器（T-ADJ-03）：`adjudicator/validators.py` 收编 step5 统一校验段（通用规则 5 条 +
+  逐动作前置校验 + 结算总线 + `debts` 写入/核销），经 `Pipeline(validate=, settler=)` 注入。
+- 对话（T-ADJ-04）：`adjudicator/dialogue.py` 整段单事件落库、`lines[].at_offset_s` 写死、话题注入
+  （T-REL-06 select/兜底/trigger_point 强制切入）、降速读取点 `ThrottleState.dialogue_daily_cap`。
+- grade（T-ADJ-07）：`adjudicator/grade.py` 为 `ui.grade` 初值唯一写入处（落库前信号预申报口径 D30），
+  `effective_grade()` = 初值 ⊕ 最新复核（M3 复核事件消费位）。
+- 回放（T-ADJ-08）：`WSIM_REPLAY_MODE=replay uv run python scripts/replay_check.py --sim-day N`——
+  seed 确定性基线 + 事件流重建（needs/mood/relations/position）逐项对账，零 LLM 调用。
+- 快照（T-ADJ-09）：`snapshot/dump.py`（batch 钩子 `kernel.snapshot`，每模拟日落 `var/snapshot/`）+
+  `snapshot/canonical.py`（state/events 两侧 canonical+digest 唯一实现，07 文档消费方同 import）+
+  `scripts/canonical.py --sim-day N [--expect sha256:…]` 对账 CLI。
+
 ## 内核主循环（M1：04 §2.2 装配；唯一裁决协程写库）
 
 ```bash
