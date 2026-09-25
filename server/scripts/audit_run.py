@@ -26,6 +26,7 @@ from worldsim.audit.daily import (  # noqa: E402
     REGISTRY, REPORT_DIR, get_item, run_daily_audit, run_item,
 )
 from worldsim.time_engine.clock import LOCAL_TZ  # noqa: E402
+from worldsim.audit.alerts import flush_warnings  # noqa: E402  # T-OPS-01：跑完冲刷聚合 WARN 落盘
 
 PG_BIN = os.path.expanduser("~/pgsql/bin")
 SOCKET_DIR = "/tmp"
@@ -128,6 +129,7 @@ async def _run(args) -> int:
         for r in report.items:
             print(f"{'PASS' if r.ok else 'RED '} {r.id} {r.name} 违规 {r.violations}")
         print(f"日报落盘：{REPORT_DIR / (report.sim_day + '.json')}")
+        flush_warnings()
         return 1 if report.red else 0
     finally:
         await pool.close()

@@ -234,6 +234,13 @@ def _write_report(report: AuditReport, report_dir: Path) -> None:
     if report.red:
         log.warning("审计日报 %s 标红：%s", report.sim_day,
                     [r.id for r in report.items if not r.ok])
+        # T-OPS-01 文件通道收口（原"内存队列"占位）：标红逐项 WARN 聚合落 alerts.log
+        from .alerts import alert
+        for r in report.items:
+            if not r.ok:
+                alert("WARN", f"audit.{r.id}",
+                      f"审计标红 {r.id} {r.name}：违规 {r.violations} 条",
+                      {"sim_day": report.sim_day})
 
 
 def consecutive_red_days(report_dir: Path = REPORT_DIR, *, upto: dt.date | None = None) -> int:
