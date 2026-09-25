@@ -299,6 +299,20 @@ async def _run(args: argparse.Namespace) -> int:
 
         register_batch_hook("kernel.rotation", kernel_rotation_hook)
 
+        # T-ADJ-09：每模拟日 world_state 全量快照落盘（模拟日界 00:00，05 §3.6；挂 batch 段注册表唯一挂载点）
+        from .snapshot.dump import dump_snapshot
+
+        async def kernel_snapshot_hook(ctx: Any) -> None:
+            now = ctx.clock.now_sim()  # batch 段补进后时点；快照对刚结束的模拟日取数（05 §3.6 日界口径）
+            sim_day = (now - dt.timedelta(minutes=1)).date()
+            await dump_snapshot(
+                pool, sim_day=sim_day, out_dir=REPO_ROOT / "var" / "snapshot",
+                tick=ctx.clock.current_tick, sim_now=now,
+                compression_ratio=ctx.clock.ratio, schedule=needs_cfg.get("schedule"),
+            )
+
+        register_batch_hook("kernel.snapshot", kernel_snapshot_hook)
+
         async def _watch(t: asyncio.Task) -> None:
             try:
                 await t
