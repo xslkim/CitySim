@@ -7,6 +7,8 @@
  */
 
 import { loadRoster } from './lib/roster.js';
+import { SubtitleQueue } from './lib/subtitle.js';
+import { SubtitleView } from './ui/subtitle-view.js';
 import { StreamWsClient } from './lib/ws-client.js';
 
 const params = new URLSearchParams(location.search);
@@ -74,6 +76,14 @@ async function bootstrap() {
 
 async function main() {
   await bootstrap();
+  // T-LTV-03 字幕引擎接线：事件 → 队列（逐句 ÷倍率）→ 字幕条 DOM
+  const subView = new SubtitleView(document.getElementById('subtitle'), ctx.roster);
+  const queue = new SubtitleQueue({
+    onLine: (line, seg) => subView.showLine(line, seg),
+    onSegmentEnd: () => subView.hide(),
+  });
+  ctx.subtitleQueue = queue;
+  ctx.handlers = [(_c, ev) => queue.push(ev)];
   if (params.get('mock') === '1') {
     const { runMock } = await import('./mock.js');
     runMock(ctx);
