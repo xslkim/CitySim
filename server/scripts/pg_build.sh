@@ -106,4 +106,23 @@ log "== phase 1: PostgreSQL ${PG_VERSION} -> ${PREFIX}"
 phase1_pg
 log "== phase 2: pgvector ${PGVECTOR_VERSION} + pg_partman ${PG_PARTMAN_VERSION}"
 phase2_ext
-log "done. 验证 SQL：CREATE EXTENSION vector; CREATE EXTENSION pg_partman;"
+
+# phase 2.5（05 T-WEB-01 增补）：PG 源码树自带 contrib 模块 pg_trgm（03 §5.1 中文检索降级路径）与
+# fuzzystrmatch（05 §3.7 ripple distortion 的 levenshtein）——DDL `CREATE EXTENSION IF NOT EXISTS` 的前置。
+build_contrib() { # build_contrib <contrib-dir>
+  local mod="$1"
+  if [ -f "$PREFIX/share/extension/${mod}.control" ]; then
+    log "contrib ${mod} already installed"
+    return 0
+  fi
+  local src="$SRC_DIR/postgresql-${PG_VERSION}/contrib/${mod}"
+  if [ ! -d "$src" ]; then log "ERROR: 缺 PG 源码树 $src（phase1 已跑过才有的路径）"; return 1; fi
+  cd "$src"
+  log "make contrib/${mod}"
+  make PG_CONFIG="$PREFIX/bin/pg_config" > "$BUILD_DIR/contrib_${mod}_make.log" 2>&1
+  make PG_CONFIG="$PREFIX/bin/pg_config" install > "$BUILD_DIR/contrib_${mod}_install.log" 2>&1
+}
+log "== phase 2.5: contrib pg_trgm + fuzzystrmatch"
+build_contrib pg_trgm
+build_contrib fuzzystrmatch
+log "done. 验证 SQL：CREATE EXTENSION vector; CREATE EXTENSION pg_partman; CREATE EXTENSION pg_trgm; CREATE EXTENSION fuzzystrmatch;"

@@ -100,6 +100,12 @@ bash server/scripts/schema_freeze_check.sh                          # 06 §4.5 �
   （premake=4，`partman.run_maintenance_proc()` 滚动建区，运维归 08）。
 - `ddl/obs_views_v1.sql`：obs schema + `obs.filter_payload()`（全项目唯一）+ `obs.events` /
   `obs.memory_projection` 视图 + `obs.payload_key_whitelist`（种子为生成物，勿手改）；obs_ro 只读。
+- `ddl/obs_derived_v1.sql`（M4，05 T-WEB-01）：obs 派生层——`obs.relation_change_log` /
+  `obs.event_grade_view` / `obs.health_daily` 三 VIEW + `obs.world_state_snapshot` / `obs.relation_daily` /
+  `obs.ripple_edge` 三实体表（与 05 §3.1~§3.8 逐字同名同列）；contrib pg_trgm/fuzzystrmatch 随 DDL 建扩展
+  （编译归 `scripts/pg_build.sh` phase 2.5）。
+- `scripts/obs_refresh.py`：三实体表按模拟日重算（快照白名单文件投影 / 05 §3.4 递推 / §3.7 涟漪边）；
+  `uv run python scripts/obs_refresh.py --day <YYYY-MM-DD> | --from/--to | --all`。
 - world_state 初始键：`clock.anchor`（2026-10-12 周一 00:00+08 冷启动占位，内核首启重锚）、
   `economy.stocks`（3 标的初值）、`economy.salary`（每人月薪抽定，M3 payroll 读取）。
 - 测试库：pytest fixture 自动建/毁 `worldsim_test` / `worldsim_seed8` / `worldsim_seed40`（socket trust）。
