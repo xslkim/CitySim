@@ -18,8 +18,11 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
+import random
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
+
+from ..time_engine.clock import LOCAL_TZ
 
 log = logging.getLogger(__name__)
 
@@ -570,3 +573,134 @@ def register_career_jobs(cal: "CalendarEngine") -> None:
 
     cal.register_job("world.promotion_window", "10:00", _promo_on, _promo)
     cal.register_job("world.perf_review", str(perf["time"]), _perf_on, _perf)
+
+
+# ---- 晚间排期（T-WA-08；01 §6.1/§1.6 黄金档；06 §1.2 world.overtime/world.team_building） ----
+
+OVERTIME_EXTRA_KEY = "schedule.overtime.extra"  # L1 排期原语复用位（T-DIR-03）：[{date, dept, reason}]
+
+
+def overtime_schedule(cal: "CalendarEngine", iso_year: int, iso_week: int, dept_key: str) -> list[dt.date]:
+    """某部门某 ISO 周的加班日排期（确定性种子可复现；每部门每周次数/仅工作日，01 §6.1 镜像）。
+
+    排期表数据结构供 T-DIR-03 L1 复用：规则排期 = 本函数；编剧加场 = `queue_extra_overtime`。
+    """
+    cfg = cal.cfg["triggers"]["overtime"]
+    lo, hi = (int(x) for x in cfg["per_dept_per_week"])
+    rng = random.Random(f"overtime|{iso_year}-W{iso_week:02d}|{dept_key}")
+    count = rng.randint(lo, hi)
+    monday = dt.date.fromisocalendar(iso_year, iso_week, 1)
+    workdays = [monday + dt.timedelta(days=i) for i in range(5)]
+    workdays = [d for d in workdays if not cal.holiday_flags(d)["work_events_suspended"]]
+    if not workdays:
+        return []
+    return sorted(rng.sample(workdays, min(count, len(workdays))))
+
+
+def overtime_start_time(cal: "CalendarEngine", date_: dt.date, dept_key: str) -> dt.datetime:
+    """加班开始时刻：窗口内种子取整 5 分钟网格（tick 对齐）。"""
+    window = cal.cfg["triggers"]["overtime"]["window"]
+    sh, sm = (int(x) for x in str(window[0]).split(":"))
+    eh, em = (int(x) for x in str(window[1]).split(":"))
+    span_min = (eh * 60 + em) - (sh * 60 + sm)
+    rng = random.Random(f"overtime-time|{date_.isoformat()}|{dept_key}")
+    offset = rng.randint(0, max(0, span_min // 5 - 1)) * 5
+    return dt.datetime.combine(date_, dt.time(sh, sm), tzinfo=LOCAL_TZ) + dt.timedelta(minutes=offset)
+
+
+async def queue_extra_overtime(cal: "CalendarEngine", date_: dt.date, dept: str, reason: str) -> None:
+    """编剧 L1 加场（排期原语，01 §11.2 点火/§9 调参入口；事件本体仍由本模块每日排期器落库）。"""
+    extra = list(await cal.get_state(OVERTIME_EXTRA_KEY, []) or [])
+    extra.append({"date": date_.isoformat(), "dept": dept, "reason": reason})
+    await cal.set_state(OVERTIME_EXTRA_KEY, extra)
+
+
+async def settle_evening_overtime(cal: "CalendarEngine", fire_time: dt.datetime) -> list[int]:
+    """每日窗口起点判定：当日命中排期（规则表 + L1 加场）的部门各落一条 `world.overtime`
+    （payload `{dept, reason, participants[]}` 逐字 06 §1.2；participants = 该部门当日未请假
+    员工，设计未定义的选取规则工程默认 D-12；`text_display` 走模板文案）。"""
+    cfg = cal.cfg["triggers"]["overtime"]
+    today = fire_time.date()
+    iso = today.isocalendar()
+    reasons = [str(x) for x in cfg["reasons"]]
+    extra = list(await cal.get_state(OVERTIME_EXTRA_KEY, []) or [])
+    extra_today = [e for e in extra if e.get("date") == today.isoformat()]
+    if extra_today:  # 加场消费后移除
+        await cal.set_state(OVERTIME_EXTRA_KEY, [e for e in extra if e.get("date") != today.isoformat()])
+    seqs: list[int] = []
+    for dept in cal.cfg["company"]["departments"]:
+        scheduled = today in overtime_schedule(cal, iso.year, iso.week, dept["key"])
+        override = next((e for e in extra_today if e.get("dept") in (dept["key"], dept["name"])), None)
+        if not scheduled and override is None:
+            continue
+        participants = []
+        for r in await cal.pool.fetch("SELECT id FROM agents WHERE department=$1 ORDER BY id", dept["name"]):
+            if not await cal.is_on_leave(r["id"], today):
+                participants.append(r["id"])
+        if not participants:
+            continue
+        if override is not None:
+            reason = str(override.get("reason") or reasons[0])
+        else:
+            rng = random.Random(f"overtime-reason|{today.isoformat()}|{dept['key']}")
+            reason = rng.choice(reasons)
+        start = overtime_start_time(cal, today, dept["key"])
+        seq = await cal.insert_event(
+            type_="world.overtime",
+            payload={"dept": dept["name"], "reason": reason, "participants": participants,
+                     "text_display": f"{dept['name']}今晚加班（{reason}）"},
+            sim_time=start, actors=participants, rng_seed=cal.clock.tick_of(start),
+        )
+        seqs.append(seq)
+    return seqs
+
+
+async def settle_team_building(cal: "CalendarEngine", fire_time: dt.datetime,
+                               *, activity: str | None = None, charge_cents: int | None = None,
+                               trigger: str = "world") -> int:
+    """`world.team_building`：每月第 2 个周六 19:00~22:00（01 §6.1/§1.6）；
+    payload `{dept|all, activity, amount_cents?}` 逐字 06 §1.2；向 agent 收费时 amount_cents
+    必有（= 收费总额负值，正入负出守恒）且打 economy 审计标记（06 §1.2）。
+    `trigger='director'` 路径供 T-DIR-03 L1 复用（同一实现仅 trigger 不同，06 §1.1）。"""
+    cfg = cal.cfg["triggers"]["team_building"]
+    rng = random.Random(f"team_building|{fire_time.date().isoformat()}")
+    activity = activity or rng.choice([str(x) for x in cfg["activities"]])
+    charge = int(cfg["charge_cents"] if charge_cents is None else charge_cents)
+    agents = await cal.pool.fetch("SELECT id FROM agents ORDER BY id")
+    payload: dict[str, Any] = {"dept": "all", "activity": activity}
+    if charge > 0:
+        total = charge * len(agents)
+        payload["amount_cents"] = -total
+        for r in agents:
+            await cal.pool.execute("UPDATE agents SET balance_cents = balance_cents - $2 WHERE id=$1",
+                                   r["id"], charge)
+    seq = await cal.insert_event(
+        type_="world.team_building", payload=payload,
+        sim_time=fire_time, actors=[r["id"] for r in agents],
+        rng_seed=cal.clock.tick_of(fire_time), trigger=trigger,
+    )
+    log.info("团建排期：%s @ %s（收费 %d/人）", activity, fire_time.date(), charge)
+    return seq
+
+
+def register_evening_jobs(cal: "CalendarEngine") -> None:
+    """注册晚间排期器（T-WA-08）：加班日判定（窗口起点）+ 月度团建。节假日互斥（01 §6.1 停发）。"""
+    ot = cal.cfg["triggers"]["overtime"]
+    tb = cal.cfg["triggers"]["team_building"]
+
+    def _ot_on(d: dt.date) -> bool:
+        return cal.is_workday(d) and not cal.holiday_flags(d)["work_events_suspended"]
+
+    def _tb_on(d: dt.date) -> bool:
+        if cal.holiday_flags(d)["work_events_suspended"]:
+            return False
+        return d == _nth_weekday_of_month(d.year, d.month, int(tb["weekday"]), int(tb["monthly_nth"]))
+
+    async def _ot(c: "CalendarEngine", t: dt.datetime) -> None:
+        await settle_evening_overtime(c, t)
+
+    async def _tb(c: "CalendarEngine", t: dt.datetime) -> None:
+        await settle_team_building(c, t)
+
+    cal.register_job("world.overtime", str(ot["window"][0]), _ot_on, _ot)
+    cal.register_job("world.team_building", str(tb["window"][0]), _tb_on, _tb)
