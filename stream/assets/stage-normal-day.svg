@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice" role="img" aria-label="404 公寓剖面：2F 公共厨房日景">
+  <!-- T-ITER3-06（R3 #6）normal 形态日景变体：与 stage-normal.svg 同几何，昼夜由 main.js
+       按 +08 本地模拟时切换（06:00~19:00 日景）。日景取色仍 ⊆ allowed_hex.txt：
+       天空=accent/雾蓝、日轮=杏黄、窗光=公司·白天主色（自然采光）、吊灯/窗灯熄灭。 -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5AC3ED"/><stop offset="1" stop-color="#C3CDDA"/>
+    </linearGradient>
+    <linearGradient id="lobby" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#161B22"/><stop offset="1" stop-color="#0E1116"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ===== 晴空 y0-130 ===== -->
+  <rect x="0" y="0" width="390" height="132" fill="url(#sky)"/>
+  <circle cx="322" cy="50" r="22" fill="#FADB40" opacity=".18"/>
+  <circle cx="322" cy="50" r="13" fill="#FADB40"/>
+
+  <!-- ===== 上部楼层剪影 y130-200（白天窗灯熄灭） ===== -->
+  <rect x="0" y="130" width="390" height="70" fill="#161B22"/>
+  <rect x="0" y="130" width="390" height="2" fill="#2D333D"/>
+  <g>
+    <rect x="16" y="142" width="16" height="20" fill="#0E1116"/>
+    <rect x="56" y="142" width="16" height="20" fill="#0E1116"/>
+    <rect x="96" y="142" width="16" height="20" fill="#0E1116"/>
+    <rect x="136" y="142" width="16" height="20" fill="#0E1116"/>
+    <rect x="216" y="142" width="16" height="20" fill="#0E1116"/>
+    <rect x="256" y="142" width="16" height="20" fill="#0E1116"/>
+    <rect x="336" y="142" width="16" height="20" fill="#0E1116"/>
+    <rect x="16" y="172" width="16" height="20" fill="#0E1116"/>
+    <rect x="96" y="172" width="16" height="20" fill="#0E1116"/>
+    <rect x="176" y="172" width="16" height="20" fill="#0E1116"/>
+    <rect x="296" y="172" width="16" height="20" fill="#0E1116"/>
+    <rect x="376" y="142" width="14" height="20" fill="#0E1116"/>
+  </g>
+
+  <!-- ===== 2F 主场景 y200-540 ===== -->
+  <rect x="0" y="200" width="390" height="340" fill="#3B3A55"/>
+
+  <!-- 203 房间 x8-118 -->
+  <rect x="8" y="200" width="110" height="340" fill="#4A5A6A" opacity=".55"/>
+  <rect x="8" y="492" width="110" height="48" fill="#A9714B" opacity=".85"/>
+  <rect x="8" y="492" width="110" height="3" fill="#7D4F30"/>
+  <g stroke="#7D4F30" stroke-width="1" opacity=".6">
+    <line x1="8" y1="506" x2="118" y2="506"/><line x1="8" y1="520" x2="118" y2="520"/>
+  </g>
+  <rect x="24" y="238" width="58" height="66" fill="#C9D2DA" opacity=".5"/>
+  <rect x="24" y="238" width="58" height="66" fill="none" stroke="#2E3A45" stroke-width="3"/>
+  <line x1="53" y1="238" x2="53" y2="304" stroke="#2E3A45" stroke-width="2.5"/>
+  <line x1="24" y1="271" x2="82" y2="271" stroke="#2E3A45" stroke-width="2.5"/>
+  <rect x="90" y="248" width="15" height="22" fill="#E07856" opacity=".85"/>
+  <rect x="18" y="330" width="34" height="24" fill="#7FA98C" opacity=".5"/>
+  <!-- 床 -->
+  <rect x="14" y="452" width="58" height="30" rx="2" fill="#7FA98C"/>
+  <rect x="14" y="452" width="58" height="30" rx="2" fill="none" stroke="#2E3A45" stroke-width="2"/>
+  <rect x="17" y="456" width="14" height="10" rx="2" fill="#F2E6D4"/>
+  <!-- 书桌+电脑 -->
+  <rect x="80" y="452" width="32" height="5" fill="#A9714B"/>
+  <rect x="82" y="457" width="4" height="27" fill="#7D4F30"/><rect x="106" y="457" width="4" height="27" fill="#7D4F30"/>
+  <rect x="86" y="438" width="18" height="14" rx="1" fill="#9AD1F0" opacity=".9"/>
+  <rect x="90" y="434" width="10" height="4" fill="#5B7B9A"/>
+  <text x="14" y="218" font-size="9.5" fill="#9AA4B2">203</text>
+
+  <!-- 公共厨房 x124-272（白天吊灯熄灭） -->
+  <rect x="124" y="200" width="148" height="340" fill="#4A5A6A" opacity=".4"/>
+  <rect x="124" y="492" width="148" height="48" fill="#A9714B"/>
+  <rect x="124" y="492" width="148" height="3" fill="#7D4F30"/>
+  <g stroke="#7D4F30" stroke-width="1" opacity=".6">
+    <line x1="124" y1="506" x2="272" y2="506"/><line x1="124" y1="520" x2="272" y2="520"/>
+  </g>
+  <rect x="216" y="224" width="44" height="54" fill="#C9D2DA" opacity=".5"/>
+  <rect x="216" y="224" width="44" height="54" fill="none" stroke="#2E3A45" stroke-width="3"/>
+  <line x1="238" y1="224" x2="238" y2="278" stroke="#2E3A45" stroke-width="2"/>
+  <!-- 灶台+油烟机 -->
+  <rect x="134" y="440" width="52" height="34" fill="#C9D2DA"/>
+  <rect x="134" y="440" width="52" height="34" fill="none" stroke="#2E3A45" stroke-width="2"/>
+  <rect x="132" y="432" width="56" height="9" fill="#2E3A45"/>
+  <circle cx="146" cy="436" r="3" fill="#F75752"/><circle cx="172" cy="436" r="3" fill="#8A93A0"/>
+  <rect x="146" y="418" width="20" height="13" rx="1" fill="#5B7B9A" stroke="#2E3A45" stroke-width="1.5"/>
+  <line x1="151" y1="418" x2="161" y2="418" stroke="#2E3A45" stroke-width="2"/>
+  <rect x="136" y="396" width="44" height="10" rx="2" fill="#2D333D"/>
+  <line x1="158" y1="396" x2="158" y2="382" stroke="#2D333D" stroke-width="3"/>
+  <!-- 蒸汽 -->
+  <path d="M152,412 q3,-4 0,-8 q-3,-4 0,-8" fill="none" stroke="#C9D2DA" stroke-width="1.5" opacity=".6"/>
+  <path d="M160,412 q3,-4 0,-8" fill="none" stroke="#C9D2DA" stroke-width="1.5" opacity=".5"/>
+  <!-- 大冰箱 -->
+  <rect x="244" y="420" width="26" height="54" rx="2" fill="#C9D2DA" stroke="#2E3A45" stroke-width="2"/>
+  <line x1="244" y1="440" x2="270" y2="440" stroke="#2E3A45" stroke-width="1.5"/>
+  <rect x="248" y="426" width="4.5" height="4.5" fill="#FEAE3E"/><rect x="255" y="431" width="4.5" height="4.5" fill="#2EFA8D"/>
+  <circle cx="262" cy="427" r="2.2" fill="#EB6999"/>
+  <!-- 共享长桌（拼桌位） -->
+  <rect x="188" y="452" width="60" height="7" rx="1" fill="#D9B48F" stroke="#2E3A45" stroke-width="1.5"/>
+  <rect x="192" y="459" width="5" height="17" fill="#A9714B"/><rect x="239" y="459" width="5" height="17" fill="#A9714B"/>
+  <circle cx="204" cy="448" r="5" fill="#F2E6D4" stroke="#2E3A45" stroke-width="1.2"/>
+  <circle cx="228" cy="448" r="5" fill="#F2E6D4" stroke="#2E3A45" stroke-width="1.2"/>
+  <circle cx="216" cy="450" r="3" fill="#E07856" opacity=".8"/>
+  <!-- 吊灯（白天熄灭，无暖光锥） -->
+  <line x1="212" y1="200" x2="212" y2="240" stroke="#2E3A45" stroke-width="2"/>
+  <polygon points="199,240 225,240 232,258 192,258" fill="#2E3A45"/>
+  <circle cx="212" cy="262" r="3.5" fill="#2D333D"/>
+  <!-- 餐具架 -->
+  <rect x="134" y="300" width="48" height="5" fill="#A9714B"/>
+  <circle cx="142" cy="295" r="4" fill="#F2E6D4"/><circle cx="153" cy="295" r="4" fill="#7FA98C"/>
+  <rect x="164" y="288" width="9" height="12" fill="#E07856"/>
+  <rect x="134" y="322" width="48" height="5" fill="#A9714B"/>
+  <rect x="138" y="310" width="7" height="12" fill="#5B7B9A"/><rect x="148" y="312" width="7" height="10" fill="#FEAE3E" opacity=".85"/>
+  <!-- 半开放隔断（右侧吧台） -->
+  <rect x="252" y="470" width="20" height="6" fill="#D9B48F" stroke="#2E3A45" stroke-width="1.5"/>
+  <rect x="254" y="476" width="16" height="16" fill="#A9714B"/>
+  <text x="130" y="218" font-size="9.5" fill="#9AA4B2">2F 公共厨房 · 餐厅</text>
+
+  <!-- 204 房间 x278-382 -->
+  <rect x="278" y="200" width="104" height="340" fill="#4A5A6A" opacity=".55"/>
+  <rect x="278" y="492" width="104" height="48" fill="#A9714B" opacity=".85"/>
+  <rect x="278" y="492" width="104" height="3" fill="#7D4F30"/>
+  <g stroke="#7D4F30" stroke-width="1" opacity=".6">
+    <line x1="278" y1="506" x2="382" y2="506"/><line x1="278" y1="520" x2="382" y2="520"/>
+  </g>
+  <rect x="322" y="238" width="48" height="64" fill="#C9D2DA" opacity=".5"/>
+  <rect x="322" y="238" width="48" height="64" fill="none" stroke="#2E3A45" stroke-width="3"/>
+  <line x1="346" y1="238" x2="346" y2="302" stroke="#2E3A45" stroke-width="2.5"/>
+  <rect x="286" y="248" width="16" height="23" fill="#7FA98C" opacity=".85"/>
+  <!-- 电竞书桌（双屏） -->
+  <rect x="312" y="452" width="56" height="5" fill="#A9714B"/>
+  <rect x="315" y="457" width="4" height="27" fill="#7D4F30"/><rect x="361" y="457" width="4" height="27" fill="#7D4F30"/>
+  <rect x="318" y="434" width="17" height="14" rx="1" fill="#9AD1F0" opacity=".85"/>
+  <rect x="338" y="434" width="17" height="14" rx="1" fill="#9AD1F0" opacity=".6"/>
+  <rect x="284" y="452" width="22" height="30" rx="2" fill="#7FA98C" opacity=".7"/>
+  <text x="284" y="218" font-size="9.5" fill="#9AA4B2">204</text>
+
+  <!-- 墙体 -->
+  <rect x="0" y="200" width="8" height="340" fill="#2E3A45"/>
+  <rect x="118" y="200" width="6" height="340" fill="#2E3A45"/>
+  <rect x="272" y="200" width="6" height="340" fill="#2E3A45"/>
+  <rect x="382" y="200" width="8" height="340" fill="#2E3A45"/>
+  <rect x="272" y="430" width="6" height="62" fill="#3B3A55"/>
+
+  <!-- ===== 楼板 + 1F 大堂（暗，纯背景） ===== -->
+  <rect x="0" y="540" width="390" height="16" fill="#2E3A45"/>
+  <rect x="0" y="540" width="390" height="2.5" fill="#5B7B9A" opacity=".7"/>
+  <rect x="0" y="556" width="390" height="288" fill="url(#lobby)"/>
+  <g opacity=".55">
+    <!-- 前台 -->
+    <rect x="24" y="660" width="96" height="44" rx="3" fill="#2D333D"/>
+    <rect x="24" y="660" width="96" height="8" rx="3" fill="#5B7B9A" opacity=".6"/>
+    <rect x="34" y="636" width="20" height="14" rx="2" fill="#9AD1F0" opacity=".5"/>
+    <!-- 公告栏 -->
+    <rect x="140" y="600" width="70" height="48" rx="3" fill="#1F2630"/>
+    <rect x="146" y="606" width="14" height="18" fill="#F2E6D4" opacity=".5"/>
+    <rect x="164" y="606" width="14" height="18" fill="#FEAE3E" opacity=".4"/>
+    <rect x="182" y="606" width="14" height="18" fill="#F2E6D4" opacity=".35"/>
+    <rect x="146" y="628" width="34" height="12" fill="#5AC3ED" opacity=".3"/>
+    <!-- 沙发组 -->
+    <rect x="230" y="676" width="86" height="26" rx="8" fill="#4A5A6A"/>
+    <rect x="230" y="664" width="14" height="22" rx="6" fill="#4A5A6A"/>
+    <rect x="302" y="664" width="14" height="22" rx="6" fill="#4A5A6A"/>
+    <!-- 快递柜 -->
+    <rect x="330" y="596" width="52" height="108" rx="3" fill="#2D333D"/>
+    <g fill="#1F2630">
+      <rect x="334" y="602" width="20" height="20"/><rect x="358" y="602" width="20" height="20"/>
+      <rect x="334" y="626" width="20" height="20"/><rect x="358" y="626" width="20" height="20"/>
+      <rect x="334" y="650" width="20" height="20"/><rect x="358" y="650" width="20" height="20"/>
+      <rect x="334" y="674" width="20" height="26"/><rect x="358" y="674" width="20" height="26"/>
+    </g>
+    <circle cx="344" cy="612" r="1.5" fill="#2EFA8D" opacity=".8"/>
+    <!-- 贩卖机 -->
+    <rect x="140" y="664" width="44" height="62" rx="4" fill="#4A5A6A"/>
+    <rect x="144" y="670" width="26" height="34" fill="#9AD1F0" opacity=".35"/>
+    <rect x="174" y="672" width="6" height="10" fill="#F75752" opacity=".6"/>
+    <!-- 大堂顶灯（白天熄灭） -->
+    <ellipse cx="195" cy="580" rx="60" ry="10" fill="#FFD166" opacity=".02"/>
+    <rect x="186" y="566" width="18" height="5" rx="2" fill="#2D333D"/>
+  </g>
+  <text x="14" y="572" font-size="9.5" fill="#9AA4B2" opacity=".6">1F 大堂</text>
+</svg>

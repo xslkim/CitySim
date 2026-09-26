@@ -13,6 +13,7 @@ import { SubtitleView } from './ui/subtitle-view.js';
 import { PcardView } from './ui/pcard-view.js';
 import { FloatView } from './ui/float-view.js';
 import { StreamWsClient } from './lib/ws-client.js';
+import { fmtSimHHMM, isDaySim } from './lib/sim-time.js';
 
 const params = new URLSearchParams(location.search);
 const TOKEN = params.get('token') || '';
@@ -36,14 +37,16 @@ async function fetchJson(url) {
   return resp.json();
 }
 
-/** 模拟墙钟 HH:MM（T-ITER2-05：Intl Asia/Shanghai 渲染，与 web lib/simTime 同口径；出站 sim_time 为 UTC ISO）。 */
-const SH_HHMM = new Intl.DateTimeFormat('zh-CN', {
-  timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hour12: false,
-});
-export function fmtSimHHMM(simTime) {
-  const d = new Date(simTime);
-  if (Number.isNaN(d.getTime())) return String(simTime).slice(11, 16);
-  return SH_HHMM.format(d);
+/** 昼夜底图切换：normal 形态日/夜两资产，src/alt 随本地模拟时切换（climax 名场面底图不受昼夜约束）。 */
+export function applyDayNight(simTime) {
+  const img = document.getElementById('stage-normal');
+  if (!img) return;
+  const day = isDaySim(simTime);
+  const want = day ? './assets/stage-normal-day.svg' : './assets/stage-normal.svg';
+  if (!img.src.endsWith(want.slice(1))) {
+    img.src = want;
+    img.alt = day ? '公寓日景' : '公寓夜景';
+  }
 }
 
 /** 左上标签：`"<地点中文名> · Day <n> · HH:MM"`（原型形态）。 */
@@ -65,6 +68,8 @@ export function renderTag() {
     const hhmm = ctx.lastSimTime ? fmtSimHHMM(ctx.lastSimTime) : '--:--';
     timeEl.textContent = `${day} · ${hhmm}`;
   }
+  // R3 #6：昼夜底图随本地模拟时切换（每次渲染标签路径顺带刷新，事件流/快照/resync 全覆盖）
+  if (ctx.lastSimTime) applyDayNight(ctx.lastSimTime);
 }
 
 async function bootstrap() {
