@@ -12,3 +12,6 @@ var/
 # M6 演练证据与报告（T-SYN-11/T-OPS-05 运行产物）
 server/scripts/sync_drill_evidence/
 server/scripts/sync_drill_evidence_full.log
+
+# 用户提供的 GLM key（本地机密，勿入 git）
+glmkey.text
