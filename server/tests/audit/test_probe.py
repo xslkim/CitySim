@@ -135,3 +135,79 @@ async def test_throttle_24h_escalation_consumed(test_db_dsn: str) -> None:
         assert await consume_throttle_escalation(ThrottleState(), clock.pause) is False
     finally:
         await pool.close()
+
+
+class _DuckClock:
+    """TimeEngine 鸭子类型（DecisionSilentProbe 消费面）。"""
+
+    def __init__(self, tick: int, sim: dt.datetime) -> None:
+        self._tick = tick
+        self._sim = sim
+
+    @property
+    def current_tick(self) -> int:
+        return self._tick
+
+    @property
+    def batch_mode(self) -> bool:
+        return False
+
+    def now_sim(self) -> dt.datetime:
+        return self._sim
+
+
+async def _ins_agent_event(pool, tick: int, sim: dt.datetime) -> None:
+    await pool.execute(
+        """
+        INSERT INTO events (tick, sim_time, type, source, trigger, payload, visibility)
+        VALUES ($1, $2, 'agent.move', 'agent:A90', 'autonomous', '{}'::jsonb, 'public')
+        """,
+        tick, sim)
+
+
+async def test_decision_silent_probe_flags_stall(test_db_dsn: str, alerts_file) -> None:
+    """R3 #5①：注入停摆——清醒非 batch 时段零角色行为事件超阈值 → stalled/reason=decision_silent
+    + world.stalled 标记 + alerts.log WARN；行为恢复清标；睡眠窗静默不告警（正常口径）。"""
+    import json as _json
+
+    from worldsim.audit.probe import DecisionSilentProbe
+    from worldsim.time_engine.clock import LOCAL_TZ
+
+    pool = await asyncpg.create_pool(test_db_dsn, min_size=1, max_size=2)
+    try:
+        t0 = dt.datetime(2026, 10, 12, 10, 0, tzinfo=LOCAL_TZ)  # 周一 10:00（清醒工作时段）
+        await _ins_agent_event(pool, 100, t0)
+        stall_reasons: list[str] = []
+
+        async def on_stall(reason: str) -> None:
+            stall_reasons.append(reason)
+
+        clock = _DuckClock(100, t0)
+        probe = DecisionSilentProbe(pool, clock=clock, is_quiet_fn=lambda _s: False,
+                                    silent_minutes=30, on_stall=on_stall)
+        assert (await probe.check_once())["stalled"] is False, "同 tick 有行为事件不告警"
+        clock._tick = 110  # +10 tick = 50 模拟分钟 > 30 阈值
+        res = await probe.check_once()
+        assert res["stalled"] is True and "decision_silent" in (res["reason"] or "")
+        assert probe.stalled_reason and "decision_silent" in probe.stalled_reason
+        assert stall_reasons, "on_stall 附加通道触发（首次越线）"
+        marker = _json.loads(await pool.fetchval(
+            "SELECT value FROM world_state WHERE key='world.stalled'"))
+        assert marker["stalled"] is True and marker["reason"] == "decision_silent"
+        assert marker["since_tick"] == 100
+        alerts.flush_warnings()
+        assert "world.decision_silent" in alerts_file.read_text(encoding="utf-8")
+        # 行为恢复 → 清标
+        await _ins_agent_event(pool, 110, t0)
+        assert (await probe.check_once())["stalled"] is False
+        marker2 = _json.loads(await pool.fetchval(
+            "SELECT value FROM world_state WHERE key='world.stalled'"))
+        assert marker2["stalled"] is False
+        # 睡眠窗静默 = 正常口径：即使 gap 超阈也不告警并清除标记
+        clock2 = _DuckClock(200, t0.replace(hour=2, minute=0))
+        probe2 = DecisionSilentProbe(pool, clock=clock2,
+                                     is_quiet_fn=lambda s: s.hour < 6, silent_minutes=30)
+        res2 = await probe2.check_once()
+        assert res2["stalled"] is False, "睡眠窗静默不得告警（决策停摆豁免口径）"
+    finally:
+        await pool.close()

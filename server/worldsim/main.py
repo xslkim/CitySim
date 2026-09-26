@@ -665,6 +665,15 @@ async def _run(args: argparse.Namespace) -> int:
                         log.exception("活性看门狗巡检失败（下轮重试）")
 
             tg.create_task(kernel_watchdog())
+            # R3 #5 探针 v2：决策活性维度（world_stalled_reason='decision_silent' 盲区修复；
+            # 只报告不动作，避免 probe 误报前科造成重启风暴）。WSIM_DECISION_SILENT_MIN 可调（默认 30 模拟分钟）
+            from .audit.probe import DecisionSilentProbe
+
+            silent_probe = DecisionSilentProbe(
+                pool, clock=clock, is_quiet_fn=needs_engine.is_sleeping,
+                silent_minutes=int(os.environ.get("WSIM_DECISION_SILENT_MIN", "30")),
+            )
+            tg.create_task(silent_probe.run(stop))
             # audit/rotation 协程挂接点（M3/T-LOD-03 接，04 §2.2 伪码行）
 
         sim_end = clock.now_sim()

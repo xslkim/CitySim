@@ -27,6 +27,100 @@ log = logging.getLogger(__name__)
 
 PROBE_INTERVAL_S = 30.0  # 04 §3.2 探测循环
 DEFAULT_DISK_PAUSE_FREE_PCT = 5.0  # 磁盘暂停线默认 5%（08 D4 工程默认；告警线 80% 见 §12.3 另口径）
+DEFAULT_SILENT_MINUTES = 30  # R3 #5：决策静默线（模拟分钟；agent 清醒且非 batch 时段口径）
+
+# 角色行为事件口径（与观测端 fetch_stall / 内核看门狗同口径，三处一致才不误报）
+AGENT_EVENT_LIKE = "type LIKE 'agent.%' OR type LIKE 'dialogue.%' OR type LIKE 'social.%'"
+
+
+class DecisionSilentProbe:
+    """R3 #5 探针 v2：决策活性维度（"脑死亡不报警"盲区修复）。
+
+    旧 world_stalled 只看 watermark 推进——时钟走、零事件零 LLM 零 ERROR 时探针恒 false
+    （round3 实案：batch 后裁决循环挂起 55 分钟，看门狗 55 分钟后才凑够 30 tick 阈值）。
+    判定：非 batch 段且 agent 清醒（作息表外）时，`clock.current_tick - 最近角色行为事件
+    tick` 折模拟分钟 > silent_minutes → decision_silent：kernel.log WARN + alerts.log 聚合
+    留痕 + world_state `world.stalled` 标记（stalled/reason/since_tick）。**只报告不动作**
+    （probe 误报前科见 G 项裁决；自动拉起/降级决策 backlog）。
+    睡眠窗/batch 段的静默是正常口径 → 清除标记不告警。
+    """
+
+    STALL_KEY = "world.stalled"
+
+    def __init__(
+        self,
+        pool: Any,
+        *,
+        clock: Any,  # TimeEngine 鸭子类型：current_tick/batch_mode/now_sim
+        is_quiet_fn: Callable[[dt.datetime], bool],  # 作息安静判定（main 注入 needs_engine.is_sleeping）
+        silent_minutes: int = DEFAULT_SILENT_MINUTES,
+        on_stall: Callable[[str], Awaitable[None]] | None = None,  # 附加通道（测试断言用）
+    ) -> None:
+        self._pool = pool
+        self._clock = clock
+        self._is_quiet = is_quiet_fn
+        self._silent_minutes = int(silent_minutes)
+        self._on_stall = on_stall
+        self.stalled = False
+        self.stalled_reason: str | None = None
+
+    async def _set_marker(self, stalled: bool, reason: str | None, since_tick: int | None) -> None:
+        import json as _json
+        await self._pool.execute(
+            """
+            INSERT INTO world_state (key, value, updated_tick, updated_at)
+            VALUES ($1, $2::jsonb, $3, now())
+            ON CONFLICT (key) DO UPDATE SET value=$2::jsonb, updated_tick=$3, updated_at=now()
+            """,
+            self.STALL_KEY, _json.dumps({
+                "stalled": stalled, "reason": reason, "since_tick": since_tick,
+                "checked_at": dt.datetime.now(LOCAL_TZ).isoformat()}, ensure_ascii=False),
+            int(self._clock.current_tick))
+
+    async def check_once(self) -> dict[str, Any]:
+        """探测一轮：返回 {stalled, reason, gap_ticks}；首次越线 WARN + 标记，恢复 INFO + 清标。"""
+        sim_now = self._clock.now_sim()
+        if self._clock.batch_mode or self._is_quiet(sim_now):
+            if self.stalled:  # 安静时段静默属正常口径（睡眠/batch）→ 清除
+                self.stalled = False
+                self.stalled_reason = None
+                log.info("决策活性探针：进入安静时段（睡眠/batch），清除 decision_silent 标记")
+                await self._set_marker(False, None, None)
+            return {"stalled": False, "reason": None, "gap_ticks": 0}
+        agent_tick = await self._pool.fetchval(
+            f"SELECT max(tick) FROM events WHERE {AGENT_EVENT_LIKE}")
+        gap = int(self._clock.current_tick) - int(agent_tick or 0)
+        gap_min = gap * 5  # tick = 模拟 5 分钟（04 §2.2）
+        if gap_min > self._silent_minutes:
+            reason = (f"decision_silent：agent 清醒且非 batch 时段，已 {gap} tick"
+                      f"（≈{gap_min} 模拟分钟）无角色行为事件（阈值 {self._silent_minutes} 模拟分钟）")
+            if not self.stalled:
+                self.stalled = True
+                self.stalled_reason = reason
+                log.warning("决策活性探针：%s → world_stalled=true（reason=decision_silent）", reason)
+                alert("WARN", "world.decision_silent", reason,
+                      {"gap_ticks": gap, "since_tick": int(agent_tick or 0)})
+                if self._on_stall is not None:
+                    await self._on_stall(reason)
+            await self._set_marker(True, "decision_silent", int(agent_tick or 0))
+            return {"stalled": True, "reason": self.stalled_reason, "gap_ticks": gap}
+        if self.stalled:
+            self.stalled = False
+            self.stalled_reason = None
+            log.info("决策活性探针：角色行为恢复（gap=%d tick）→ 清除 decision_silent", gap)
+        await self._set_marker(False, None, None)
+        return {"stalled": False, "reason": None, "gap_ticks": gap}
+
+    async def run(self, stop: asyncio.Event) -> None:  # pragma: no cover - 常驻循环
+        while not stop.is_set():
+            try:
+                await self.check_once()
+            except Exception:  # noqa: BLE001
+                log.exception("决策活性探针异常（下轮继续）")
+            await asyncio.sleep(PROBE_INTERVAL_S)
+
+
+LOCAL_TZ = dt.timezone(dt.timedelta(hours=8))
 
 
 async def consume_throttle_escalation(

@@ -123,28 +123,54 @@ async def fetch_active_dialogues(pool: Any, tick: int) -> list[dict[str, Any]]:
 
 
 STALL_TICKS = 30  # T-ITER2-01④：N tick 无角色行为事件即判停滞（与内核看门狗 WSIM_WATCHDOG_TICKS 同阈）
+STALL_LATEST_WALL_S = 600  # R3 #5：latest 帧墙钟保鲜线（10 分钟无帧 = 内核/sync 死，世界停滞）
 # 角色行为事件口径（看门狗双参照之一：max(agent 事件 tick) vs watermark）
 AGENT_EVENT_LIKE = "type LIKE 'agent.%' OR type LIKE 'dialogue.%' OR type LIKE 'social.%'"
 
 
 async def fetch_stall(pool: Any) -> dict[str, Any]:
-    """世界停滞判定：watermark_tick 与最近角色行为事件 tick 的差 > 阈值（T-ITER2-01④）。
+    """世界停滞判定 v2（T-ITER2-01④ + R3 #5 探针 v2 观测端对齐）。
 
-    内核死后观测端继续自称 rolling 假实时的事故修复——world_stalled 进 snapshot 响应，
-    前端头部显示"世界停滞"人话提示（替代"（滚动刷新）"假实时口径）。
+    三参照并集（任何一条命中即 stalled，reason 区分口径）：
+    ① watermark 与最近角色行为事件 tick 差 > 阈值（原口径）；
+    ② **decision_silent**：当日滚动 latest 帧 tick 仍推进（sync 活着、时钟走）但角色行为
+       事件静默——决策链挂起而世界假活（round3 实案：batch 后裁决循环挂起 55 分钟）；
+    ③ latest 帧墙钟保鲜超线（内核/sync 死，观测端不再收到新帧）。
     """
     row = await pool.fetchrow(
         f"SELECT max(tick) AS wm, max(tick) FILTER (WHERE {AGENT_EVENT_LIKE}) AS agent_tick FROM obs.events"
     )
-    if row is None or row["wm"] is None:
+    wm = int(row["wm"]) if row is not None and row["wm"] is not None else None
+    agent_tick = int(row["agent_tick"] or 0) if row is not None else 0
+    latest_tick = latest_age_s = None
+    if await pool.fetchval("SELECT to_regclass('obs.world_state_latest') IS NOT NULL"):
+        lr = await pool.fetchrow("SELECT tick, updated_at FROM obs.world_state_latest WHERE id=1")
+        if lr is not None:
+            latest_tick = int(lr["tick"])
+            latest_age_s = (dt.datetime.now(dt.timezone.utc) - lr["updated_at"].astimezone(dt.timezone.utc)).total_seconds()
+    if wm is None and latest_tick is None:
         return {"stalled": False, "stalled_ticks": 0, "stalled_reason": None}
-    gap = int(row["wm"]) - int(row["agent_tick"] or 0)
+    ref_tick = max(wm or 0, latest_tick or 0)
+    gap = ref_tick - agent_tick
     stalled = gap > STALL_TICKS
+    reason = None
+    if stalled:
+        if latest_tick is not None and wm is not None and latest_tick > wm:
+            reason = (f"decision_silent：时钟走（latest tick {latest_tick}）但角色行为静默 "
+                      f"{gap} tick（≈{gap * 5} 模拟分钟），决策链可能挂起")
+        elif latest_tick is not None and wm is None:
+            reason = f"decision_silent：仅 latest 帧流动，角色行为静默 {gap} tick"
+        else:
+            reason = f"已 {gap} tick（≈{gap * 5} 模拟分钟）没有角色行为，世界可能停滞"
+    if latest_age_s is not None and latest_age_s > STALL_LATEST_WALL_S and not stalled:
+        stalled = True
+        reason = (f"latest 帧 {int(latest_age_s)}s 未更新（保鲜线 {STALL_LATEST_WALL_S}s）："
+                  f"内核或同步通道已死，观测端停留在旧世界")
     return {
         "stalled": stalled,
         "stalled_ticks": gap,
-        "stalled_reason": (f"已 {gap} tick（≈{gap * 5} 模拟分钟）没有角色行为，世界可能停滞"
-                           if stalled else None),
+        "stalled_reason": reason,
+        "last_agent_event_tick": agent_tick,
     }
 
 
@@ -157,9 +183,12 @@ async def fetch_llm_status(pool: Any) -> dict[str, Any]:
     """
     stall = await fetch_stall(pool)
     ref = await pool.fetchval("SELECT max(sim_time) FROM obs.events")
+    decision_fields = {"last_agent_event_tick": stall.get("last_agent_event_tick"),
+                       "decision_gap_ticks": stall["stalled_ticks"]}  # R3 #5③：决策链活性直读
     if ref is None:
         return {"degraded": False, "failover_count": 0, "last_reason": None,
-                "stalled": stall["stalled"], "stalled_reason": stall["stalled_reason"]}
+                "stalled": stall["stalled"], "stalled_reason": stall["stalled_reason"],
+                **decision_fields}
     window_start = ref - dt.timedelta(hours=2)
     rows = await pool.fetch(
         """
@@ -176,7 +205,8 @@ async def fetch_llm_status(pool: Any) -> dict[str, Any]:
     degraded = bool(latest_star and latest_star.get("to_provider") == "chain_end")
     return {"degraded": degraded, "failover_count": count,
             "last_reason": (latest_star or {}).get("reason") if latest_star else None,
-            "stalled": stall["stalled"], "stalled_reason": stall["stalled_reason"]}
+            "stalled": stall["stalled"], "stalled_reason": stall["stalled_reason"],
+            **decision_fields}
 
 
 async def assemble_snapshot(pool: Any, snap: dict[str, Any]) -> dict[str, Any]:

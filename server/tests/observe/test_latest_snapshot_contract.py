@@ -147,3 +147,42 @@ async def test_world_stalled_flag_observable(env: Any) -> None:
     data2 = (await env["client"].get("/api/snapshot")).json()["data"]
     assert data2["world_stalled"] is False
     assert data2["llm_status"]["stalled"] is False
+
+
+@pytest.mark.asyncio
+async def test_decision_silent_detected_via_latest_frame(env: Any) -> None:
+    """R3 #5②：事件流静默但 latest 帧推进（sync 活着、时钟走、决策链挂起）→ stalled + decision_silent 口径。
+
+    round3 实案复现：batch 后裁决循环挂起 55 分钟，旧口径 watermark/agent_tick 双双冻结 gap=0 不报警。
+    """
+    snap_time = dt.datetime(2026, 10, 12, 13, 25, tzinfo=LOCAL_TZ)
+    async with env["pool"].acquire() as conn:
+        # 角色行为事件停在 tick 100（此后只有系统事件）
+        await conn.execute(
+            "INSERT INTO events (tick, sim_time, type, source, trigger, actors, payload, visibility)"
+            " VALUES (100, $1, 'agent.move', 'agent:A01', 'autonomous', '{A01}', '{}'::jsonb, 'public')",
+            snap_time)
+        await conn.execute(
+            "INSERT INTO events (tick, sim_time, type, source, trigger, actors, payload, visibility)"
+            " VALUES (130, $1, 'state.needs_delta', 'system', 'system', '{}', '{}'::jsonb, 'internal')",
+            snap_time + dt.timedelta(minutes=10))
+        # latest 帧继续推进（sync 通道活着）：tick 160，领先事件 watermark 30+
+        await conn.execute(
+            "UPDATE public.world_state_latest SET tick=160, updated_at=now()")
+    data = (await env["client"].get("/api/snapshot")).json()["data"]
+    assert data["world_stalled"] is True
+    assert "decision_silent" in (data["world_stalled_reason"] or "")
+    assert data["llm_status"]["last_agent_event_tick"] == 100, "R3 #5③：上次成功决策 tick 直读"
+    assert data["llm_status"]["decision_gap_ticks"] == 60
+    # latest 帧墙钟保鲜超线（内核/sync 死）→ 停滞（另一条口径）
+    async with env["pool"].acquire() as conn:
+        await conn.execute(
+            "UPDATE public.world_state_latest SET updated_at=now() - interval '20 minutes'")
+        # 事件流 watermark 追平 latest（消除 decision_silent 口径）
+        await conn.execute(
+            "INSERT INTO events (tick, sim_time, type, source, trigger, actors, payload, visibility)"
+            " VALUES (160, $1, 'agent.think', 'agent:A02', 'autonomous', '{A02}', '{}'::jsonb, 'internal')",
+            snap_time + dt.timedelta(minutes=40))
+    data2 = (await env["client"].get("/api/snapshot")).json()["data"]
+    assert data2["world_stalled"] is True
+    assert "latest 帧" in (data2["world_stalled_reason"] or "")
