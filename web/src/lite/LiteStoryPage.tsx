@@ -48,7 +48,10 @@ export default function LiteStoryPage() {
     <LiteShell>
       <div className="mx-auto max-w-2xl space-y-3 p-4" data-testid="lite-story-page">
         <div className="card">
-          <div className="text-title text-text-0">{title || '今天全楼都在说这件事'}</div>
+          <div className="text-title text-text-0">
+            {/* R1 #7：无 ripple 时标题与空态正文同口径（中性），有内容时恢复"全楼都在说" */}
+            {title || (empty ? '今天还没有特别热闹的事' : '今天全楼都在说这件事')}
+          </div>
         </div>
         {empty && <div className="card text-text-1">今天还没有特别热闹的事，去地图上看看吧。</div>}
         {data && (
