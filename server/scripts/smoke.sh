@@ -85,13 +85,14 @@ set -a; . "$REPO_ROOT/.env"; set +a
   "$PG_BIN/psql" -h /tmp -d worldsim -v ON_ERROR_STOP=1 -f "$SERVER_DIR/ddl/obs_derived_v1.sql" >/dev/null
   "$PG_BIN/psql" -h /tmp -d postgres -c "DROP DATABASE IF EXISTS worldsim_replica WITH (FORCE)" >/dev/null
   bash "$SERVER_DIR/scripts/replica_init.sh" >/dev/null
-  # 内核加速档（09 §8 "加速档"冒烟工程口径）：WSIM_RATIO 透传 --ratio
-  WSIM_RATIO="${WSIM_SMOKE_RATIO:-480}" bash "$REPO_ROOT/deploy/start_local.sh"
+  # 内核加速档（09 §8 "加速档"冒烟工程口径）：试跑 unthrottled（--sim-hours 长跑；
+  # paced 档段 ratio 恒被变速表覆写，--ratio 在 paced 无效，08 D15）
+  SIM_HOURS="${WSIM_SMOKE_SIM_HOURS:-720}" bash "$REPO_ROOT/deploy/start_local.sh"
 } >>"$REPO_ROOT/var/logs/smoke_step1.log" 2>&1 \
   && record "step1_cold_start" "PASS" "PG+内核+obs_refresh+摄入 API+派生 worker+obs-api+web dev 全栈就绪" \
   || record "step1_cold_start" "FAIL" "见 var/logs/smoke_step1.log"
 
-log "step② 内核运行 ≥${KERNEL_MIN_WALL_S}s（加速档：WSIM_SMOKE_RATIO=${WSIM_SMOKE_RATIO:-480}，窗口跨 ≥2 日界，08 D15）：events 增长 / seq 无空洞 / 类型覆盖 ≥6"
+log "step② 内核运行 ≥${KERNEL_MIN_WALL_S}s（加速档=试跑 unthrottled ${WSIM_SMOKE_SIM_HOURS:-720} sim-h，窗口跨多日界，08 D15）：events 增长 / seq 无空洞 / 类型覆盖 ≥6"
 e0=$(psql_main "SELECT coalesce(max(seq),0) FROM events")
 sleep "$KERNEL_MIN_WALL_S"
 e1=$(psql_main "SELECT coalesce(max(seq),0) FROM events")
