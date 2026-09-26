@@ -8,6 +8,7 @@ import RippleDag from '../components/ripple/RippleDag';
 import TodayRipples from '../components/ripple/TodayRipples';
 import { renderEvent } from '../lib/eventText';
 import { exportCardText } from '../lib/rippleLayout';
+import { formatSimMMddHHMM } from '../lib/simTime';
 import { rippleDataSchema, type RippleData } from '../proto/ripple';
 import { useAgentsStore } from '../stores/agentsStore';
 
@@ -62,7 +63,7 @@ export default function RipplePage() {
         <span className="text-title text-text-0">
           源事件 e{data.source_seq}
           {sourceText && <span className="ml-2 text-body font-normal">「{sourceText}」</span>}
-          {data.source && <span className="ml-2 text-aux text-text-1">{data.source.sim_time.slice(0, 16).replace('T', ' ')}</span>}
+          {data.source && <span className="ml-2 text-aux text-text-1">{formatSimMMddHHMM(data.source.sim_time)}</span>}
           {sourceGrade === 'A' && <span className="ml-1 text-warn">★A级</span>}
         </span>
         <button type="button" className="ml-auto rounded bg-bg-2 px-2 py-1 text-aux text-accent"

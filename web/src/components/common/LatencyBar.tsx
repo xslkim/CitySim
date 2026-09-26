@@ -3,9 +3,11 @@
  * 颜色仍按事件滞后（watermark_tick − 最新事件 tick 换算）分级——>60s 黄 / >10min 红。
  * R1 #1：快照滚动刷新间隔 > 数秒，不再自称"live / 延迟<1s"（验收 ④）。
  * tick = 模拟 5 分钟（00 §4 红线 10）：滞后 tick 数 × 5min / 压缩比 折算真实秒。
+ * T-ITER2-05：时刻格式化走 lib/simTime（+08 展示唯一入口）。
  */
 import { useTimelineStore } from '../../stores/timelineStore';
 import { useWorldStore } from '../../stores/worldStore';
+import { formatSimHHMM } from '../../lib/simTime';
 
 export const TICK_SIM_MINUTES = 5; // tick = 模拟 5 分钟（00 §4 红线 10）
 
@@ -29,14 +31,9 @@ const COLOR: Record<LatencyLevel, string> = {
   negative: 'text-negative',
 };
 
-/** 快照 ISO 时点 → HH:MM（本地时区，与日界口径一致） */
+/** 快照 ISO 时点 → HH:MM（+08 展示，与日界口径一致；唯一定义在 lib/simTime） */
 export function snapshotHHMM(simTime: string | null | undefined): string {
-  if (!simTime) return '—';
-  const d = new Date(simTime);
-  if (Number.isNaN(d.getTime())) return String(simTime).slice(11, 16);
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  return `${hh}:${mm}`;
+  return formatSimHHMM(simTime);
 }
 
 export default function LatencyBar() {

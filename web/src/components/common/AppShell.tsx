@@ -12,6 +12,7 @@ import { useAgentsStore } from '../../stores/agentsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { useWorldStore } from '../../stores/worldStore';
 import { wsManager } from '../../ws/manager';
+import { formatSimHHMM } from '../../lib/simTime';
 import AgentList from './AgentList';
 import LatencyBar from './LatencyBar';
 import LocationTree from '../map/LocationTree';
@@ -25,10 +26,7 @@ const NAV = [
 
 export function simClockText(simTime: string | null, simDay: number | null): string {
   if (!simTime) return '—';
-  const d = new Date(simTime);
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  return `Day ${simDay ?? '?'} ${hh}:${mm}`;
+  return `Day ${simDay ?? '?'} ${formatSimHHMM(simTime)}`;  // T-ITER2-05：+08 展示（唯一定义在 lib/simTime）
 }
 
 export default function AppShell() {

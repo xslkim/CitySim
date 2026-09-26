@@ -3,6 +3,7 @@ import * as echarts from 'echarts';
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { RelationPair } from '../../proto/relations';
+import { formatSimYMD } from '../../lib/simTime';
 
 export default function PairCurves({ pair }: { pair: RelationPair }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -16,7 +17,7 @@ export default function PairCurves({ pair }: { pair: RelationPair }) {
       days.map((d) => series.find((p) => p.sim_day === d)?.[key] ?? null);
     const markPoints = pair.changes
       .map((c) => {
-        const day = c.sim_time.slice(0, 10);
+        const day = formatSimYMD(c.sim_time);  // T-ITER2-05：+08 日期（与 sim_day 列口径一致）
         const series = c.a === pair.a ? pair.series.forward : pair.series.backward;
         const y = series.find((p) => p.sim_day === day)?.affinity;
         return y == null ? null : { coord: [day, y], value: `e${c.event_seq}`, eventSeq: c.event_seq };

@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { useRef, useState } from 'react';
 import type { ObsEvent } from '../../proto/event';
 import { displaySeq, renderEvent, triggerColorVar } from '../../lib/eventText';
+import { formatSimHHMM } from '../../lib/simTime';
 import { useUiStore } from '../../stores/uiStore';
 
 export const ROW_H = 44;
@@ -80,7 +81,7 @@ export default function TimelineList({ events, names }: { events: ObsEvent[]; na
                   borderLeftColor: triggerColorVar(e.trigger) }}
                 data-seq={e.seq}
               >
-                <span className="pl-1 text-ts text-text-1">{e.sim_time.slice(11, 16)}</span>
+                <span className="pl-1 text-ts text-text-1">{formatSimHHMM(e.sim_time)}</span>
                 <span>{r.icon}</span>
                 <span className={`truncate text-body ${r.kind === 'gray' ? 'text-text-1' : 'text-text-0'}`}>
                   {r.text}

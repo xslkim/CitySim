@@ -29,6 +29,9 @@ export const healthMetricSchema = z
 export const healthDataSchema = z
   .object({
     sim_day: z.string().nullable(),
+    // T-ITER2-05：日口径标注（日结滞后是事实，标注而非伪装当日）
+    day_notice: z.string().optional(),
+    sim_day_semantics: z.string().optional(),
     metrics: z.array(healthMetricSchema),
     today_partial: z.object({
       events_today: z.number().int(),

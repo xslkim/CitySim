@@ -33,7 +33,9 @@ export default function HealthPage() {
   return (
     <div data-testid="health-page">
       <div className="mb-1 text-aux text-text-1">
-        健康度日结：{health.sim_day ?? '—'}；当日未定稿：事件 {health.today_partial.events_today} 条 /
+        {health.day_notice ?? `健康度日结：${health.sim_day ?? '—'}`}
+        <span className="ml-2 text-ts" title={health.sim_day_semantics}>（日结口径，非当日实时）</span>
+        ；当日未定稿：事件 {health.today_partial.events_today} 条 /
         A级 {health.today_partial.a_grade_today} 条 / 干预率{' '}
         {(health.today_partial.intervention_rate_today * 100).toFixed(1)}%
       </div>

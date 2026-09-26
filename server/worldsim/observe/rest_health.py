@@ -143,6 +143,10 @@ async def health_payload(pool: Any) -> dict[str, Any]:
     director_today = int(today_partial["director_today"]) if today_partial else 0
     return {
         "sim_day": latest["sim_day"].isoformat() if latest else None,
+        # T-ITER2-05（round2 #5②）：日口径标注——health_daily 为日结表，滞后当日是事实，
+        # 头部明确"数据截至"并标注语义，不再伪装当日（GM 看错日期下错判断的修复）
+        "day_notice": f"数据截至 {latest['sim_day'].isoformat()}" if latest else "尚无日结数据",
+        "sim_day_semantics": "最近一个已完成日结的模拟日（日界滞后为正常口径，非当日实时）",
         "metrics": metrics,
         "today_partial": {
             "events_today": events_today,

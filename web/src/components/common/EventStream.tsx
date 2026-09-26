@@ -8,6 +8,7 @@ import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ObsEvent } from '../../proto/event';
 import { displaySeq, renderEvent, triggerColorVar } from '../../lib/eventText';
+import { formatSimHHMM } from '../../lib/simTime';
 import { useUiStore } from '../../stores/uiStore';
 
 export const ROW_HEIGHT = 44;   // 03 §6.3
@@ -17,11 +18,6 @@ interface Props {
   events: ObsEvent[];
   names?: Map<string, string>;
   height?: number;
-}
-
-function hhmm(simTime: string): string {
-  const d = new Date(simTime);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 export default function EventStream({ events, names, height = 480 }: Props) {
@@ -76,7 +72,7 @@ export default function EventStream({ events, names, height = 480 }: Props) {
                 }}
                 data-seq={e.seq}
               >
-                <span className="pl-1 text-ts text-text-1">{hhmm(e.sim_time)}</span>
+                <span className="pl-1 text-ts text-text-1">{formatSimHHMM(e.sim_time)}</span>
                 <span>{r.icon}</span>
                 <span className={`truncate text-body ${r.kind === 'gray' ? 'text-text-1' : 'text-text-0'} ${stockColor}`}>
                   {r.text}

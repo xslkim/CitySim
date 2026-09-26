@@ -34,11 +34,14 @@ async function fetchJson(url) {
   return resp.json();
 }
 
-/** 模拟墙钟 HH:MM（Asia/Shanghai +08，time_engine/clock.py LOCAL_TZ 口径；出站 sim_time 为 UTC ISO）。 */
+/** 模拟墙钟 HH:MM（T-ITER2-05：Intl Asia/Shanghai 渲染，与 web lib/simTime 同口径；出站 sim_time 为 UTC ISO）。 */
+const SH_HHMM = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hour12: false,
+});
 export function fmtSimHHMM(simTime) {
   const d = new Date(simTime);
   if (Number.isNaN(d.getTime())) return String(simTime).slice(11, 16);
-  return new Date(d.getTime() + 8 * 3600_000).toISOString().slice(11, 16);
+  return SH_HHMM.format(d);
 }
 
 /** 左上标签：`"<地点中文名> · Day <n> · HH:MM"`（原型形态）。 */

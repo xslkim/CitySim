@@ -18,6 +18,7 @@ import { envelopeEventsSchema } from '../proto';
 import type { ObsEvent } from '../proto/event';
 import { renderEvent } from '../lib/eventText';
 import { locationName } from '../lib/mapLayout';
+import { formatSimHHMM, formatSimMMddHHMM } from '../lib/simTime';
 import { useAgentsStore } from '../stores/agentsStore';
 import { useWorldStore } from '../stores/worldStore';
 
@@ -113,7 +114,7 @@ export default function AgentPage() {
         <div className="mt-1 space-y-0.5 text-aux">
           {(schedule?.events ?? []).map((e) => (
             <div key={e.seq} className="flex gap-1">
-              <span className="text-text-1">{e.sim_time.slice(11, 16)}</span>
+              <span className="text-text-1">{formatSimHHMM(e.sim_time)}</span>
               <span className="truncate text-text-0">{renderEvent(e, (x) => names.get(x) ?? x).text}</span>
             </div>
           ))}
@@ -127,7 +128,7 @@ export default function AgentPage() {
         {reflections.map((r) => (
           <blockquote key={r.memory_id} className="mb-1 border-l-2 border-border pl-2 text-body text-text-0">
             {r.content_display}
-            <div className="text-ts text-text-1">{r.sim_time.slice(0, 16).replace('T', ' ')}</div>
+            <div className="text-ts text-text-1">{formatSimMMddHHMM(r.sim_time)}</div>
           </blockquote>
         ))}
       </div>
