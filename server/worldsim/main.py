@@ -357,6 +357,32 @@ async def _run(args: argparse.Namespace) -> int:
                 pass
 
         baseline_events = await pool.fetchval("SELECT coalesce(max(seq), 0) FROM events")
+
+        # T-OPS-05 E9 崩溃恢复编排（04 §3.2；追平机制归 02 T-TIME，本处只编排）：
+        # ① anchor.paused_at 在 → 故障后重启：resume + 两档追平；
+        # ② 崩溃（kill，无 paused_at）且锚点漂移 >60s → 追补 time.paused 后同路径。
+        async def _restart_recovery() -> None:
+            anchor = clock._require_anchor()
+            if not clock.paused:
+                drift = dt.datetime.now(LOCAL_TZ).astimezone(LOCAL_TZ) - anchor.anchor_wall
+                if drift <= dt.timedelta(seconds=60):
+                    return  # 正常启动（漂移在时钟容差内）
+                log.warning("检测到内核中断痕迹（漂移 %s）→ 追补 time.paused 并追平（04 §3.2，E9）",
+                            drift)
+                await clock.pause(f"crash_recovery：内核中断后重启（漂移 {drift}）")
+            downtime, planned = await clock.resume("restart_recovery")
+            plan = clock.plan_catchup(downtime, planned)
+            if plan.mode == "continuous":
+                async def drive(p: Any) -> None:  # 连跑档：追平期间提速回到计划位置
+                    while clock.now_sim() < p.to_sim:
+                        await asyncio.sleep(0.5)
+                await clock.run_catchup(plan, drive=drive)
+            else:
+                await clock.run_catchup(plan, agent_ids=agent_ids, summarize=batch_summarize)
+            log.info("崩溃恢复追平完成（04 §3.2）：%s → %s", downtime, planned)
+
+        await _restart_recovery()
+
         sim_start = clock.now_sim()
         log.info(
             "主循环启动：mode=%s sim_start=%s target=%s",

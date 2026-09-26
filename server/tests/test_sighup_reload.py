@@ -102,7 +102,7 @@ async def test_bad_yaml_keeps_old_and_warns(tmp_path, caplog) -> None:
     assert cb._throttle_ratio == 2.0
 
 
-def test_speed_table_defers_to_segment_boundary(tmp_path) -> None:
+async def test_speed_table_defers_to_segment_boundary(tmp_path) -> None:
     """变速表热更在下一个段边界生效，当前段不中断（04 §3.1/§12.4）。"""
     from worldsim.time_engine.speed_table import SpeedTableReloader, load
 

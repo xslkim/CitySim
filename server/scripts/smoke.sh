@@ -56,7 +56,7 @@ if [ "${1:-}" = "e9" ]; then
   sleep 3
   bash "$REPO_ROOT/deploy/start_local.sh"
   sleep 45   # 等内核恢复与追平段（04 §3.2 短停机档）
-  after_rows=$(psql_main "SELECT type || '=' || count(*) FROM events WHERE type IN ('time.paused','time.resumed','time.catchup.start','time.catchup.end') GROUP BY 1 ORDER BY 1")
+  after_rows=$(psql_main "SELECT type || '=' || count(*)::text FROM events WHERE type IN ('time.paused','time.resumed','time.catchup.start','time.catchup.end') GROUP BY type ORDER BY type")
   after=$(psql_main "SELECT count(*) FROM events WHERE type IN ('time.paused','time.resumed','time.catchup.start','time.catchup.end')")
   if [ "$after" -gt "$before" ] && printf '%s' "$after_rows" | grep -q "time.paused" \
        && printf '%s' "$after_rows" | grep -q "time.resumed"; then
