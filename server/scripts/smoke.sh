@@ -106,9 +106,9 @@ else
 fi
 
 log "step③ WSIM_REPLAY_MODE=replay 重放对账（零 LLM 调用）"
-DAY1=$(psql_main "SELECT count(DISTINCT (sim_time AT TIME ZONE 'Asia/Shanghai')::date) - 1
-                  FROM events WHERE seq <= $e1" || echo 0)
-[ "$DAY1" -ge 1 ] || DAY1=1
+# 重放日取首个完整模拟日（多日跨度时第 N 日重放撞"窗口外事件"判定——replay_check 窗口
+# 语义要求实跑恰为该日；首日窗口恒闭区间安全，冒烟工程口径，08 D15 补记）
+DAY1=1
 llm_before=$(psql_main "SELECT count(*) FROM llm_calls")
 if (cd "$SERVER_DIR" && WSIM_REPLAY_MODE=replay uv run python scripts/replay_check.py \
       --sim-day "$DAY1" >>"$REPO_ROOT/var/logs/smoke_step3.log" 2>&1); then
@@ -151,14 +151,25 @@ async def main() -> int:
         assert w["op"] == "welcome", w
         await ws.send(json.dumps({"op": "subscribe", "channels": [
             {"channel": "events", "filter": {}}]}))
+
+        async def heartbeat() -> None:  # 03 §5.2：30s ping（90s 无心跳服务端 4408 断开）
+            while True:
+                await asyncio.sleep(20)
+                await ws.send(json.dumps({"op": "ping"}))
+
+        hb = asyncio.create_task(heartbeat())
         try:
-            f = json.loads(await asyncio.wait_for(ws.recv(), 180))  # 08 D15：M6 链路延迟窗口
-            assert f["op"] == "event", f
-            print("WS 增量事件 seq=", f.get("data", {}).get("seq"))
-            return 0
+            while True:
+                f = json.loads(await asyncio.wait_for(ws.recv(), 180))  # 08 D15：M6 链路延迟窗口
+                if f["op"] == "event":
+                    print("WS 增量事件 seq=", f.get("data", {}).get("seq"))
+                    return 0
+                # pong/health/state_diff 等帧跳过继续等
         except asyncio.TimeoutError:
             print("WS 180s 未收增量事件（08 D15 窗口；M6 链路 = 内核→sync→ingest→副本→obs-api）")
             return 1
+        finally:
+            hb.cancel()
 
 sys.exit(asyncio.run(main()))
 PY
