@@ -28,6 +28,9 @@ log = logging.getLogger(__name__)
 
 LAST_SETTLED_KEY = "calendar.last_settled"
 EPOCH_KEY = "calendar.epoch_date"
+FIRED_KEY_PREFIX = "calendar.fired."   # R3 #3③：按日记录实际触发的排程项（触发率检查数据源）
+FIRED_RETENTION_DAYS = 40              # fired 键保留窗口（覆盖月频作业 + 余量）
+STALE_WINDOW_DAYS = 14                 # 近 N 模拟日零触发 → 告警（日历作业实际触发率检查）
 
 # 作息段键（与 world.yaml schedule.workday 段一致；周末/节假日返回 "free"）
 SEGMENT_KEYS = ("morning", "work_am", "lunch", "work_pm", "evening", "sleep")
@@ -277,6 +280,7 @@ class CalendarEngine:
                     pending.append((fire, order, job.name, job.fn))
             day += dt.timedelta(days=1)
         pending.sort(key=lambda x: (x[0], x[1]))
+        fired_days: dict[str, list[str]] = {}
         for fire_time, _, name, fn in pending:
             if name == "time.day_summary":
                 await self._emit_day_summary(fire_time)
@@ -284,6 +288,15 @@ class CalendarEngine:
                 log.debug("日历排程触发：%s @ %s", name, fire_time.isoformat())
                 await fn(self, fire_time)
             fired.append(name)
+            fired_days.setdefault(fire_time.date().isoformat(), []).append(name)
+        # R3 #3③：按日记录实际触发清单（日历作业实际触发率检查数据源）+ 保留窗清理
+        for day, names in fired_days.items():
+            await self.set_state(FIRED_KEY_PREFIX + day, names)
+        cutoff = (to_sim.date() - dt.timedelta(days=FIRED_RETENTION_DAYS)).isoformat()
+        for row in await self._pool.fetch(
+                "SELECT key FROM world_state WHERE key LIKE 'calendar.fired.%'"):
+            if str(row["key"]).rsplit(".", 1)[-1] < cutoff:
+                await self._pool.execute("DELETE FROM world_state WHERE key=$1", row["key"])
         await self.set_state(LAST_SETTLED_KEY, to_sim.isoformat())
         self._last_settled = to_sim
         return fired
@@ -306,8 +319,52 @@ class CalendarEngine:
     # ---- 8:00 打卡：内部出勤状态结算，不产事件（04 §3.3 v1.2 注，D-03 转正） ----------
 
     def register_core_jobs(self) -> None:
-        """注册日历引擎自带排程项（当前仅 8:00 打卡；payroll/stock 等由各 WA 任务注册）。"""
+        """注册日历引擎自带排程项（8:00 打卡 + R3 #3③ 触发率审计；payroll/stock 等各 WA 任务注册）。"""
         self.register_job("attendance.checkin", "08:00", self.is_workday, self._settle_checkin)
+        self.register_job("calendar.freshness_audit", "00:10", lambda d: True, self._run_freshness_audit)
+
+    async def _run_freshness_audit(self, engine: "CalendarEngine", fire_time: dt.datetime) -> None:
+        await self.audit_freshness(fire_time)
+
+    async def audit_freshness(self, sim_now: dt.datetime) -> list[str]:
+        """日历作业实际触发率检查（R3 #3③）：近 STALE_WINDOW_DAYS 模拟日零触发的注册作业 →
+        WARN 告警（alerts.log 聚合留痕）并附**下个谓词命中日**。
+
+        世界 mid-month 启动时月频作业（payday=1 日/bill_day=3 日/团建第 2 周六）天然缺席——
+        这不是哑火而是纪元时序，但沉默使 GM/观众无法区分"坏了"与"还没到"；本检查把
+        "还没到"变成可见的下个触发日。谓词近期无任何命中日的作业一并列出。
+        """
+        fired_rows = await self._pool.fetch(
+            "SELECT key, value FROM world_state WHERE key LIKE 'calendar.fired.%'")
+        window_start = (sim_now.date() - dt.timedelta(days=STALE_WINDOW_DAYS)).isoformat()
+        recent_fired: set[str] = set()
+        for row in fired_rows:
+            day = str(row["key"]).rsplit(".", 1)[-1]
+            if day >= window_start:
+                value = row["value"]
+                recent_fired.update(json.loads(value) if isinstance(value, str) else list(value or []))
+        stale: list[tuple[str, dt.date | None]] = []
+        for job in self._jobs:
+            if job.name in recent_fired:
+                continue
+            nxt: dt.date | None = None
+            for i in range(1, 63):
+                d = sim_now.date() + dt.timedelta(days=i)
+                if job.on(d):
+                    nxt = d
+                    break
+            stale.append((job.name, nxt))
+        if stale:
+            from ..audit.alerts import alert
+
+            detail = "；".join(
+                f"{name}（下个触发日 {nxt.isoformat()}）" if nxt is not None else f"{name}（62 日内谓词无命中）"
+                for name, nxt in stale)
+            msg = (f"日历作业实际触发率检查：{len(stale)}/{len(self._jobs)} 项近 "
+                   f"{STALE_WINDOW_DAYS} 模拟日零触发：{detail}")
+            alert("WARN", "calendar.job_stale", msg, {"stale": [n for n, _ in stale]})
+            log.warning("%s", msg)
+        return [name for name, _ in stale]
 
     async def is_on_leave(self, agent_id: str, date_: dt.date) -> bool:
         """请假标记判定（`world_state` `leave.<agent_id>` = {"until": "YYYY-MM-DD"}，T-WA-09 illness 写入）。"""

@@ -187,3 +187,42 @@ async def test_checkin_internal_no_event(cal_dsn) -> None:
         assert len(marks) == 8  # seed_8 全员
     finally:
         await pool.close()
+
+
+@pytest.mark.asyncio
+async def test_fired_recording_and_freshness_audit(cal_dsn, tmp_path) -> None:
+    """R3 #3③：settle_span 按日记录触发清单；月频作业近 14 模拟日零触发 → stale 附下个触发日
+    （mid-month 启动世界：payday=1/bill_day=3/团建第 2 周六 均早于纪元——"还没到"必须可见）。"""
+    from worldsim.audit import alerts
+    from worldsim.world_agent.calendar import register_evening_jobs
+    from worldsim.world_agent.economy import register_economy_jobs
+
+    alerts.set_path(tmp_path / "alerts.log")
+    pool = await asyncpg.create_pool(cal_dsn, min_size=1, max_size=2)
+    try:
+        cal, clock = _engine(pool, dt.datetime(2026, 10, 16, 0, 30, tzinfo=LOCAL_TZ))  # 周五
+        cal.register_core_jobs()
+        register_economy_jobs(cal)
+        register_evening_jobs(cal)
+        # 游标对齐 00:30（共享库 cursor 可能被同模块其他用例推进；freshness_audit 的 00:10 已过不触发）
+        await cal.mark_settled(dt.datetime(2026, 10, 16, 0, 30, tzinfo=LOCAL_TZ))
+        clock.set(dt.datetime(2026, 10, 16, 13, 0, tzinfo=LOCAL_TZ))
+        fired = await cal.tick()
+        assert "attendance.checkin" in fired, "工作日 08:00 打卡须触发（沙盒拨时直验，C①）"
+        # 触发清单按日落 world_state（触发率检查数据源）
+        day_log = await cal.get_state("calendar.fired.2026-10-16")
+        assert day_log and "attendance.checkin" in list(day_log)
+        stale = await cal.audit_freshness(dt.datetime(2026, 10, 16, 13, 0, tzinfo=LOCAL_TZ))
+        assert "attendance.checkin" not in stale, "今日触发的作业不得判 stale"
+        by_name = {}
+        rows = await pool.fetch("SELECT key, value FROM world_state WHERE key LIKE 'calendar.fired.%'")
+        # audit 返回不带日期，这里直接断言关键月频作业 stale 且 WARN 文案含下个触发日
+        assert "economy.payroll" in stale and "world.team_building" in stale
+        alerts.flush_warnings()
+        text = (tmp_path / "alerts.log").read_text(encoding="utf-8")
+        assert "calendar.job_stale" in text
+        assert "economy.payroll" in text and "2026-11-01" in text, "月频作业必须给出下个触发日"
+        assert "world.team_building" in text and "2026-11-14" in text, "团建=每月第 2 周六"
+    finally:
+        alerts.set_path(None)
+        await pool.close()
