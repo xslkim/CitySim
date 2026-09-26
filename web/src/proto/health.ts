@@ -22,6 +22,8 @@ export const healthMetricSchema = z
     }),
     color: z.enum(['green', 'yellow', 'red']).nullable(), // 前端映射 green→positive/yellow→warn/red→negative（02 §7.1）
     advice: z.string().nullable(),
+    // R3 #7④：单一口径注释（A 级间隔 = 日结 gap_days 唯一定义；0 值不附建议由后端控制）
+    note: z.string().nullable().optional(),
     history: z.array(z.object({ sim_day: z.string(), value: z.number().nullable() })), // 趋势 sparkline（03 §3.6）
   })
   .strip();

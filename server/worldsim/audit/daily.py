@@ -174,7 +174,12 @@ async def run_item(pool: Any, item: AuditItem, *, sim_now: dt.datetime,
 
 async def _run_cache_reconcile(pool: Any, sql: str, sim_day: dt.date) -> list[dict[str, Any]]:
     """审计⑥：抽样 5 人，needs 缓存 == 锚定初始值 + Σ state.needs_delta（04 §10.1 ⑥；
-    逐项比对 + new_value 交叉校验）。"""
+    逐项比对 + new_value 交叉校验）。
+
+    R3 #7③：容忍带 EPSILON=0.05——重放侧每步 round(…,2) 与运行侧全精度之间的亚单位
+    累计舍入（round3 前 229 条漂移的生产教训）；0.05 以下的漂移无行为意义，超带仍报红。
+    """
+    EPSILON = 0.05  # 亚单位舍入容忍带（工程默认，偏差表登记；篡改级差异 ≫ 带宽仍必报）
     raw = await pool.fetchval("SELECT value FROM world_state WHERE key=$1", INITIAL_NEEDS_KEY)
     initial = json.loads(raw) if isinstance(raw, str) else dict(raw or {})
     agent_ids = [r["id"] for r in await pool.fetch("SELECT id FROM agents ORDER BY id")]
@@ -188,14 +193,14 @@ async def _run_cache_reconcile(pool: Any, sql: str, sim_day: dt.date) -> list[di
             c = json.loads(c) if isinstance(c, str) else dict(c)
             acc[c["need"]] = round(max(0.0, min(100.0, acc[c["need"]] + float(c["delta"]))), 2)
             # new_value 交叉校验（04 §6.5 记录自洽性）
-            if abs(float(c["new_value"]) - acc[c["need"]]) > 0.01:
+            if abs(float(c["new_value"]) - acc[c["need"]]) > EPSILON:
                 violations.append({"agent_id": aid, "need": c["need"], "kind": "new_value_mismatch",
                                    "event_seq": int(d["seq"]), "expected": acc[c["need"]],
                                    "recorded": float(c["new_value"])})
         cur = await pool.fetchval("SELECT needs FROM agents WHERE id=$1", aid)
         cur = json.loads(cur) if isinstance(cur, str) else dict(cur or {})
         for k in NEED_KEYS:
-            if abs(float(cur.get(k, 0.0)) - acc[k]) > 0.01:
+            if abs(float(cur.get(k, 0.0)) - acc[k]) > EPSILON:
                 violations.append({"agent_id": aid, "need": k, "kind": "cache_mismatch",
                                    "expected": acc[k], "cached": float(cur.get(k, 0.0))})
     return violations

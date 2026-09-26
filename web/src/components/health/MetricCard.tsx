@@ -38,7 +38,10 @@ export default function MetricCard({ metric }: { metric: HealthMetric }) {
   const colorCls = metricColorClass(metric.color);
   return (
     <div className="card" data-testid={`metric-${metric.key}`}>
-      <div className="text-aux text-text-1">{metricLabel(metric.key)}</div>
+      <div className="text-aux text-text-1" title={metric.note ?? undefined}>
+        {metricLabel(metric.key)}
+        {metric.note ? <span className="ml-1 text-ts">ⓘ</span> : null}
+      </div>
       <div className={`text-title ${colorCls}`}>
         {metric.value == null ? '—' : metric.unit === 'ratio' ? `${(metric.value * 100).toFixed(1)}%` : metric.value}
         <span className="ml-1 text-ts">{metric.color === 'red' ? '🔴' : metric.color === 'yellow' ? '🟡' : '🟢'}</span>

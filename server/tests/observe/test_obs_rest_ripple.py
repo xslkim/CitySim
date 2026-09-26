@@ -96,7 +96,7 @@ async def fx() -> Any:
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         c.headers["Authorization"] = f"Bearer {token}"
-        yield c, {"e1": e1, "e2": e2, "e3": e3, "e_rel": e_rel, "day": day}
+        yield c, {"e1": e1, "e2": e2, "e3": e3, "e_rel": e_rel, "day": day, "pool": pool}
     await pool.close()
     _drop_db(DB_NAME)
 
@@ -205,3 +205,23 @@ async def test_health_thresholds_from_config(fx: Any) -> None:
                        "cost_limit_micro_cny", "cost_breaker", "replica_lag_s", "replica_lag_ticks"}
     assert rt["intervention_rate"] == 0.083 and rt["replica_lag_s"] == 0
     assert set(data["today_partial"]) == {"events_today", "a_grade_today", "intervention_rate_today"}
+
+
+@pytest.mark.asyncio
+async def test_zero_value_metric_carries_no_advice(fx: Any) -> None:
+    """R3 #7④：0 值指标不附问题型建议（0 = 可能未启动而非出问题）；非 0 保留建议 + A 级间隔单口径注释。"""
+    c, fxdata = fx
+    day = fxdata["day"]
+    async with fxdata["pool"].acquire() as conn:
+        await conn.execute(
+            "INSERT INTO health_daily (sim_day, a_grade_gap_days, type_entropy, gini, ngram_dup,"
+            " relation_week_change, high_tension_ratio, active_conflict_edges, stars_without_conflict,"
+            " intervention_rate, cost_micro_cny)"
+            " VALUES ($1, 0, 2.8, 0.52, 0.09, 0.12, 0.094, 14, 0, 0.083, 0)",
+            day + dt.timedelta(days=1))
+    data = (await c.get("/api/health")).json()["data"]
+    by_key = {m["key"]: m for m in data["metrics"]}
+    assert by_key["a_grade_event_interval_days"]["value"] == 0
+    assert by_key["a_grade_event_interval_days"]["advice"] is None, "0 值不附问题型建议"
+    assert by_key["a_grade_event_interval_days"]["note"], "A 级间隔单口径注释必附"
+    assert by_key["appearance_gini"]["advice"], "非 0 值保留建议"

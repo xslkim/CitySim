@@ -108,10 +108,11 @@ async def health_payload(pool: Any) -> dict[str, Any]:
         key = spec["metric"]
         col = METRIC_COLUMN.get(key)
         value = latest[col] if (latest is not None and col) else None
+        v_float = float(value) if value is not None else None
         metrics.append({
             "key": key,
             "column": col,
-            "value": float(value) if value is not None else None,
+            "value": v_float,
             "history": [
                 {"sim_day": r["sim_day"].isoformat(),
                  "value": float(r[col]) if col and r[col] is not None else None}
@@ -121,7 +122,13 @@ async def health_payload(pool: Any) -> dict[str, Any]:
             "window": spec.get("window"),
             "thresholds": {k: spec.get(k) for k in ("healthy", "warning", "alarm")},
             "color": classify_color(value, spec),
-            "advice": METRIC_ADVICE.get(key),
+            # R3 #7④：0 值/无数据不附问题型建议——0 可能是"未启动"而非"出问题"，建议文案会误导
+            "advice": (METRIC_ADVICE.get(key)
+                       if (v_float is not None and v_float != 0.0) else None),
+            # R3 #7④：A 级间隔单一口径注释（与页头 day_notice 同一日结口径，GM 报告 0.71 绿 vs
+            # gap_days 红混排 = 两 surfaces 口径误读；此处钉死定义）
+            "note": ("距最近一个 A 级事件的已完结模拟日数（日结口径；当日未定稿部分不计入，"
+                     "页头'数据截至'即本口径锚点）" if key == "a_grade_event_interval_days" else None),
         })
     # 当日未定稿部分实时小查询（05 §6 行 / D12：主库侧现算）
     today_partial = await pool.fetchrow(
