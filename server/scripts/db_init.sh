@@ -145,6 +145,9 @@ do_reset() { # reset = drop + create database worldsim（供测试反复跑 DDL�
   log "database $DB_NAME created（owner=$APP_ROLE）"
   prepare_db
   log "extensions ready（vector / pg_partman；partman 权限已授 $APP_ROLE）"
+  # 世界运行产物随库同生命周期：旧世界快照不清会被 obs_refresh 重新灌入新库（陈旧 sim_day 串档实测缺陷）
+  rm -f "$SCRIPT_DIR/../../var/snapshot/"snapshot_* 2>/dev/null || true
+  log "var/snapshot 旧世界快照已清理"
 }
 
 case "${1:-}" in

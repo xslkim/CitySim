@@ -137,6 +137,19 @@ async def _run(args: argparse.Namespace) -> int:
             await clock.set_ratio(args.ratio)
         target_sim = clock.now_sim() + dt.timedelta(hours=args.sim_hours) if trial else None
 
+        # 新世界第 0 天引导快照：events 为空 = 首启（seed 占位锚点已重锚）。paced 模式首个
+        # 日界快照要等 ~24 模拟小时，观察端 /api/snapshot 此前 404、地图空——首启即落一份，
+        # 与日界快照同一 dump_snapshot 实现（非 batch 钩子语义，仅引导）。
+        if await pool.fetchval("SELECT NOT EXISTS(SELECT 1 FROM events)"):
+            from .snapshot.dump import dump_snapshot
+            boot_sim = clock.now_sim()
+            await dump_snapshot(
+                pool, sim_day=boot_sim.date(), out_dir=REPO_ROOT / "var" / "snapshot",
+                tick=0, sim_now=boot_sim,
+                compression_ratio=clock.ratio, schedule=None,
+            )
+            log.info("首启引导快照已落盘（sim_day=%s）", boot_sim.date())
+
         queue = AdjudicationQueue()
         notify = asyncio.Event()
         queue.bind_notify_event(notify)
