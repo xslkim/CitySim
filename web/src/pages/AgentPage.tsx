@@ -42,7 +42,9 @@ export default function AgentPage() {
     apiGet(`/api/agents/${id}/state`, agentStateSchema).then((r) => setState(r.data)).catch(() => undefined);
     apiGet(`/api/agents/${id}/reflections?limit=3`, reflectionsSchema)
       .then((r) => setReflections(r.data.items)).catch(() => undefined);
-    apiGet(`/api/agents/${id}/schedule`, scheduleSchema).then((r) => setSchedule(r.data)).catch(() => undefined);
+    apiGet(`/api/agents/${id}/schedule`, scheduleSchema)
+      .then((r) => setSchedule(r.data))
+      .catch((e: unknown) => console.warn('[agent] schedule 拉取失败', e));  // T-ITER2-03：不留静默 catch
     apiGet(`/api/events?actor=${id}&type=agent.promoted,agent.demoted&order=asc`, envelopeEventsSchema)
       .then((r) => setLodHistory(r.data.items)).catch(() => undefined);
     apiGet(`/api/relations?agent=${id}`)
@@ -103,7 +105,10 @@ export default function AgentPage() {
       <div className="card">
         <div className="mb-1 text-aux text-text-1">今日日程（sim）</div>
         <div className="text-aux text-text-0">
-          {JSON.stringify((schedule?.routine as any)?.regular ?? {}, null, 0).replace(/[{}"]/g, '')}
+          {schedule && Object.keys((schedule.routine as any)?.regular ?? {}).length === 0
+            && (schedule.events ?? []).length === 0
+            ? <span data-testid="schedule-empty">今天没有排定的事项，看看 TA 会自己做什么。</span>  // T-ITER2-03 空态文案（GM P2-6 搭车）
+            : JSON.stringify((schedule?.routine as any)?.regular ?? {}, null, 0).replace(/[{}"]/g, '')}
         </div>
         <div className="mt-1 space-y-0.5 text-aux">
           {(schedule?.events ?? []).map((e) => (

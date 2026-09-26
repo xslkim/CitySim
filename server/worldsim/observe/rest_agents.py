@@ -107,10 +107,20 @@ async def api_agent_schedule(
     day: str | None = Query(default=None),
     pool: Any = Depends(get_pool),
 ) -> dict[str, Any]:
-    """指定模拟日日程 = 快照 `routine` + 当日该 actor 的 public 事件（05 §6 行）。day 缺省 = 最新快照日。"""
+    """指定模拟日日程 = 快照 `routine` + 当日该 actor 的 public 事件（05 §6 行）。day 缺省 = 最新快照日。
+
+    T-ITER2-03：day 形态校验（ISO 日期）；非法入参 422 而非 500。
+    """
     a = await _agent_row(pool, agent_id)
     snap = await latest_snapshot(pool)
-    sim_day = dt.date.fromisoformat(day) if day else snap["sim_day"]
+    sim_day: dt.date
+    if day:
+        try:
+            sim_day = dt.date.fromisoformat(day)
+        except ValueError as e:
+            raise ApiError("bad_param", f"非法 day：{day!r}（期望 YYYY-MM-DD）", 422) from e
+    else:
+        sim_day = snap["sim_day"]
     rows = await pool.fetch(
         """
         SELECT * FROM obs.events

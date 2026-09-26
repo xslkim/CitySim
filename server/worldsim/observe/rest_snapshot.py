@@ -51,8 +51,15 @@ async def latest_snapshot(pool: Any) -> dict[str, Any] | None:
             "SELECT tick, sim_time, state::text AS state FROM obs.world_state_latest WHERE id = 1"
         )
         if row is not None:
+            # T-ITER2-03：rolling 分支补 sim_day 派生（帧头 sim_time 的本地日期），
+            # 与 day_end 分支键集一致——schedule 等消费方缺省日依赖本键（回归护栏见
+            # tests/observe/test_latest_snapshot_contract.py）
+            sim_time = row["sim_time"]
+            sim_day = (sim_time.astimezone(LOCAL_TZ).date()
+                       if isinstance(sim_time, dt.datetime) else None)
             return {"kind": "rolling", "tick": int(row["tick"]),
-                    "sim_time": row["sim_time"].isoformat(),
+                    "sim_time": sim_time.isoformat(),
+                    "sim_day": sim_day,
                     "state": json.loads(row["state"])}
     row = await pool.fetchrow(
         "SELECT sim_day, state::text AS state FROM obs.world_state_snapshot ORDER BY sim_day DESC LIMIT 1"
