@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, Path, Query
 from .app import ApiError, get_pool, ok_envelope, require_token
 from .rest_snapshot import latest_snapshot
 from .serde import serialize_event
+from ..sanitize import display_or_fallback
 
 router = APIRouter(prefix="/api/agents", dependencies=[Depends(require_token)])
 
@@ -133,7 +134,7 @@ async def api_agent_reflections(
     limit: int = Query(default=3, ge=1, le=50),
     pool: Any = Depends(get_pool),
 ) -> dict[str, Any]:
-    """最近反思（仅 content_display，05 §3.2 唯一全文通道）。"""
+    """最近反思（仅 content_display，05 §3.2 唯一全文通道）；R1 #3 出站清洗 + 人话兜底。"""
     rows = await pool.fetch(
         """
         SELECT memory_id, sim_time, content_display, importance FROM obs.memory_projection
@@ -145,7 +146,8 @@ async def api_agent_reflections(
     items = [{
         "memory_id": int(r["memory_id"]),
         "sim_time": r["sim_time"].isoformat(),
-        "content_display": r["content_display"],
+        "content_display": display_or_fallback(
+            r["content_display"], "这段心事没能完整记录下来。"),  # R1 #3
         "importance": r["importance"],
     } for r in rows]
     return await ok_envelope(pool, {"items": items}, kind="reflections")

@@ -410,7 +410,8 @@ class ActionValidator:
                                  location_id=obs.position, visibility="internal", rng_seed=rng_seed,
                                  payload={"topic_hint": args.get("topic_hint", decision.intent[:20])})
         importance = 1 + (rng_seed + int(obs.agent_id[1:])) % 3  # 低重要性 1~3（04 §6.2 think 行）
-        content = decision.intent if not decision.degraded else "走神了（LLM 输出解析失败降级，04 §6.1 step3）"
+        # R1 #3：降级留痕写人话（"走神了"），技术细节只进日志不进展示/记忆文本
+        content = decision.intent if not decision.degraded else "走神了"
         await store.insert_memory(self._pool, self._gw, agent_id=obs.agent_id, sim_time=sim_now,
                                   kind="reflection", content=content, importance=importance,
                                   source_event_seq=seq, rng_seed=rng_seed)

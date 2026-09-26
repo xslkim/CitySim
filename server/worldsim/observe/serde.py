@@ -5,6 +5,9 @@
 - `location_id` 为出站白名单列（05 §3.1），并入 `payload.location_id` 下发（03 §5.1 示例形态；
   原 payload 已含同名键时不覆盖）。
 - 不新增任何字段；`text_raw`/internal 键已在 obs 视图层剥除（00 §4 红线 7），本层不再过滤。
+- R1 #3：展示文本（`payload.text_display` / `lines[].text_display`）统一过 sanitize
+  （worldsim/sanitize.py 唯一实现）——工程黑话/代码残块拦截 + 人话兜底，既有污染数据在
+  API 输出层兜住（验收以 API 输出为准）；原文不受影响。
 """
 
 from __future__ import annotations
@@ -12,6 +15,24 @@ from __future__ import annotations
 import datetime as dt
 import json
 from typing import Any
+
+from ..sanitize import FALLBACK_GENERIC, FALLBACK_LINE, sanitize_display_text
+
+
+def _sanitize_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """展示文本键出站清洗（text_display / lines[].text_display），其余键原样。"""
+    out = dict(payload)
+    if "text_display" in out:
+        out["text_display"] = sanitize_display_text(out.get("text_display")) or FALLBACK_GENERIC
+    lines = out.get("lines")
+    if isinstance(lines, list):
+        cleaned = []
+        for line in lines:
+            if isinstance(line, dict) and isinstance(line.get("text_display"), str):
+                line = {**line, "text_display": sanitize_display_text(line["text_display"]) or FALLBACK_LINE}
+            cleaned.append(line)
+        out["lines"] = cleaned
+    return out
 
 
 def _jsonable(v: Any) -> Any:
@@ -26,6 +47,7 @@ def serialize_event(row: Any) -> dict[str, Any]:
     if isinstance(payload, str):
         payload = json.loads(payload)
     payload = dict(payload or {})
+    payload = _sanitize_payload(payload)
     if row["location_id"] and "location_id" not in payload:
         payload["location_id"] = row["location_id"]
     if "actors" not in payload:

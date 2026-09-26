@@ -248,22 +248,28 @@ class Reflector:
 
     @staticmethod
     def _parse_insights(text: str) -> list[str]:
+        """R1 #3：解析失败/残块 → 人话兜底句（原文只留本机调试通道，不进展示/记忆）。"""
+        from ..sanitize import FALLBACK_REFLECTION, sanitize_display_text
+
         try:
             body = json.loads(text)
         except (ValueError, TypeError):
-            return [text[:80]]
+            return [sanitize_display_text(text) or FALLBACK_REFLECTION]
         insights = body.get("insights")
         if isinstance(insights, list) and insights:
-            return [str(x)[:80] for x in insights[:3]]
-        return [text[:80]]
+            return [sanitize_display_text(x) or FALLBACK_REFLECTION for x in insights[:3]]
+        return [sanitize_display_text(text) or FALLBACK_REFLECTION]
 
     @staticmethod
     def _parse_diary(text: str) -> str:
+        """R1 #3：同上——截断 ```json 残块不再直出展示字段。"""
+        from ..sanitize import FALLBACK_REFLECTION, sanitize_display_text
+
         try:
             body = json.loads(text)
         except (ValueError, TypeError):
-            return text[:120]
-        return str(body.get("diary") or body.get("intent") or text)[:120]
+            return sanitize_display_text(text) or FALLBACK_REFLECTION
+        return sanitize_display_text(str(body.get("diary") or body.get("intent") or "")) or FALLBACK_REFLECTION
 
     async def _persona(self, agent_id: str) -> dict[str, Any]:
         row = await self._pool.fetchrow("SELECT persona FROM agents WHERE id=$1", agent_id)
