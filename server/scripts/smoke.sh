@@ -106,9 +106,11 @@ else
 fi
 
 log "step③ WSIM_REPLAY_MODE=replay 重放对账（零 LLM 调用）"
-# 重放日取首个完整模拟日（多日跨度时第 N 日重放撞"窗口外事件"判定——replay_check 窗口
-# 语义要求实跑恰为该日；首日窗口恒闭区间安全，冒烟工程口径，08 D15 补记）
-DAY1=1
+# 重放日 = 库内最后一个模拟日（replay_check「对账窗口外事件须为空」= 库中 cutoff 后无事件，
+# 只有末日 cutoff 后无事件；M1 E3 语义 = 静态库对账。内核续跑与对账的竞态在冒烟窗口内
+# 可忽略，08 D15 补记）
+DAY1=$(psql_main "SELECT count(DISTINCT (sim_time AT TIME ZONE 'Asia/Shanghai')::date) FROM events" || echo 0)
+[ "$DAY1" -ge 1 ] || DAY1=1
 llm_before=$(psql_main "SELECT count(*) FROM llm_calls")
 if (cd "$SERVER_DIR" && WSIM_REPLAY_MODE=replay uv run python scripts/replay_check.py \
       --sim-day "$DAY1" >>"$REPO_ROOT/var/logs/smoke_step3.log" 2>&1); then
