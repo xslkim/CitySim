@@ -145,3 +145,39 @@ async def test_settle_decay_via_aggregator(pool, engine: NeedsEngine) -> None:
     assert all(c["cause"] == "201" for c in payload_changes), "cause 指系统结算事件（裸 seq 数字字符串）"
     cache = await agg.read_needs("A23")
     assert cache["wealth"] == 70, "财富不衰减"
+
+
+@pytest.mark.asyncio
+async def test_passive_recovery_sleep_and_meals(pool, engine: NeedsEngine) -> None:
+    """T-ITER2-01②：决策停摆被动兜底——睡眠窗恢复 energy（sleep_per_hour 积分）、进食窗恢复 hunger。
+
+    死锁修复验收：能量/饥饿不再依赖决策链（强制 rest/eat 动作）才能恢复。
+    """
+    agg = StateAggregator(pool)
+    # 睡眠窗 00:30~06:30 整段 6h：energy +9.0*6 = +54
+    t1 = T0.replace(hour=0, minute=30)
+    t2 = T0.replace(hour=6, minute=30)
+    changes = await engine.settle_passive_recovery(agg, agent_id="A23", from_sim=t1, to_sim=t2, cause="999")
+    by_need = {c["need"]: c for c in changes}
+    # 初值 70 + 9.0*6 = 124 → clamp 100（值域 [0,100]，needs.yaml）；实际恢复 30
+    assert by_need["energy"]["new_value"] == pytest.approx(100)
+    assert by_need["energy"]["delta"] == pytest.approx(
+        min(CFG["satisfy"]["energy"]["sleep_per_hour"] * 6, 100 - 70))
+    assert "hunger" not in by_need, "睡眠窗不在进食窗内"
+    await agg.flush(tick=30, sim_now=t2, trigger="system", rng_seed=30)
+
+    # 进食窗 12:00~13:00 整段 1h：hunger +canteen*1 = +30；energy 无睡眠恢复
+    t3 = T0.replace(hour=12, minute=0)
+    t4 = T0.replace(hour=13, minute=0)
+    changes2 = await engine.settle_passive_recovery(agg, agent_id="A24", from_sim=t3, to_sim=t4, cause="998")
+    by_need2 = {c["need"]: c for c in changes2}
+    assert by_need2["hunger"]["delta"] == pytest.approx(CFG["satisfy"]["hunger"]["canteen"] * 1)
+    assert "energy" not in by_need2
+
+
+def test_is_meal_time(engine: NeedsEngine) -> None:
+    """T-ITER2-01③ 消费面：进食窗判定（batch 保底事件作息分支）。"""
+    assert engine.is_meal_time(T0.replace(hour=12, minute=30))
+    assert engine.is_meal_time(T0.replace(hour=19, minute=30))
+    assert not engine.is_meal_time(T0.replace(hour=15))
+    assert not engine.is_meal_time(T0.replace(hour=3))  # 深夜睡眠窗

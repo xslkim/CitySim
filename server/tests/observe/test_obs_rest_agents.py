@@ -98,7 +98,8 @@ async def test_snapshot_shape(client: Any) -> None:
     data = body["data"]
     assert set(data) == {"tick", "sim_time", "sim_day", "compression_ratio",
                          "agents", "economy", "active_dialogues",
-                         "snapshot_time", "snapshot_kind", "llm_status"}  # R1 #1/#2 标注字段
+                         "snapshot_time", "snapshot_kind", "llm_status",
+                         "world_stalled", "world_stalled_reason"}  # R1 #1/#2 标注字段 + T-ITER2-01④ 停滞信号
     assert len(data["agents"]) == 8
     a = data["agents"][0]
     assert set(a) == {"id", "name", "lod", "location_id", "activity", "mood", "needs"}

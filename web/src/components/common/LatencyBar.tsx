@@ -5,6 +5,7 @@
  * tick = 模拟 5 分钟（00 §4 红线 10）：滞后 tick 数 × 5min / 压缩比 折算真实秒。
  * T-ITER2-05：时刻格式化走 lib/simTime（+08 展示唯一入口）。
  */
+import { useEffect, useState } from 'react';
 import { useTimelineStore } from '../../stores/timelineStore';
 import { useWorldStore } from '../../stores/worldStore';
 import { formatSimHHMM } from '../../lib/simTime';
@@ -41,9 +42,26 @@ export default function LatencyBar() {
   const latestTick = useTimelineStore((s) => s.latestTick);
   const ratio = useWorldStore((s) => s.snapshot?.compression_ratio ?? 1);
   const snapshot = useWorldStore((s) => s.snapshot);
+  // T-ITER2-01④：watermark 超过 3 分钟墙钟不动 = 世界停滞（替代"（滚动刷新）"假实时口径）
+  const [lastMoveWall, setLastMoveWall] = useState(() => Date.now());
+  const [, forceTick] = useState(0);
+  useEffect(() => setLastMoveWall(Date.now()), [watermarkTick]);
+  useEffect(() => {
+    const t = setInterval(() => forceTick((n) => n + 1), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  const watermarkStaleS = (Date.now() - lastMoveWall) / 1000;
+  const worldStalled = snapshot?.world_stalled === true;
   const lag = latestTick > 0 ? lagSeconds(watermarkTick, latestTick, ratio || 1) : 0;
-  const level = latencyLevel(lag);
+  const level: LatencyLevel = worldStalled || watermarkStaleS > 180 ? 'negative' : latencyLevel(lag);
   const snapTime = snapshot?.snapshot_time ?? snapshot?.sim_time ?? null;
+  if (worldStalled || watermarkStaleS > 180) {
+    return (
+      <span data-testid="latency-bar" data-stalled="true" className={COLOR.negative}>
+        世界停滞{snapshot?.world_stalled_reason ? `（${snapshot.world_stalled_reason}）` : '（世界时钟未推进）'}
+      </span>
+    );
+  }
   return (
     <span data-testid="latency-bar" className={COLOR[level]}>
       世界状态截至 {snapshotHHMM(snapTime)}

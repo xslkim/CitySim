@@ -62,6 +62,15 @@ class NeedsEngine:
         start, end, weekdays = self._work
         return sim_now.weekday() in weekdays and start <= sim_now.hour * 60 + sim_now.minute < end
 
+    def is_meal_time(self, sim_now: dt.datetime) -> bool:
+        """passive.meals 进食窗判定（T-ITER2-01②/③ 消费面：被动恢复与 batch 保底共用）。"""
+        m = sim_now.hour * 60 + sim_now.minute
+        for win in self._cfg.get("passive", {}).get("meals", []):
+            s, e = _hhmm_to_min(win[0]), _hhmm_to_min(win[1])
+            if (s <= m < e) if s < e else (m >= s or m < e):
+                return True
+        return False
+
     # ---- 衰减积分 ---------------------------------------------------------------
 
     def decay_rate(self, need: str, sim_now: dt.datetime) -> float:
@@ -133,6 +142,58 @@ class NeedsEngine:
             if delta == 0.0:
                 continue
             change = await agg.apply_needs_delta(agent_id=agent_id, need=need, delta=delta, cause=cause)
+            if change is not None:
+                changes.append(change)
+        return changes
+
+    # ---- 被动恢复兜底（T-ITER2-01②：决策停摆时按作息表直接结算，不依赖 LLM/决策链） ----------
+
+    def _window_overlap_hours(
+        self, from_sim: dt.datetime, to_sim: dt.datetime, start_min: int, end_min: int,
+    ) -> float:
+        """[from,to) 与每日 [start,end)（分钟数，可跨零点）的交集时长（小时，逐日展开）。"""
+        if end_min <= start_min:
+            end_min += MINUTES_PER_DAY
+        total = 0.0
+        day = from_sim.date()
+        while True:
+            ws = dt.datetime.combine(day, dt.time(start_min // 60, start_min % 60), tzinfo=from_sim.tzinfo)
+            we = ws + dt.timedelta(minutes=end_min - start_min)
+            lo, hi = max(ws, from_sim), min(we, to_sim)
+            if hi > lo:
+                total += (hi - lo).total_seconds() / 3600
+            if ws >= to_sim:
+                break
+            day += dt.timedelta(days=1)
+            if day > to_sim.date() + dt.timedelta(days=1):
+                break
+        return total
+
+    async def settle_passive_recovery(
+        self, agg: StateAggregator, *, agent_id: str, from_sim: dt.datetime, to_sim: dt.datetime, cause: str,
+        big_five: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """作息表被动结算：睡眠窗恢复 energy（satisfy.energy.sleep_per_hour 积分）；
+        进食窗恢复 hunger（satisfy.hunger.canteen 按 1h 窗口摊算，needs.yaml passive.meals）。
+
+        与衰减解耦：决策链停摆（LLM 全挂/裁决异常）时 needs 仍沿作息表恢复，打破
+        "能量归零 → 强制休息依赖决策 → 永不恢复"死锁（round2 #1 验收②）。
+        """
+        changes: list[dict[str, Any]] = []
+        sleep_h = self._window_overlap_hours(from_sim, to_sim, *self._sleep)
+        if sleep_h > 0:
+            delta = self.satisfy_amount("energy", "sleep_per_hour", big_five=big_five) * sleep_h
+            change = await agg.apply_needs_delta(agent_id=agent_id, need="energy", delta=delta, cause=cause)
+            if change is not None:
+                changes.append(change)
+        meals = self._cfg.get("passive", {}).get("meals", [])
+        canteen = float(self._cfg.get("satisfy", {}).get("hunger", {}).get("canteen", 30))
+        for win in meals:
+            h = self._window_overlap_hours(from_sim, to_sim, _hhmm_to_min(win[0]), _hhmm_to_min(win[1]))
+            if h <= 0:
+                continue
+            change = await agg.apply_needs_delta(
+                agent_id=agent_id, need="hunger", delta=canteen * h, cause=cause)
             if change is not None:
                 changes.append(change)
         return changes

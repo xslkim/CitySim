@@ -40,6 +40,12 @@ schedule:                      # 睡眠/工作时段判定（01 §1.4 作息日�
   work: { start: "09:00", end: "18:00", weekdays: [0, 1, 2, 3, 4] }   # 周一至周五（工作日工作时段）
   achievement_daytime: ["09:00", "18:00"]      # 成就衰减"仅工作日白天"（同工作时段口径）
 
+passive:                       # T-ITER2-01②（round2 #1）：决策停摆被动兜底——按作息表直接结算
+                               # 睡眠/进食恢复，不依赖 LLM 决策链（能量/饥饿死锁修复）；
+                               # 数值口径：energy 复用 satisfy.energy.sleep_per_hour，
+                               # hunger 按 satisfy.hunger.canteen 摊到 1h 窗口（工程默认，偏差表登记）
+  meals: [["12:00", "13:00"], ["19:00", "20:00"]]   # 进食窗（两段各 1 模拟小时）
+
 state_rule:                    # 04 §6.2 通用校验状态行 + 01 §3.1 强制行为（方向：低值 = 匮乏，评审二轮 P2-3 修正后口径）
   energy_forced_rest_below: 10         # 精力 <10 强制 rest
   hunger_forced_eat_below: 10          # 饥饿 <10 强制 eat

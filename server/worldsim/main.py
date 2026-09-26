@@ -433,6 +433,9 @@ async def _run(args: argparse.Namespace) -> int:
                 last = last_decay.get(aid, sim_start)
                 if sim_now > last:
                     await needs_engine.settle_decay(agg, agent_id=aid, from_sim=last, to_sim=sim_now, cause=cause)
+                    # T-ITER2-01②：被动恢复兜底——按作息表直接结算睡眠/进食（决策停摆也能恢复）
+                    await needs_engine.settle_passive_recovery(
+                        agg, agent_id=aid, from_sim=last, to_sim=sim_now, cause=cause)
                     last_decay[aid] = sim_now
             # 04 §6.5：本 tick 聚合状态事件合并落库（≤2 条）
             await agg.flush(tick=tick, sim_now=sim_now, trigger="system", rng_seed=tick)
@@ -525,6 +528,38 @@ async def _run(args: argparse.Namespace) -> int:
 
         register_batch_hook("kernel.snapshot", kernel_snapshot_hook)
 
+        async def kernel_batch_floor(ctx: Any) -> None:
+            """T-ITER2-01③：batch 追日保底——每 agent 每模拟小时至少 1 条免 LLM 作息事件。
+
+            round2 事故：batch 追日 7 秒跳过 8 模拟小时、0 agent 行为（世界在数据里"不存在"）。
+            保底事件按作息表确定性合成（睡眠 agent.rest / 进食窗 agent.eat 零金额 / 其余
+            agent.think），trigger/visibility 口径与契约注册表一致，观众可追。
+            """
+            hours = max(1, int(round(ctx.sim_hours)))
+            start = ctx.clock.now_sim() - dt.timedelta(hours=ctx.sim_hours)
+            tick = ctx.clock.current_tick
+            for aid in ctx.agent_ids:
+                for h in range(hours):
+                    t = start + dt.timedelta(hours=h, minutes=30)  # 小时窗中点作息判定
+                    if needs_engine.is_sleeping(t):
+                        kind, payload = "agent.rest", {"mode": "sleep"}
+                    elif needs_engine.is_meal_time(t):
+                        kind, payload = "agent.eat", {"venue": "home", "with": [], "amount_cents": 0}
+                    else:
+                        kind, payload = "agent.think", {"topic_hint": "按部就班的一天"}
+                    await pool.execute(
+                        """
+                        INSERT INTO events (tick, sim_time, type, source, trigger, actors,
+                                            location_id, rng_seed, visibility, payload)
+                        VALUES ($1, $2, $3, $4, 'autonomous', $5, NULL, $1, 'public', $6::jsonb)
+                        """,
+                        tick, t, kind, f"agent:{aid}", [aid],
+                        json.dumps(payload, ensure_ascii=False),
+                    )
+            log.info("batch 保底行为已合成：%d agents × %d 模拟小时", len(ctx.agent_ids), hours)
+
+        register_batch_hook("kernel.batch_floor", kernel_batch_floor)
+
         async def _watch(t: asyncio.Task) -> None:
             try:
                 await t
@@ -582,6 +617,35 @@ async def _run(args: argparse.Namespace) -> int:
             if args.llm == "routed":
                 probe._providers_ok = lambda: "zhipu" not in failover_breaker.tripped_providers()
             tg.create_task(probe.run(stop))
+
+            # T-ITER2-01④：裁决活性看门狗（world_stalled 观测端口径 = obs 侧同阈值复算，
+            # 本协程负责 kernel.log WARN 告警通道；N tick 无 agent 事件即判停滞，env 可调）
+            stall_ticks = int(os.environ.get("WSIM_WATCHDOG_TICKS", "30"))
+
+            async def kernel_watchdog() -> None:
+                warned = False
+                while not stop.is_set():
+                    try:
+                        await asyncio.sleep(30)
+                        agent_tick = await pool.fetchval(
+                            "SELECT max(tick) FROM events WHERE type LIKE 'agent.%'"
+                            " OR type LIKE 'dialogue.%' OR type LIKE 'social.%'"
+                        )
+                        gap = clock.current_tick - int(agent_tick or 0)
+                        if gap > stall_ticks and not warned:
+                            log.warning(
+                                "世界停滞看门狗：已 %d tick（阈值 %d，≈%d 模拟分钟）无角色行为事件"
+                                " → 观测端将亮 world_stalled，排查裁决/供给链路",
+                                gap, stall_ticks, gap * 5)
+                            warned = True
+                        elif gap <= stall_ticks:
+                            if warned:
+                                log.info("世界停滞看门狗：角色行为事件恢复（gap=%d）", gap)
+                            warned = False
+                    except Exception:  # noqa: BLE001 - 看门狗自身故障不得反噬主循环
+                        log.exception("活性看门狗巡检失败（下轮重试）")
+
+            tg.create_task(kernel_watchdog())
             # audit/rotation 协程挂接点（M3/T-LOD-03 接，04 §2.2 伪码行）
 
         sim_end = clock.now_sim()

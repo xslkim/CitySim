@@ -29,6 +29,13 @@ export default function LiteShell({ children }: { children: React.ReactNode }) {
           世界稍作整理，马上回来
         </div>
       )}
+      {/* T-ITER2-01④：世界停滞人话提示（内核死后假实时修复；world_stalled 口径见 obs fetch_stall） */}
+      {snapshot?.world_stalled && (
+        <div className="bg-bg-2 px-4 py-1.5 text-center text-aux text-negative"
+          data-testid="lite-stalled-banner">
+          世界停滞了——正在恢复，请稍候
+        </div>
+      )}
       {children}
     </div>
   );

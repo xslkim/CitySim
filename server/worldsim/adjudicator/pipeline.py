@@ -454,6 +454,9 @@ async def adjudication_loop(
     - `lod`：T-LOD-01 时钟兜底排程器（`collect_due` 写回 `agents.next_due_sim`）；注入后取代
       `STAR_EVERY_N_TICKS` 最小兜底块（缺省保留旧行为，供既有测试）。
     - rng_seed = 本 tick 序号（04 §5.2 events.rng_seed 规则骰子口径，可复现）。
+    - T-ITER2-01⑤（round2 #1）：协程隔离兜底层——裁决循环内除 LLM 链路两类已知异常外，
+      **一切未预期异常（DB/授权/未知）捕获后记 ERROR 并跳过本拍**，协程不得静默退出
+      （round2 事故：单个未捕获异常穿出裁决协程 → 世界空转/全核退出，停摆完全无告警）。
     """
     while not stop.is_set():
         if notify is not None:
@@ -465,56 +468,59 @@ async def adjudication_loop(
                     pass
         if stop.is_set():
             break
-        tick = clock.current_tick
-        items = queue.pop_due(tick)
-        if not items:
-            if drained is not None:
-                drained.set()
-            continue
-        agents_due: list[str] = []
-        clock_seen = False
-        for it in items:
-            if it.kind == WORLD_EVENT:
-                enter = it.payload.get("enter_batch")
-                if enter is not None:
-                    if batch_summarize is None:
-                        log.warning("enter_batch 到达但无 batch_summarize 注入，跳过")
-                        continue
-                    try:
-                        await batch_advance(
-                            clock, agent_ids, float(enter["sim_hours"]),
-                            summarize=batch_summarize, director_preempt=director_preempt,
-                        )
-                    except (ChainExhausted, ProviderUnavailable) as exc:
-                        log.error("batch 段 LLM 链路不可用（%s）→ 本批 LLM 摘要跳过（03 §6 D45 护栏）", exc)
-            elif it.kind == WAKEUP:
-                if it.agent_id and it.agent_id not in agents_due:
-                    agents_due.append(it.agent_id)
-            elif it.kind == CLOCK_TICK:
-                clock_seen = True
-        if clock_seen:
-            if lod is not None:
-                for aid in await lod.collect_due(tick=tick, sim_now=clock.sim_of_tick(tick)):
-                    if aid not in agents_due:
-                        agents_due.append(aid)
-            elif tick % STAR_EVERY_N_TICKS == 0:
-                rows = await pool.fetch("SELECT id FROM agents WHERE cognition_tier='star' ORDER BY id")
-                for r in rows:
-                    if r["id"] not in agents_due:
-                        agents_due.append(r["id"])
-        if agents_due:
-            sim_now = clock.sim_of_tick(tick)
-            try:
-                await pipeline.run_tick(tick=tick, sim_now=sim_now, agent_ids=agents_due, rng_seed=tick)
-            except (ChainExhausted, ProviderUnavailable) as exc:
-                # M2 真接入崩溃护栏（03 §6 D43/D45）：结算/对话路径链尽不拖垮主循环；
-                # pause_clock 等末端动作的消费接线归 08 T-OPS-03。
-                log.error("LLM 链路不可用（%s）→ 本 tick 剩余结算跳过", exc)
-        if after_tick is not None and not clock.batch_mode:
-            try:
-                await after_tick(tick, clock.now_sim())
-            except (ChainExhausted, ProviderUnavailable) as exc:
-                log.error("after_tick LLM 链路不可用（%s）→ 本 tick 收尾 LLM 作业跳过（03 §6 D45 护栏）", exc)
+        try:
+            tick = clock.current_tick
+            items = queue.pop_due(tick)
+            if not items:
+                if drained is not None:
+                    drained.set()
+                continue
+            agents_due: list[str] = []
+            clock_seen = False
+            for it in items:
+                if it.kind == WORLD_EVENT:
+                    enter = it.payload.get("enter_batch")
+                    if enter is not None:
+                        if batch_summarize is None:
+                            log.warning("enter_batch 到达但无 batch_summarize 注入，跳过")
+                            continue
+                        try:
+                            await batch_advance(
+                                clock, agent_ids, float(enter["sim_hours"]),
+                                summarize=batch_summarize, director_preempt=director_preempt,
+                            )
+                        except (ChainExhausted, ProviderUnavailable) as exc:
+                            log.error("batch 段 LLM 链路不可用（%s）→ 本批 LLM 摘要跳过（03 §6 D45 护栏）", exc)
+                elif it.kind == WAKEUP:
+                    if it.agent_id and it.agent_id not in agents_due:
+                        agents_due.append(it.agent_id)
+                elif it.kind == CLOCK_TICK:
+                    clock_seen = True
+            if clock_seen:
+                if lod is not None:
+                    for aid in await lod.collect_due(tick=tick, sim_now=clock.sim_of_tick(tick)):
+                        if aid not in agents_due:
+                            agents_due.append(aid)
+                elif tick % STAR_EVERY_N_TICKS == 0:
+                    rows = await pool.fetch("SELECT id FROM agents WHERE cognition_tier='star' ORDER BY id")
+                    for r in rows:
+                        if r["id"] not in agents_due:
+                            agents_due.append(r["id"])
+            if agents_due:
+                sim_now = clock.sim_of_tick(tick)
+                try:
+                    await pipeline.run_tick(tick=tick, sim_now=sim_now, agent_ids=agents_due, rng_seed=tick)
+                except (ChainExhausted, ProviderUnavailable) as exc:
+                    # M2 真接入崩溃护栏（03 §6 D43/D45）：结算/对话路径链尽不拖垮主循环；
+                    # pause_clock 等末端动作的消费接线归 08 T-OPS-03。
+                    log.error("LLM 链路不可用（%s）→ 本 tick 剩余结算跳过", exc)
+            if after_tick is not None and not clock.batch_mode:
+                try:
+                    await after_tick(tick, clock.now_sim())
+                except (ChainExhausted, ProviderUnavailable) as exc:
+                    log.error("after_tick LLM 链路不可用（%s）→ 本 tick 收尾 LLM 作业跳过（03 §6 D45 护栏）", exc)
+        except Exception:  # noqa: BLE001 - T-ITER2-01⑤ 协程隔离：DB/授权/未知异常不杀裁决协程
+            log.exception("裁决循环未预期异常（DB/授权/未知）→ 本拍跳过，协程隔离不退出（T-ITER2-01⑤）")
         if drained is not None:
             drained.set()
     log.info("adjudication_loop 退出（stop）")

@@ -122,15 +122,44 @@ async def fetch_active_dialogues(pool: Any, tick: int) -> list[dict[str, Any]]:
     return out
 
 
+STALL_TICKS = 30  # T-ITER2-01④：N tick 无角色行为事件即判停滞（与内核看门狗 WSIM_WATCHDOG_TICKS 同阈）
+# 角色行为事件口径（看门狗双参照之一：max(agent 事件 tick) vs watermark）
+AGENT_EVENT_LIKE = "type LIKE 'agent.%' OR type LIKE 'dialogue.%' OR type LIKE 'social.%'"
+
+
+async def fetch_stall(pool: Any) -> dict[str, Any]:
+    """世界停滞判定：watermark_tick 与最近角色行为事件 tick 的差 > 阈值（T-ITER2-01④）。
+
+    内核死后观测端继续自称 rolling 假实时的事故修复——world_stalled 进 snapshot 响应，
+    前端头部显示"世界停滞"人话提示（替代"（滚动刷新）"假实时口径）。
+    """
+    row = await pool.fetchrow(
+        f"SELECT max(tick) AS wm, max(tick) FILTER (WHERE {AGENT_EVENT_LIKE}) AS agent_tick FROM obs.events"
+    )
+    if row is None or row["wm"] is None:
+        return {"stalled": False, "stalled_ticks": 0, "stalled_reason": None}
+    gap = int(row["wm"]) - int(row["agent_tick"] or 0)
+    stalled = gap > STALL_TICKS
+    return {
+        "stalled": stalled,
+        "stalled_ticks": gap,
+        "stalled_reason": (f"已 {gap} tick（≈{gap * 5} 模拟分钟）没有角色行为，世界可能停滞"
+                           if stalled else None),
+    }
+
+
 async def fetch_llm_status(pool: Any) -> dict[str, Any]:
     """R1 #2：LLM 降级运行态（观众/GM 可见信号）——近 2 模拟小时 system.llm.failover 事件口径。
 
     `degraded` = 最近一次 star_decision failover 落入 chain_end（降级链走尽 → 裁决 think 兜底）；
     failover 事件 = 内核 breaker 落库（internal、结构化四键），随事件流同步副本，本层只读聚合。
+    T-ITER2-01④：`stalled`/`stalled_reason` 附停滞原因（世界空转对观测端可见，假 healthy 修复）。
     """
+    stall = await fetch_stall(pool)
     ref = await pool.fetchval("SELECT max(sim_time) FROM obs.events")
     if ref is None:
-        return {"degraded": False, "failover_count": 0, "last_reason": None}
+        return {"degraded": False, "failover_count": 0, "last_reason": None,
+                "stalled": stall["stalled"], "stalled_reason": stall["stalled_reason"]}
     window_start = ref - dt.timedelta(hours=2)
     rows = await pool.fetch(
         """
@@ -146,7 +175,8 @@ async def fetch_llm_status(pool: Any) -> dict[str, Any]:
          if json.loads(r["payload"]).get("task_type") == "star_decision"), None)
     degraded = bool(latest_star and latest_star.get("to_provider") == "chain_end")
     return {"degraded": degraded, "failover_count": count,
-            "last_reason": (latest_star or {}).get("reason") if latest_star else None}
+            "last_reason": (latest_star or {}).get("reason") if latest_star else None,
+            "stalled": stall["stalled"], "stalled_reason": stall["stalled_reason"]}
 
 
 async def assemble_snapshot(pool: Any, snap: dict[str, Any]) -> dict[str, Any]:
@@ -157,6 +187,7 @@ async def assemble_snapshot(pool: Any, snap: dict[str, Any]) -> dict[str, Any]:
     """
     state = snap["state"]
     sim = state.get("sim") or {}
+    stall = await fetch_stall(pool)  # T-ITER2-01④：世界停滞对观测端可见（假 healthy 修复）
     if snap.get("kind") == "rolling":
         tick = int(snap["tick"])
         sim_time = snap.get("sim_time") or sim.get("sim_time")
@@ -175,6 +206,8 @@ async def assemble_snapshot(pool: Any, snap: dict[str, Any]) -> dict[str, Any]:
         "agents": [agent_ui_view(a) for a in state.get("agents") or []],
         "economy": state.get("economy") or {"stocks": []},
         "active_dialogues": await fetch_active_dialogues(pool, tick),
+        "world_stalled": stall["stalled"],          # T-ITER2-01④（前端"世界停滞"人话提示数据源）
+        "world_stalled_reason": stall["stalled_reason"],
         "llm_status": await fetch_llm_status(pool),  # R1 #2：降级运行态（三端观众信号）
     }
 

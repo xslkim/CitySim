@@ -117,3 +117,33 @@ async def test_schedule_bad_day_422(env: Any) -> None:
     ok = await env["client"].get("/api/agents/A01/schedule?day=2026-10-12")
     assert ok.status_code == 200
     assert ok.json()["data"]["day"] == "2026-10-12"
+
+
+@pytest.mark.asyncio
+async def test_world_stalled_flag_observable(env: Any) -> None:
+    """T-ITER2-01④：watermark 与最近角色行为事件差 > 30 tick → snapshot world_stalled:true + llm_status 附原因。"""
+    snap_time = dt.datetime(2026, 10, 12, 13, 25, tzinfo=LOCAL_TZ)
+    async with env["pool"].acquire() as conn:
+        # 最近角色行为在 tick 100，watermark 已到 140（gap 40 > 30）
+        await conn.execute(
+            "INSERT INTO events (tick, sim_time, type, source, trigger, actors, payload, visibility)"
+            " VALUES (100, $1, 'agent.move', 'agent:A01', 'autonomous', '{A01}', '{}'::jsonb, 'public')", snap_time)
+        await conn.execute(
+            "INSERT INTO events (tick, sim_time, type, source, trigger, actors, payload, visibility)"
+            " VALUES (140, $1, 'state.needs_delta', 'system', 'system', '{}', '{}'::jsonb, 'internal')",
+            snap_time + dt.timedelta(minutes=10))
+    r = await env["client"].get("/api/snapshot")
+    data = r.json()["data"]
+    assert data["world_stalled"] is True
+    assert data["world_stalled_reason"] and "40 tick" in data["world_stalled_reason"]
+    assert data["llm_status"]["stalled"] is True
+    assert data["llm_status"]["stalled_reason"] == data["world_stalled_reason"]
+    # 补上更近的角色行为事件 → 恢复（看门狗双参照：gap 归零）
+    async with env["pool"].acquire() as conn:
+        await conn.execute(
+            "INSERT INTO events (tick, sim_time, type, source, trigger, actors, payload, visibility)"
+            " VALUES (141, $1, 'agent.think', 'agent:A02', 'autonomous', '{A02}', '{}'::jsonb, 'internal')",
+            snap_time + dt.timedelta(minutes=15))
+    data2 = (await env["client"].get("/api/snapshot")).json()["data"]
+    assert data2["world_stalled"] is False
+    assert data2["llm_status"]["stalled"] is False

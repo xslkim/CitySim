@@ -26,6 +26,8 @@ export const ctx = {
   locationNames: new Map(), // location_id → 中文名（03 §3.1）
   simDay: null,       // Day 标签（snapshot.sim_day 起，time.day_summary 更新）
   lastSimTime: null,  // HH:MM 取最近事件 sim_time（T-LTV-03）
+  worldStalled: false, // T-ITER2-01④：snapshot.world_stalled（或断流 3min 兜底）
+  lastFrameWall: 0,   // 最近一帧（事件或快照）墙钟 ms——断流停滞判定
 };
 
 async function fetchJson(url) {
@@ -52,6 +54,13 @@ export function renderTag() {
     locEl.textContent = ctx.locationNames.get(ctx.lastLocationId) || ctx.lastLocationId; // B8 降级原文
   }
   if (timeEl) {
+    // T-ITER2-01④：世界停滞人话提示（直播时钟事件断流期冻结不再假装正常进行）
+    if (ctx.worldStalled) {
+      timeEl.textContent = '世界停滞 · 正在恢复';
+      timeEl.dataset.stalled = 'true';
+      return;
+    }
+    delete timeEl.dataset.stalled;
     const day = ctx.simDay != null ? `Day ${ctx.simDay}` : 'Day –';
     const hhmm = ctx.lastSimTime ? fmtSimHHMM(ctx.lastSimTime) : '--:--';
     timeEl.textContent = `${day} · ${hhmm}`;
@@ -83,6 +92,9 @@ async function bootstrap() {
     ctx.simDay = snap?.data?.sim_day ?? null;
     // R1 #1：时钟初值取快照自身时点（日内滚动快照到达前不再 --:--）
     ctx.lastSimTime = snap?.data?.sim_time ?? ctx.lastSimTime;
+    // T-ITER2-01④：世界停滞信号（观测端 world_stalled 口径）
+    ctx.worldStalled = snap?.data?.world_stalled === true;
+    ctx.lastFrameWall = Date.now();
     // R1 #2：降级运行态人话提示（llm_status.degraded = 降级链走尽）
     const degradedEl = document.getElementById('tag-degraded');
     if (degradedEl) degradedEl.hidden = !(snap?.data?.llm_status?.degraded);
@@ -175,6 +187,16 @@ async function main() {
   if (Number.isFinite(from) && from > 0) client.lastSeq = from;
   client.connect();
   ctx.wsClient = client;
+
+  // T-ITER2-01④：断流停滞巡检——3 分钟无新帧（事件或快照）→ 头部"世界停滞"人话提示
+  setInterval(() => {
+    const idleMs = Date.now() - (ctx.lastFrameWall || 0);
+    const stalled = idleMs > 180_000;
+    if (stalled !== !!ctx.worldStalled) {
+      ctx.worldStalled = stalled;
+      renderTag();
+    }
+  }, 30_000);
 
   // ?soak=1 长挂打点（T-LTV-07 验收 6 / 09 §6 E5）：每 30s 输出 heap 与事件计数
   ctx.quiet = params.get('quiet') === '1'; // quiet：不打 console（隔离 console 缓冲滞留），heap 写 title

@@ -8,6 +8,8 @@ export function dispatchEvent(ctx, ev) {
   if (!ev || typeof ev.type !== 'string') return;
   if (!ctx.quiet) console.log('[stream] event', ev.seq, ev.type); // 验收留痕（seq 去重/重连补推断言依据）
   ctx.lastSimTime = ev.sim_time || ctx.lastSimTime;
+  ctx.lastFrameWall = Date.now();   // T-ITER2-01④：帧活性（断流停滞判定参照）
+  ctx.worldStalled = false;         // 新事件到达 = 世界恢复
   if (ev.payload?.location_id) ctx.lastLocationId = ev.payload.location_id;
   if (ev.type === 'time.day_summary' && Number.isFinite(ev.payload?.day)) {
     ctx.simDay = ev.payload.day; // Day 标签随日界更新（06 §1.2）
