@@ -106,9 +106,18 @@ else
 fi
 
 log "step③ WSIM_REPLAY_MODE=replay 重放对账（零 LLM 调用）"
+# 对账前提 = 静态库（M1 E3）：试跑内核 --sim-hours 跑完即自然退出，但 600s 窗口只是下限、
+# 退出时点有墙钟波动（run6 实测：对账期内核仍在写事件，needs 缓存漂移失配——D15「竞态
+# 可忽略」假设被证伪）。对账前有界等其自然退出（不杀进程，等不到记 FAIL；08 D16③）
+k_wait=0
+while pgrep -f "\.venv/bin/python.*worldsim\.main" >/dev/null && [ "$k_wait" -lt 600 ]; do
+  sleep 5; k_wait=$((k_wait+5))
+done
+if pgrep -f "\.venv/bin/python.*worldsim\.main" >/dev/null; then
+  record "step3_replay" "FAIL" "试跑内核额外 600s 仍未自然退出，静态库对账前提不成立"
+else
 # 重放日 = 库内最后一个模拟日（replay_check「对账窗口外事件须为空」= 库中 cutoff 后无事件，
-# 只有末日 cutoff 后无事件；M1 E3 语义 = 静态库对账。内核续跑与对账的竞态在冒烟窗口内
-# 可忽略，08 D15 补记）
+# 只有末日 cutoff 后无事件；M1 E3 语义 = 静态库对账，08 D15 补记）
 DAY1=$(psql_main "SELECT count(DISTINCT (sim_time AT TIME ZONE 'Asia/Shanghai')::date) FROM events" || echo 0)
 [ "$DAY1" -ge 1 ] || DAY1=1
 llm_before=$(psql_main "SELECT count(*) FROM llm_calls")
@@ -123,10 +132,29 @@ if (cd "$SERVER_DIR" && WSIM_REPLAY_MODE=replay uv run python scripts/replay_che
 else
   record "step3_replay" "FAIL" "replay_check 非零退出（var/logs/smoke_step3.log）"
 fi
+fi
 
 log "step④ 观察端 API：dev token → 三端点 200 + proto:check + WS 增量"
+# step④ 前置：step② 试跑内核（unthrottled --sim-hours 720）在 600s 窗口内跑完即退出，
+# 「WS 连接收增量事件」的链路前提 = 内核在跑（09 §8；M6 链路 内核→sync→ingest→副本→obs-api
+# 无源则无增量）。重启 paced 档内核覆盖 step④⑤⑥——重启恢复段本身即落 time.paused/resumed/
+# catchup.* 增量事件（04 §3.2 短停机档），step③ 静态库对账已在其前完成不受影响（08 D16）
+if ! pgrep -f "\.venv/bin/python.*worldsim\.main" >/dev/null; then
+  log "step④ 前置：重启 paced 档内核（step② 试跑内核已跑完退出）"
+  (cd "$SERVER_DIR" && HF_HUB_OFFLINE=1 PYTHONUNBUFFERED=1 nohup uv run python -m worldsim.main \
+    >>"$REPO_ROOT/var/logs/kernel.log" 2>&1 &)
+  sleep 5   # 等内核进恢复追平段（time.* 事件随即出库进链路）
+fi
+# 冒烟 token 自清：tokens.db（var/observe/tokens.db）跨 run 持久，03 §8.3 容量 10 按
+# disabled=0 计，历次冒烟签发堆积会撑满容量（run6 实测签发被拒）——签发前吊销全部
+# 活跃 smoke 标签（缺陷修复，非偏差）
+mapfile -t smoke_toks < <(cd "$SERVER_DIR" && uv run python -m worldsim.observe.tokens_cli list \
+  | awk -F'\t' '$2 == "smoke" && $0 !~ /\(disabled\)/ {print $1}')
+for tok in ${smoke_toks[@]+"${smoke_toks[@]}"}; do
+  (cd "$SERVER_DIR" && uv run python -m worldsim.observe.tokens_cli revoke --token "$tok" >/dev/null)
+done
 TOKEN=$(cd "$SERVER_DIR" && uv run python -m worldsim.observe.tokens_cli issue --label smoke \
-        | grep -oE 'dev_[A-Za-z0-9_-]+' | head -1)
+        | grep -oE 'dev_[A-Za-z0-9_-]+' | head -1) || true   # 签发失败（如容量满）走下方 FAIL 分支，不由 set -e 截断
 step4_ok=1
 if [ -z "$TOKEN" ]; then record "step4_obs_api" "FAIL" "token 签发失败"; step4_ok=0; fi
 if [ "$step4_ok" = "1" ]; then
@@ -141,37 +169,68 @@ if [ "$step4_ok" = "1" ]; then
 fi
 if [ "$step4_ok" = "1" ]; then
   if (cd "$SERVER_DIR" && T="$TOKEN" uv run python - "$OBS_PORT" <<'PY'
-import asyncio, json, sys
-import websockets
+import asyncio, json, os, sys, time
 
-async def main() -> int:
-    import os
-    url = f"ws://127.0.0.1:{sys.argv[1]}/ws"
-    async with websockets.connect(url) as ws:
-        await ws.send(json.dumps({"op": "hello", "token": os.environ["T"], "client": "smoke/1.0"}))
+import websockets
+from websockets.exceptions import WebSocketException
+
+PORT = sys.argv[1]
+TOKEN = os.environ["T"]
+TOTAL_S = float(os.environ.get("WSIM_SMOKE_WS_DEADLINE_S", "240"))  # 总时限：到点 FAIL 不挂起（08 D16）
+
+
+async def wait_event(ws) -> None:
+    async def heartbeat() -> None:  # 03 §5.2：30s ping（90s 无心跳服务端 4408 断开）
+        while True:
+            await asyncio.sleep(20)
+            await ws.send(json.dumps({"op": "ping"}))
+
+    hb = asyncio.create_task(heartbeat())
+    try:
+        while True:
+            # 不设逐帧超时：pong/health 等保活帧会无限重置逐帧窗口（run4/5 挂起根因），
+            # 总时限由外层 asyncio.wait_for(session, remain) 统一兜底
+            f = json.loads(await ws.recv())
+            if f.get("op") == "event":
+                print("WS 增量事件 seq=", f.get("seq"), "type=", (f.get("data") or {}).get("type"))
+                return
+            # welcome/pong/health/state_diff 等帧跳过继续等
+    finally:
+        hb.cancel()
+
+
+async def session() -> None:
+    url = f"ws://127.0.0.1:{PORT}/ws"
+    async with websockets.connect(url, open_timeout=10) as ws:
+        await ws.send(json.dumps({"op": "hello", "token": TOKEN, "client": "smoke/1.0"}))
         w = json.loads(await asyncio.wait_for(ws.recv(), 10))
         assert w["op"] == "welcome", w
+        # 03 §5.1 帧格式：channels[].name（旧冒烟误用 "channel" 键被服务端静默忽略→零订阅，缺陷修复）
         await ws.send(json.dumps({"op": "subscribe", "channels": [
-            {"channel": "events", "filter": {}}]}))
+            {"name": "events", "filter": {}}]}))
+        await wait_event(ws)
 
-        async def heartbeat() -> None:  # 03 §5.2：30s ping（90s 无心跳服务端 4408 断开）
-            while True:
-                await asyncio.sleep(20)
-                await ws.send(json.dumps({"op": "ping"}))
 
-        hb = asyncio.create_task(heartbeat())
-        try:
-            while True:
-                f = json.loads(await asyncio.wait_for(ws.recv(), 180))  # 08 D15：M6 链路延迟窗口
-                if f["op"] == "event":
-                    print("WS 增量事件 seq=", f.get("data", {}).get("seq"))
-                    return 0
-                # pong/health/state_diff 等帧跳过继续等
-        except asyncio.TimeoutError:
-            print("WS 180s 未收增量事件（08 D15 窗口；M6 链路 = 内核→sync→ingest→副本→obs-api）")
+async def main() -> int:
+    deadline = time.monotonic() + TOTAL_S
+    attempt = 0
+    while True:
+        remain = deadline - time.monotonic()
+        if remain <= 0:
+            print(f"WS 总时限 {TOTAL_S:.0f}s 内未收增量事件（FAIL；M6 链路 = 内核→sync→ingest→副本→obs-api）")
             return 1
-        finally:
-            hb.cancel()
+        attempt += 1
+        try:
+            await asyncio.wait_for(session(), timeout=remain)
+            return 0
+        except (asyncio.TimeoutError, OSError, WebSocketException, AssertionError) as e:
+            # 1012/4408 断连、welcome 超时、断言失败 → 剩余预算内重连重订阅；预算耗尽即 FAIL
+            remain = deadline - time.monotonic()
+            print(f"WS 第 {attempt} 次会话断开/超时：{type(e).__name__} {e}；剩余预算 {remain:.0f}s")
+            if remain <= 2:
+                return 1
+            await asyncio.sleep(min(3, remain - 1))
+
 
 sys.exit(asyncio.run(main()))
 PY
