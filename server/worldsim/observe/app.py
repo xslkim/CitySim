@@ -39,9 +39,21 @@ def error_body(code: str, message: str) -> dict[str, Any]:
     return {"ok": False, "error": {"code": code, "message": message}}
 
 
+STALE_TICK_LAG = 24  # tick = 模拟 5 分钟（04 §2.2）；落后 24 tick = 2 模拟小时判 stale
+
+
 async def ok_envelope(pool: Any, data: Any, meta: dict[str, Any] | None = None,
                       kind: str | None = None) -> dict[str, Any]:
-    m = {"watermark_tick": await watermark_tick(pool)}
+    watermark = await watermark_tick(pool)
+    m: dict[str, Any] = {"watermark_tick": watermark}
+    # R3 #2④ 副本滞后标注：watermark 落后当日滚动 latest 超 2 模拟小时 → stale:true
+    # （观测端提示"同步中"；obs.world_state_latest 缺席的主库直连部署跳过本标注）。
+    if await pool.fetchval("SELECT to_regclass('obs.world_state_latest') IS NOT NULL"):
+        latest = await pool.fetchval("SELECT tick FROM obs.world_state_latest WHERE id=1")
+        if latest is not None and int(latest) - watermark > STALE_TICK_LAG:
+            m["stale"] = True
+            m["stale_reason"] = "replica_lag"
+            m["latest_tick"] = int(latest)
     if kind:
         m["kind"] = kind  # proto_check.mjs 按 meta.kind 选 zod schema（05 T-WEB-09）
     if meta:

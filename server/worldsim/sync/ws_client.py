@@ -320,6 +320,13 @@ class SyncClient:
                 break
             reply = await self._recv()
             if reply.get("frame") == "ack" and reply.get("upto") is not None:
+                if reply.get("reset"):  # R3 #2：副本重建 → 全部在飞批作废，位点回退续传
+                    upto = int(reply["upto"])
+                    self._cursor_seq = upto
+                    await update_sync_state(self.pool, upto=upto)
+                    in_flight.clear()
+                    log.warning("追平中收到 reset ack upto=%s → 在飞批清空续传", upto)
+                    continue
                 upto = int(reply["upto"])
                 in_flight = [b for b in in_flight if b[1] > upto]
                 await self._apply_ack(reply)
@@ -330,8 +337,19 @@ class SyncClient:
         return sent
 
     async def _handle_reply(self, reply: dict[str, Any]) -> None:
-        """ack → 推进 sync_state；nack{from|expected_seq} → WARN 记日志 + 游标回退重发（04 §9.1）。"""
+        """ack → 推进 sync_state；nack{from|expected_seq} → WARN 记日志 + 游标回退重发（04 §9.1）。
+
+        R3 #2：ack 带 `reset:true` = 摄入侧检测到时间线分叉并已重建副本（ack 已重放该批），
+        同步位点必须回退到 acked_upto——剩余行下一周期重拉续传，否则副本重建后本机误以为
+        已全部送达，split-brain 冻结复发。
+        """
         if reply.get("frame") == "ack":
+            if reply.get("reset") and reply.get("upto") is not None:
+                self._cursor_seq = int(reply["upto"])
+                await update_sync_state(self.pool, upto=self._cursor_seq)
+                log.warning("摄入侧副本重建（reset ack upto=%s）→ 同步位点回退续传",
+                            self._cursor_seq)
+                return
             await self._apply_ack(reply)
         elif reply.get("frame") == "nack":
             rewind = reply.get("expected_seq") or reply.get("from") or 0

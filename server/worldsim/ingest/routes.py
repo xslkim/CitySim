@@ -50,7 +50,7 @@ async def events_batch(request: Request, body: dict[str, Any],
         return JSONResponse(status_code=400,
                             content={"error": "单批 >500 条（04 §9.1）", "reason": "schema"})
     try:
-        acked = await _buffer(request).submit(
+        acked, reset = await _buffer(request).submit(
             request.app.state.pool, from_seq, events, mode=body.get("mode"))
     except BatchReject as e:
         log.error("events:batch 整批拒绝（%s）from=%s", e, from_seq)
@@ -59,7 +59,10 @@ async def events_batch(request: Request, body: dict[str, Any],
             content["expected_seq"] = e.expected_seq
         return JSONResponse(status_code=e.status, content=content)
     log.info("sync batch acked_upto=%s（https 回退，from=%s n=%d）", acked, from_seq, len(events))
-    return JSONResponse(content={"acked_upto": acked})
+    content = {"acked_upto": acked}
+    if reset:
+        content["reset"] = True  # R3 #2：副本已重建，本机游标回退续传
+    return JSONResponse(content=content)
 
 
 @router.post("/memories:batch")

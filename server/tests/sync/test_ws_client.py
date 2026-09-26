@@ -226,3 +226,23 @@ async def test_frame_schema(env) -> None:
                              "snap_upto": "2026-10-12"})
     s = await read_sync_state(env["pool"])
     assert s["last_acked_snapshot_day"] == dt.date(2026, 10, 12)
+
+
+async def test_reset_ack_rewinds_cursor(env) -> None:
+    """R3 #2：摄入侧副本重建 ack 带 reset:true → 同步位点回退 acked_upto，剩余行下一周期续传。"""
+    await _ins_events(env["pool"], 10)
+    env["fake"].reply_script = [{"frame": "ack", "upto": 6, "mem_upto": None,
+                                 "snap_upto": None, "reset": True}]
+    clock = FakeClock()
+    client = _client(env, clock)
+    await client.connect()
+    await client.sync_once()
+    clock.advance(2.1)
+    await client.sync_once()          # 发出 1..10 → 收到 reset ack upto=6
+    assert client._cursor_seq == 6    # 回退而非 max(原游标, 6)
+    s = await read_sync_state(env["pool"])
+    assert s["last_acked_seq"] == 6
+    clock.advance(2.1)
+    n = await client.sync_once()      # 续传 7..10
+    assert n["events"] == 4
+    assert client._cursor_seq == 10

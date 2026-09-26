@@ -222,3 +222,47 @@ async def test_health_endpoint(server) -> None:
         assert body["max_seq"] == 1
         assert "ingest_lag_seconds" in body
         assert body["last_digest"] is None  # digest_log 归 T-SYN-09，未建表时缺席
+
+
+async def test_timeline_divergence_sim_time_regression(server, tmp_path) -> None:
+    """R3 #2①：重启后低位 seq 重排且 sim_time 系统性回退 → 副本重建、ack 带 reset、alerts 留痕。"""
+    from worldsim.audit import alerts
+    alerts.set_path(tmp_path / "alerts.log")
+    try:
+        async with httpx.AsyncClient(base_url=server["http"]) as c:
+            old = [_event(i, payload={"old": i}) for i in range(1, 11)]
+            r1 = await c.post("/v1/events:batch", json={"from_seq": 1, "events": old},
+                              headers=AUTH)
+            assert r1.status_code == 200 and r1.json()["acked_upto"] == 10
+            # 新时间线：seq 从 1 重排、sim_time 回退 7 天（split-brain 重启重排场景）
+            new = [_event(i, payload={"new": i}, minutes=-10080 + i) for i in range(1, 6)]
+            r2 = await c.post("/v1/events:batch", json={"from_seq": 1, "events": new},
+                              headers=AUTH)
+            assert r2.status_code == 200 and r2.json()["reset"] is True
+            assert r2.json()["acked_upto"] == 5
+        pool = server["pool"]
+        assert await pool.fetchval("SELECT count(*) FROM events") == 5  # 旧时间线已清空
+        assert await pool.fetchval("SELECT payload->>'new' FROM events WHERE seq=1") == "1"
+        text = (tmp_path / "alerts.log").read_text(encoding="utf-8")
+        assert "replica.timeline_diverged" in text
+    finally:
+        alerts.set_path(None)
+
+
+async def test_timeline_divergence_content_conflict(server, tmp_path) -> None:
+    """R3 #2②：seq 撞车且内容不一致（sim_time 未回退）→ 同样走重建通道，不静默吞。"""
+    from worldsim.audit import alerts
+    alerts.set_path(tmp_path / "alerts.log")
+    try:
+        async with httpx.AsyncClient(base_url=server["http"]) as c:
+            old = [_event(i, payload={"old": i}) for i in range(1, 11)]
+            await c.post("/v1/events:batch", json={"from_seq": 1, "events": old}, headers=AUTH)
+            new = [_event(i, payload={"new": i}, minutes=2000 + i) for i in range(1, 6)]
+            r = await c.post("/v1/events:batch", json={"from_seq": 1, "events": new},
+                             headers=AUTH)
+            assert r.status_code == 200 and r.json()["reset"] is True
+        pool = server["pool"]
+        assert await pool.fetchval("SELECT count(*) FROM events") == 5
+        assert await pool.fetchval("SELECT payload->>'new' FROM events WHERE seq=5") == "5"
+    finally:
+        alerts.set_path(None)

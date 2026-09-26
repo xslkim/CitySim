@@ -72,10 +72,16 @@ async def _handle_data_frame(ws: WebSocket, msg: dict[str, Any]) -> None:
     try:
         if frame == "batch":
             events = msg.get("events") or []
-            acked = await ws.app.state.batch_buffer.submit(
+            acked, reset = await ws.app.state.batch_buffer.submit(
                 pool, int(msg.get("from", 0)), events, mode=msg.get("mode"))
-            log.info("sync batch ack upto=%s（ws，from=%s n=%d）", acked, msg.get("from"), len(events))
-            await _send(ws, {"frame": "ack", "upto": acked, "mem_upto": None, "snap_upto": None})
+            log.info("sync batch ack upto=%s（ws，from=%s n=%d）", acked, msg.get("from"),
+                     len(events))
+            ack: dict[str, Any] = {"frame": "ack", "upto": acked, "mem_upto": None,
+                                   "snap_upto": None}
+            if reset:
+                ack["reset"] = True  # R3 #2：副本已重建，本机游标回退续传
+                log.error("sync batch 触发时间线分叉重建 → ack 带 reset（upto=%s）", acked)
+            await _send(ws, ack)
         elif frame == "mem_batch":
             mems = msg.get("memories") or []
             acked = await ingest_memories(pool, int(msg.get("from", 0)), mems)
