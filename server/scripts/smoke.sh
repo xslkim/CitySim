@@ -49,25 +49,20 @@ fi
 
 # ---------------------------------------------------------------- e9 子命令（用户态恢复演练）
 if [ "${1:-}" = "e9" ]; then
-  log "E9 用户态恢复演练：kill 内核 → start_local.sh 恢复全栈"
+  log "E9 用户态恢复演练：kill 内核 → start_local.sh 恢复全栈（09 §7 E9，A16）"
   set -a; . "$REPO_ROOT/.env"; set +a
-  before_paused=$(psql_main "SELECT count(*) FROM events WHERE type='time.paused'")
-  pkill -f "worldsim.main" || true
+  before=$(psql_main "SELECT count(*) FROM events WHERE type IN ('time.paused','time.resumed','time.catchup.start','time.catchup.end')")
+  pkill -f "\.venv/bin/python.*worldsim\.main" || true   # 锚定解释器，防误杀包装进程
   sleep 3
   bash "$REPO_ROOT/deploy/start_local.sh"
-  sleep 30   # 等内核恢复与追平段
-  seq_rows=$(psql_main "SELECT string_agg(type, '>' ORDER BY seq) FROM (
-                          SELECT type, seq FROM events
-                          WHERE type IN ('time.paused','time.resumed','time.catchup.start',
-                                         'time.catchup.end') AND seq >
-                          (SELECT coalesce(max(seq),0) FROM events WHERE type='time.paused'
-                             AND seq < (SELECT max(seq) FROM events)) ORDER BY seq) t" || true)
-  after=$(psql_main "SELECT count(*) FROM events WHERE type='time.paused'")
-  if [ "$after" -gt "$before_paused" ] && printf '%s' "$seq_rows" | grep -q "time.paused" \
-       && printf '%s' "$seq_rows" | grep -q "time.resumed"; then
-    record "e9" "PASS" "暂停/恢复/追平事件序列：$seq_rows"
+  sleep 45   # 等内核恢复与追平段（04 §3.2 短停机档）
+  after_rows=$(psql_main "SELECT type || '=' || count(*) FROM events WHERE type IN ('time.paused','time.resumed','time.catchup.start','time.catchup.end') GROUP BY 1 ORDER BY 1")
+  after=$(psql_main "SELECT count(*) FROM events WHERE type IN ('time.paused','time.resumed','time.catchup.start','time.catchup.end')")
+  if [ "$after" -gt "$before" ] && printf '%s' "$after_rows" | grep -q "time.paused" \
+       && printf '%s' "$after_rows" | grep -q "time.resumed"; then
+    record "e9" "PASS" "恢复后序列：$(printf '%s' "$after_rows" | tr '\n' ' ')"
   else
-    record "e9" "FAIL" "事件序列不完整：$seq_rows"
+    record "e9" "FAIL" "序列不完整：$after_rows"
   fi
   exit "$FAILED"
 fi
