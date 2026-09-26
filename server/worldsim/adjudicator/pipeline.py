@@ -115,6 +115,8 @@ class Pipeline:
         after_settle: AfterSettleFn | None = None,
         obs_builder: ObsBuilderFn | None = None,
         settler: SettleFn | None = None,
+        decide_concurrency: int = 2,   # R1 #2：star 决策在飞并发闸（对齐免费档实测 concurrency=2）
+        decide_stagger_s: float = 0.0,  # R1 #2：逐 agent 起跑错峰（main.py 经 WSIM_DECISION_STAGGER_S 注入）
     ) -> None:
         self._pool = pool
         self._gw = gateway
@@ -125,15 +127,28 @@ class Pipeline:
         self._after_settle = after_settle
         self._obs_builder = obs_builder
         self._settler = settler  # T-ADJ-03：19 动作结算总线（None = M1 骨架 think/move 内置路径）
+        self._decide_concurrency = max(1, int(decide_concurrency))
+        self._decide_stagger_s = max(0.0, float(decide_stagger_s))
 
     # ---- tick 驱动（04 §2.2：LLM 并发、落库串行） -------------------------
 
     async def run_tick(self, *, tick: int, sim_now: dt.datetime, agent_ids: list[str], rng_seed: int) -> list[int]:
-        """本 tick 一批 agent 的六步闭环；返回落库事件 seq 列表（按队列顺序）。"""
-        # step1~step3：LLM 并发发出（04 §2.2"tick 内 LLM 调用并发发出"）
-        decisions = await asyncio.gather(
-            *(self._decide_one(aid, tick, sim_now, rng_seed) for aid in agent_ids)
-        )
+        """本 tick 一批 agent 的六步闭环；返回落库事件 seq 列表（按队列顺序）。
+
+        R1 #2（免费档 429 降损）：step1~step3 由"无界并发"改为"在飞并发闸 + 逐 agent 起跑错峰"——
+        8 位 star 同拍突发摊到时间轴上（供给探测：免费档不能突发、持续 41 次/分无 429），
+        落库串行序不变（gather 保 agent 顺序）。
+        """
+        sem = asyncio.Semaphore(self._decide_concurrency)
+
+        async def _one(idx: int, aid: str) -> Decision:
+            if self._decide_stagger_s > 0 and idx > 0:
+                await asyncio.sleep(self._decide_stagger_s * idx)
+            async with sem:
+                return await self._decide_one(aid, tick, sim_now, rng_seed)
+
+        # step1~step3：并发闸 + 错峰发出；step4~step6：按队列顺序串行回写（04 §2.2）
+        decisions = await asyncio.gather(*(_one(i, aid) for i, aid in enumerate(agent_ids)))
         # step4~step6：按队列顺序串行回写（04 §2.2"结果写回按队列顺序串行落库"）
         seqs: list[int] = []
         for decision in decisions:

@@ -22,6 +22,13 @@ export default function LiteShell({ children }: { children: React.ReactNode }) {
           世界状态截至 {simClockText(snapshot?.sim_time ?? null, snapshot?.sim_day ?? null)}
         </span>
       </header>
+      {/* R1 #2：LLM 降级运行态人话提示（降级链走尽 ≠ 世界死机） */}
+      {snapshot?.llm_status?.degraded && (
+        <div className="bg-bg-2 px-4 py-1.5 text-center text-aux text-warn"
+          data-testid="lite-degraded-banner">
+          世界稍作整理，马上回来
+        </div>
+      )}
       {children}
     </div>
   );

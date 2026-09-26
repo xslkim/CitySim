@@ -283,6 +283,10 @@ async def _run(args: argparse.Namespace) -> int:
             settler=lambda obs, decision, tick, sim_now, seed: action_validator.settle(
                 obs, decision, tick=tick, sim_now=sim_now, rng_seed=seed,
             ),
+            # R1 #2 免费档 429 降损：star 决策在飞并发闸对齐 provider 实测 concurrency=2，
+            # 起跑错峰默认 0.5s（WSIM_DECISION_STAGGER_S 可调，0 关闭错峰）
+            decide_concurrency=int(os.environ.get("WSIM_DECISION_CONCURRENCY", "2")),
+            decide_stagger_s=float(os.environ.get("WSIM_DECISION_STAGGER_S", "0.5")),
         )
 
         # ---- M3 接线（04 文档 T-WA/T-DIR）：日历引擎 + 世界 Agent 全作业 + 编剧导演 --------------

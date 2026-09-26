@@ -115,6 +115,33 @@ async def fetch_active_dialogues(pool: Any, tick: int) -> list[dict[str, Any]]:
     return out
 
 
+async def fetch_llm_status(pool: Any) -> dict[str, Any]:
+    """R1 #2：LLM 降级运行态（观众/GM 可见信号）——近 2 模拟小时 system.llm.failover 事件口径。
+
+    `degraded` = 最近一次 star_decision failover 落入 chain_end（降级链走尽 → 裁决 think 兜底）；
+    failover 事件 = 内核 breaker 落库（internal、结构化四键），随事件流同步副本，本层只读聚合。
+    """
+    ref = await pool.fetchval("SELECT max(sim_time) FROM obs.events")
+    if ref is None:
+        return {"degraded": False, "failover_count": 0, "last_reason": None}
+    window_start = ref - dt.timedelta(hours=2)
+    rows = await pool.fetch(
+        """
+        SELECT payload::text AS payload, sim_time FROM obs.events
+        WHERE type = 'system.llm.failover' AND sim_time >= $1
+        ORDER BY seq DESC
+        """,
+        window_start,
+    )
+    count = len(rows)
+    latest_star = next(
+        (json.loads(r["payload"]) for r in rows
+         if json.loads(r["payload"]).get("task_type") == "star_decision"), None)
+    degraded = bool(latest_star and latest_star.get("to_provider") == "chain_end")
+    return {"degraded": degraded, "failover_count": count,
+            "last_reason": (latest_star or {}).get("reason") if latest_star else None}
+
+
 async def assemble_snapshot(pool: Any, snap: dict[str, Any]) -> dict[str, Any]:
     """state JSONB → 03 §5.1 /api/snapshot data 形态（T-WEB-04 历史合并复用本函数）。
 
@@ -141,6 +168,7 @@ async def assemble_snapshot(pool: Any, snap: dict[str, Any]) -> dict[str, Any]:
         "agents": [agent_ui_view(a) for a in state.get("agents") or []],
         "economy": state.get("economy") or {"stocks": []},
         "active_dialogues": await fetch_active_dialogues(pool, tick),
+        "llm_status": await fetch_llm_status(pool),  # R1 #2：降级运行态（三端观众信号）
     }
 
 

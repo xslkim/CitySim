@@ -216,7 +216,8 @@ async def test_concurrent_decisions_serial_writeback(pool) -> None:
                               latency_ms=1, request_id="s", provider="stub", model="s")
 
     gw = BarrierGateway()
-    pipe = Pipeline(pool, gw)
+    # R1 #2：默认在飞并发闸 = 2（免费档 429 降损）；本用例验证"并发完成、串行落库"语义，显式放回 3
+    pipe = Pipeline(pool, gw, decide_concurrency=3)
     baseline = await pool.fetchval("SELECT coalesce(max(seq), 0) FROM events")
     seqs = await pipe.run_tick(tick=2, sim_now=T0, agent_ids=["A10", "A11", "A12"], rng_seed=2)
     assert gw.started == 3, "3 个决策并发发出（屏障放行前全部到达）"
@@ -224,6 +225,14 @@ async def test_concurrent_decisions_serial_writeback(pool) -> None:
     actor_order = [r["actors"][0] for r in rows]
     assert actor_order == ["A10", "A11", "A12"], "落库序 = 队列序而非完成序"
     assert seqs == [r["seq"] for r in rows]
+
+
+async def test_decide_concurrency_cap_r1(pool) -> None:
+    """R1 #2 验收：decide_concurrency=1 → 同 tick 决策调用在飞并发恒 ≤1（免费档错峰降损）。"""
+    gw = StubGateway(delay=0.02)
+    pipe = Pipeline(pool, gw, decide_concurrency=1)
+    await pipe.run_tick(tick=3, sim_now=T0, agent_ids=["A10", "A11", "A12"], rng_seed=3)
+    assert gw.max_in_flight == 1, "并发闸=1 时决策须串行（错峰调度生效）"
 
 
 async def test_pipeline_injected_mock_deterministic() -> None:

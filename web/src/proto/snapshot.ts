@@ -22,6 +22,9 @@ export const snapshotSchema = z
     compression_ratio: z.number(),
     snapshot_time: z.string().nullable().optional(), // R1 #1：快照自身时点（"截至 HH:MM"标注）
     snapshot_kind: z.enum(['rolling', 'day_end']).optional(), // R1 #1：rolling=日内滚动 latest
+    llm_status: z // R1 #2：LLM 降级运行态（观众人话提示信号）
+      .object({ degraded: z.boolean(), failover_count: z.number().int(), last_reason: z.string().nullable() })
+      .optional(),
     agents: z.array(snapshotAgentSchema),
     economy: z.object({ stocks: z.array(z.object({ symbol: z.string(), price: z.number() })) }),
     active_dialogues: z.array(

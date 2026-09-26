@@ -107,6 +107,13 @@ export default function AppShell() {
           </span>
           <span>压缩比 {snapshot?.compression_ratio ?? '—'}×</span>
           <LatencyBar />
+          {/* R1 #2：GM 侧降级计数（近窗口 failover 数；chain_end = 降级链走尽） */}
+          {snapshot?.llm_status && snapshot.llm_status.failover_count > 0 && (
+            <span data-testid="llm-degraded-badge" className="text-warn">
+              LLM 降级 {snapshot.llm_status.failover_count} 次
+              {snapshot.llm_status.degraded ? '（降级中）' : ''}
+            </span>
+          )}
           {token && <span title="访问 token">token:{token.slice(0, 10)}…</span>}
         </div>
       </header>

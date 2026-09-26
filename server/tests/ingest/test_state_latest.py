@@ -114,6 +114,38 @@ async def test_state_latest_upsert_and_digest_recheck(stack) -> None:
     assert row2["digest"] == "sha256:" + sha256_hex(canonical(good))
 
 
+async def test_snapshot_llm_status_r1_2(stack) -> None:
+    """R1 #2 验收：近窗 system.llm.failover 事件 → llm_status（star chain_end = degraded 观众信号）。"""
+    pool, obs, token = stack["pool"], stack["obs"], stack["obs_token"]
+    await pool.execute(
+        "INSERT INTO world_state_snapshot (sim_day, state, digest) VALUES ($1,$2::jsonb,'sha256:t')",
+        T0.date(), json.dumps(_state("12:30"), ensure_ascii=False))
+    ref = T0 + dt.timedelta(hours=5)
+    async def _failover(seq: int, to_provider: str, task_type: str = "star_decision") -> None:
+        await pool.execute(
+            """
+            INSERT INTO events (seq, tick, sim_time, wall_time, type, source, trigger, actors,
+                                payload, visibility)
+            VALUES ($1,$1,$2,$2,'system.llm.failover','system','system','{}',$3::jsonb,'internal')
+            """,
+            seq, ref, json.dumps({"task_type": task_type, "from_provider": "zhipu",
+                                  "to_provider": to_provider, "reason": "consecutive_429_5xx"},
+                                 ensure_ascii=False))
+    await _failover(1, "chain_end")
+    await _failover(2, "zhipu", task_type="dialogue")  # 他类型恢复事件不解除 star 判定
+    await pool.execute(
+        "INSERT INTO events (seq, tick, sim_time, wall_time, type, source, trigger, actors,"
+        " payload, visibility) VALUES (3,3,$1,$1,'agent.move','agent:A01','autonomous','{A01}',"
+        " '{\"from\":\"a\",\"to\":\"b\"}'::jsonb,'internal')", ref)
+    headers = {"Authorization": f"Bearer {token}"}
+    async with httpx.AsyncClient(base_url=obs) as c:
+        r = await c.get("/api/snapshot", headers=headers)
+    status = r.json()["data"]["llm_status"]
+    assert status["degraded"] is True
+    assert status["failover_count"] == 2
+    assert status["last_reason"] == "consecutive_429_5xx"
+
+
 async def test_snapshot_api_prefers_rolling_then_falls_back(stack) -> None:
     """验收：latest 有行 → kind=rolling + snapshot_time；删行 → 回退日界 kind=day_end。"""
     pool, obs, token = stack["pool"], stack["obs"], stack["obs_token"]

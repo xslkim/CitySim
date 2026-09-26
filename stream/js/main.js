@@ -80,6 +80,9 @@ async function bootstrap() {
     ctx.simDay = snap?.data?.sim_day ?? null;
     // R1 #1：时钟初值取快照自身时点（日内滚动快照到达前不再 --:--）
     ctx.lastSimTime = snap?.data?.sim_time ?? ctx.lastSimTime;
+    // R1 #2：降级运行态人话提示（llm_status.degraded = 降级链走尽）
+    const degradedEl = document.getElementById('tag-degraded');
+    if (degradedEl) degradedEl.hidden = !(snap?.data?.llm_status?.degraded);
   } catch (e) {
     console.warn('[stream] snapshot 加载失败：', e.message);
   }
