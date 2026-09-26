@@ -229,7 +229,8 @@ async def test_frame_schema(env) -> None:
 
 
 async def test_reset_ack_rewinds_cursor(env) -> None:
-    """R3 #2：摄入侧副本重建 ack 带 reset:true → 同步位点回退 acked_upto，剩余行下一周期续传。"""
+    """R3 #2：摄入侧副本重建 ack 带 reset:true → 同步位点回退 0 全量重发（副本已清空，
+    只重放触发批会丢尾巴；重发行撞同内容走幂等跳过）。"""
     await _ins_events(env["pool"], 10)
     env["fake"].reply_script = [{"frame": "ack", "upto": 6, "mem_upto": None,
                                  "snap_upto": None, "reset": True}]
@@ -239,10 +240,24 @@ async def test_reset_ack_rewinds_cursor(env) -> None:
     await client.sync_once()
     clock.advance(2.1)
     await client.sync_once()          # 发出 1..10 → 收到 reset ack upto=6
-    assert client._cursor_seq == 6    # 回退而非 max(原游标, 6)
+    assert client._cursor_seq == 0, "reset → 位点回退 0 全量重发（而非回退到触发批位点）"
     s = await read_sync_state(env["pool"])
-    assert s["last_acked_seq"] == 6
+    assert s["last_acked_seq"] == 0
     clock.advance(2.1)
-    n = await client.sync_once()      # 续传 7..10
-    assert n["events"] == 4
+    n = await client.sync_once()      # 从头重发 1..10
+    assert n["events"] == 10
     assert client._cursor_seq == 10
+
+
+async def test_connect_rewinds_when_cursor_ahead_of_local_max(env) -> None:
+    """R3 #2 增补：持久化位点领先本机 max(seq)（时间线重置/reseed 残留）→ 建连即回退 0。
+
+    不修则副本撞车检测可能被推迟到下一个新事件（位点跳过整段新时间线）。"""
+    await _ins_events(env["pool"], 3)
+    from worldsim.sync.outbox import update_sync_state
+    await update_sync_state(env["pool"], upto=999)  # 残留位点（高于本机 max seq=3）
+    client = _client(env)
+    await client.connect()
+    assert client._cursor_seq == 0
+    hello = next(f for f in env["fake"].frames if f["frame"] == "hello")
+    assert hello["from_seq"] == 0, "回退后 hello 从 0 起报"

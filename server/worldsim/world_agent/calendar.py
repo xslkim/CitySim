@@ -336,6 +336,8 @@ class CalendarEngine:
         """
         fired_rows = await self._pool.fetch(
             "SELECT key, value FROM world_state WHERE key LIKE 'calendar.fired.%'")
+        if not fired_rows:
+            return []  # 机制冷启动（无触发清单历史）：首日全量"零触发"是噪声非事实，跳过
         window_start = (sim_now.date() - dt.timedelta(days=STALE_WINDOW_DAYS)).isoformat()
         recent_fired: set[str] = set()
         for row in fired_rows:

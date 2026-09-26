@@ -132,6 +132,13 @@ class SyncClient:
         """建连 + hello/hello_ack；返回 hello_ack（恢复态判定依据）。"""
         state = await read_sync_state(self.pool)
         self._cursor_seq = max(self._cursor_seq, int(state["last_acked_seq"]))
+        # R3 #2 增补：位点领先本机 max(seq) = 时间线重置/reseed 残留（重启 seq 低位重排的
+        # 本机侧表象）→ 回退 0 全量重发，让摄入侧撞车内容比对走分叉重建（而非沉默等待）
+        local_max = int(await self.pool.fetchval("SELECT COALESCE(max(seq), 0) FROM events") or 0)
+        if self._cursor_seq > local_max:
+            log.warning("同步位点 %s 领先本机 max(seq)=%s（时间线重置残留）→ 位点回退 0 全量重发",
+                        self._cursor_seq, local_max)
+            self._cursor_seq = 0
         self._ws = await self._connect(
             self.url, additional_headers={"Authorization": f"Bearer {self.token}"})
         await self._send({"frame": "hello", "token": self.token, "from_seq": self._cursor_seq,
@@ -320,12 +327,11 @@ class SyncClient:
                 break
             reply = await self._recv()
             if reply.get("frame") == "ack" and reply.get("upto") is not None:
-                if reply.get("reset"):  # R3 #2：副本重建 → 全部在飞批作废，位点回退续传
-                    upto = int(reply["upto"])
-                    self._cursor_seq = upto
-                    await update_sync_state(self.pool, upto=upto)
+                if reply.get("reset"):  # R3 #2：副本重建 → 从头全量重发（在飞批全部作废）
+                    self._cursor_seq = 0
+                    await update_sync_state(self.pool, upto=0)
                     in_flight.clear()
-                    log.warning("追平中收到 reset ack upto=%s → 在飞批清空续传", upto)
+                    log.warning("追平中收到 reset ack upto=%s → 位点回退 0 全量重发", reply["upto"])
                     continue
                 upto = int(reply["upto"])
                 in_flight = [b for b in in_flight if b[1] > upto]
@@ -345,10 +351,12 @@ class SyncClient:
         """
         if reply.get("frame") == "ack":
             if reply.get("reset") and reply.get("upto") is not None:
-                self._cursor_seq = int(reply["upto"])
-                await update_sync_state(self.pool, upto=self._cursor_seq)
-                log.warning("摄入侧副本重建（reset ack upto=%s）→ 同步位点回退续传",
-                            self._cursor_seq)
+                # R3 #2：摄入侧时间线分叉重建。ack 仅重放了触发批——副本其余行已被清空，
+                # 必须从头全量重发（重发行撞同内容走幂等跳过，不重复落库）。
+                self._cursor_seq = 0
+                await update_sync_state(self.pool, upto=0)
+                log.warning("摄入侧副本重建（reset ack upto=%s）→ 同步位点回退 0 全量重发",
+                            reply["upto"])
                 return
             await self._apply_ack(reply)
         elif reply.get("frame") == "nack":
