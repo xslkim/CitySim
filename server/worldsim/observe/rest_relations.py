@@ -6,6 +6,8 @@
   + 关键事件标记（05 §6 行；事件序列化 = serde 唯一实现）。
 - `/api/relations?agent=`：单角色有序出边列表（/agent/:id 关系区块数据源，03 §3.3），
   按 |affinity| 降序，附边色所需的 tension（02 §7.5 映射在前端）。
+  R1 #6：双向覆盖（a_id/b_id 任一命中即返回，归一为 agent→对方）+ 随行 `one_line` 文案
+  （取最新快照 state.relations，含日内滚动 latest 通道；出站过 sanitize）。
 """
 
 from __future__ import annotations
@@ -18,7 +20,9 @@ from fastapi import APIRouter, Depends, Query
 
 from .app import ApiError, get_pool, ok_envelope, require_token
 from .rest_agents import AGENT_ID_PATTERN
+from .rest_snapshot import latest_snapshot
 from .serde import serialize_event
+from ..sanitize import display_or_fallback
 
 router = APIRouter(prefix="/api/relations", dependencies=[Depends(require_token)])
 
@@ -32,7 +36,18 @@ def _valid_agent(v: str, label: str) -> str:
 
 def _edge(r: Any) -> dict[str, Any]:
     return {"a": r["a_id"], "b": r["b_id"], "aff": r["affinity"], "ten": r["tension"],
-            "label": list(r["labels"] or [])}
+            "label": list(r["labels"] or []), "one_line": None}
+
+
+async def _one_line_map(pool: Any) -> dict[tuple[str, str], str]:
+    """最新快照 state.relations 的 (a,b)→one_line（R1 #6；rolling 通道优先，日界兜底）。"""
+    snap = await latest_snapshot(pool)
+    out: dict[tuple[str, str], str] = {}
+    for rel in (snap or {}).get("state", {}).get("relations") or []:
+        one = display_or_fallback(rel.get("one_line"), "") if rel.get("one_line") else ""
+        if one:
+            out[(rel.get("a"), rel.get("b"))] = one
+    return out
 
 
 def _is_nonzero(r: Any) -> bool:
@@ -45,15 +60,32 @@ async def api_relations_agent(
     pool: Any = Depends(get_pool),
 ) -> dict[str, Any]:
     _valid_agent(agent, "agent")
+    # R1 #6：双向命中（relation_daily 只物化单向种子边时 b 侧角色不再空白），归一为 agent→对方
     rows = await pool.fetch(
         """
         SELECT a_id, b_id, affinity, tension, labels FROM obs.relation_daily
-        WHERE a_id = $1 AND sim_day = (SELECT max(sim_day) FROM obs.relation_daily)
+        WHERE (a_id = $1 OR b_id = $1)
+          AND sim_day = (SELECT max(sim_day) FROM obs.relation_daily)
         ORDER BY abs(affinity) DESC, abs(tension) DESC
         """,
         agent,
     )
-    return await ok_envelope(pool, {"items": [_edge(r) for r in rows]}, kind="relations_agent")
+    one_lines = await _one_line_map(pool)
+    by_other: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        edge = _edge(r)
+        direct = edge["a"] == agent
+        other = edge["b"] if direct else edge["a"]
+        if other in by_other and not direct:
+            continue  # 双向种子边同存时，以 agent 直出边为准
+        edge = {"a": agent, "b": other, "aff": edge["aff"], "ten": edge["ten"],
+                "label": edge["label"], "one_line": edge["one_line"]}
+        edge["one_line"] = one_lines.get((agent, other)) or one_lines.get((other, agent)) \
+            or edge["one_line"]
+        by_other[other] = edge
+    items = sorted(by_other.values(),
+                   key=lambda e: (-abs(e["aff"]), -abs(e["ten"])))
+    return await ok_envelope(pool, {"items": items}, kind="relations_agent")
 
 
 @router.get("/snapshots")

@@ -152,6 +152,36 @@ async def test_relations_snapshots_and_pair(fx: Any) -> None:
 
 
 @pytest.mark.asyncio
+async def test_relations_agent_bidirectional_oneline_r1_6(fx: Any) -> None:
+    """R1 #6：b 侧角色（只有入边）也能查到自己的关系；one_line 从最新快照 state.relations 随行。"""
+    c, ids = fx
+    day = ids["day"]
+    # A02 只有入边（A05→A02），且种子边 A01→A03 带 one_line
+    pool = c._transport.app.state.pool  # type: ignore[attr-definition]
+    await pool.execute(
+        "INSERT INTO obs.relation_daily (sim_day, a_id, b_id, affinity, tension, labels)"
+        " VALUES ($1, 'A05', 'A02', 22, 6, '{老相识}')", day)
+    await pool.execute(
+        "INSERT INTO obs.world_state_snapshot (sim_day, state, digest) VALUES ($1, $2::jsonb, 'sha256:t')",
+        day,
+        json.dumps({"relations": [
+            {"a": "A01", "b": "A03", "affinity": -20, "tension": 48,
+             "labels": ["冷战"], "one_line": "谁也没先开口道歉"},
+            {"a": "A05", "b": "A02", "affinity": 22, "tension": 6,
+             "labels": ["老相识"], "one_line": "楼上楼下随叫随到"},
+        ]}, ensure_ascii=False))
+    items = (await c.get("/api/relations?agent=A02")).json()["data"]["items"]
+    by_other = {e["b"]: e for e in items}
+    assert by_other["A05"]["a"] == "A02" and by_other["A05"]["aff"] == 22
+    assert by_other["A05"]["one_line"] == "楼上楼下随叫随到"
+    assert by_other["A01"]["aff"] == 0  # 零值入边也可见（前端再滤，口径与 a 侧一致）
+    items_a01 = (await c.get("/api/relations?agent=A01")).json()["data"]["items"]
+    by_other = {e["b"]: e for e in items_a01}
+    assert by_other["A03"]["one_line"] == "谁也没先开口道歉"
+    assert by_other["A03"]["a"] == "A01"  # 双向种子边同存时以直出边为准（不重复）
+
+
+@pytest.mark.asyncio
 async def test_health_thresholds_from_config(fx: Any) -> None:
     """响应阈值与 health_thresholds.yaml 逐字一致（改 yaml 重读生效）；六块齐全。"""
     c, _ = fx

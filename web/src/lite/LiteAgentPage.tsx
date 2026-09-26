@@ -17,7 +17,7 @@ import { useWorldStore } from '../stores/worldStore';
 import LiteShell from './LiteShell';
 import { moodSentence, narrateEvent, relationPhrase } from './narrativeMap';
 
-interface Edge { a: string; b: string; aff: number; ten: number; label: string[] }
+interface Edge { a: string; b: string; aff: number; ten: number; label: string[]; one_line?: string | null }
 
 export default function LiteAgentPage() {
   const { id = '' } = useParams();
@@ -99,6 +99,11 @@ export default function LiteAgentPage() {
           </div>
           <div className="card">
             <div className="mb-2 text-title text-text-0">TA 的人际关系</div>
+            {edges.length === 0 && (  // R1 #6 人话空态：不再空白卡
+              <div className="text-body text-text-1" data-testid="lite-relations-empty">
+                刚搬进来，还都是点头之交。
+              </div>
+            )}
             {edges.map((e) => {
               const ph = relationPhrase(e.label, e.aff, e.ten);
               return (
@@ -112,6 +117,7 @@ export default function LiteAgentPage() {
                         {e.aff < 0 ? '↘' : '↗'} {ph.phrase}
                       </span>
                     </div>
+                    {e.one_line && <div className="text-aux text-text-1">{e.one_line}</div>}
                   </div>
                   <span className="ml-auto rounded bg-bg-2 px-2 py-0.5 text-ts text-text-1">{ph.tag}</span>
                 </div>
