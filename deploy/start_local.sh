@@ -35,11 +35,12 @@ else
   log "PG already running"
 fi
 
-# 2) 内核（mock provider 默认；真跑 GLM 加 --llm routed，00 §1 A9）
+# 2) 内核（mock provider 默认；真跑 GLM：WSIM_LLM=routed，00 §1 A9）
 if ! pgrep -f "worldsim.main" >/dev/null; then
-  log "启动内核（mock）…"
+  log "启动内核（${WSIM_LLM:-mock}）…"
   HF_HUB_OFFLINE=1 PYTHONUNBUFFERED=1 nohup uv run python -m worldsim.main \
     ${SIM_HOURS:+--sim-hours $SIM_HOURS} ${WSIM_RATIO:+--ratio $WSIM_RATIO} \
+    ${WSIM_LLM:+--llm $WSIM_LLM} \
     >>"$LOG_DIR/kernel.log" 2>&1 &
 else
   log "内核 already running"
