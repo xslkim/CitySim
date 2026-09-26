@@ -287,6 +287,7 @@ async def _run(args: argparse.Namespace) -> int:
             # 起跑错峰默认 0.5s（WSIM_DECISION_STAGGER_S 可调，0 关闭错峰）
             decide_concurrency=int(os.environ.get("WSIM_DECISION_CONCURRENCY", "2")),
             decide_stagger_s=float(os.environ.get("WSIM_DECISION_STAGGER_S", "0.5")),
+            needs_engine=needs_engine,  # R3 #4③：工作时段通勤候选开放
         )
 
         # ---- M3 接线（04 文档 T-WA/T-DIR）：日历引擎 + 世界 Agent 全作业 + 编剧导演 --------------
@@ -429,13 +430,28 @@ async def _run(args: argparse.Namespace) -> int:
                 )
             # T-REL-01：全员六需求被动衰减（只读 sim_time；cause = 本裁决点前最后一事件 seq，工程口径 D22）
             cause = str(await pool.fetchval("SELECT coalesce(max(seq), 0) FROM events"))
+            # R3 #4①②：per-agent Big Five 修正 + 显著关系边数（社交保底座）——打破"一条 needs_delta
+            # 对全员逐位相同"的克隆态（batch 保底/被动结算路径接入人设差异）
+            personas = {
+                r["id"]: (json.loads(r["persona"]) if isinstance(r["persona"], str) else r["persona"])
+                for r in await pool.fetch("SELECT id, persona FROM agents")
+            }
+            edge_counts = {
+                r["a_id"]: int(r["n"])
+                for r in await pool.fetch(
+                    "SELECT a_id, count(*) AS n FROM relations "
+                    "WHERE affinity <> 0 OR tension <> 0 OR cardinality(labels) > 0 GROUP BY a_id")
+            }
             for aid in agent_ids:
                 last = last_decay.get(aid, sim_start)
                 if sim_now > last:
-                    await needs_engine.settle_decay(agg, agent_id=aid, from_sim=last, to_sim=sim_now, cause=cause)
+                    bf = (personas.get(aid) or {}).get("big_five")
+                    await needs_engine.settle_decay(agg, agent_id=aid, from_sim=last, to_sim=sim_now,
+                                                    cause=cause, big_five=bf)
                     # T-ITER2-01②：被动恢复兜底——按作息表直接结算睡眠/进食（决策停摆也能恢复）
                     await needs_engine.settle_passive_recovery(
-                        agg, agent_id=aid, from_sim=last, to_sim=sim_now, cause=cause)
+                        agg, agent_id=aid, from_sim=last, to_sim=sim_now, cause=cause,
+                        big_five=bf, relation_edges=edge_counts.get(aid, 0))
                     last_decay[aid] = sim_now
             # 04 §6.5：本 tick 聚合状态事件合并落库（≤2 条）
             await agg.flush(tick=tick, sim_now=sim_now, trigger="system", rng_seed=tick)
@@ -545,6 +561,9 @@ async def _run(args: argparse.Namespace) -> int:
                         kind, payload = "agent.rest", {"mode": "sleep"}
                     elif needs_engine.is_meal_time(t):
                         kind, payload = "agent.eat", {"venue": "home", "with": [], "amount_cents": 0}
+                    elif needs_engine.is_working(t):
+                        # R3 #4③：工作日工作时段保底出工作类事件（追日快进不再"全员在家"）
+                        kind, payload = "agent.work", {"task_id": None}
                     else:
                         kind, payload = "agent.think", {"topic_hint": "按部就班的一天"}
                     await pool.execute(

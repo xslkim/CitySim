@@ -181,3 +181,46 @@ def test_is_meal_time(engine: NeedsEngine) -> None:
     assert engine.is_meal_time(T0.replace(hour=19, minute=30))
     assert not engine.is_meal_time(T0.replace(hour=15))
     assert not engine.is_meal_time(T0.replace(hour=3))  # 深夜睡眠窗
+
+
+def test_bigfive_factor_differentiates(engine: NeedsEngine) -> None:
+    """R3 #4①：±20% 系数表生效——同段积分随 Big Five 维度分差异化（needs 克隆态打破）。"""
+    t1 = T0.replace(hour=10)
+    t2 = t1 + dt.timedelta(hours=2)
+    base = engine.integrate("social", t1, t2)                      # 中性 1.0
+    extro = engine.integrate("social", t1, t2, big_five={"extraversion": 80})
+    intro = engine.integrate("social", t1, t2, big_five={"extraversion": 20})
+    assert extro < base < intro, "E 高者社交渴求衰减更快（更需要人），积分更负"
+    assert extro == pytest.approx(base * engine.bigfive_factor("social", {"extraversion": 80}))
+    # 未映射需求保持中性（hunger/wealth 不映射，工程默认）
+    assert engine.bigfive_factor("hunger", {"conscientiousness": 90}) == 1.0
+    assert engine.bigfive_factor("social", None) == 1.0
+
+
+@pytest.mark.asyncio
+async def test_social_floor_by_relation_edges(pool, engine: NeedsEngine) -> None:
+    """R3 #4②：社交保底座——social 低于底座（base + per_edge×min(edges, 封顶)）时补差额，高于不动。"""
+    agg = StateAggregator(pool)
+    t1 = T0.replace(hour=12, minute=0)
+    t2 = t1 + dt.timedelta(hours=1)
+    await pool.execute("UPDATE agents SET needs = needs || '{\"social\": 5}'::jsonb WHERE id='A23'")
+    try:
+        changes = await engine.settle_passive_recovery(
+            agg, agent_id="A23", from_sim=t1, to_sim=t2, cause="777", relation_edges=4)
+        by_need = {c["need"]: c for c in changes}
+        floor = (CFG["passive"]["social_floor_base"] + CFG["passive"]["social_floor_per_edge"]
+                 * min(4, CFG["passive"]["social_floor_max_edges"]))
+        assert by_need["social"]["new_value"] == pytest.approx(floor), "低于底座补到底座"
+        assert by_need["social"]["delta"] == pytest.approx(floor - 5)
+        # 高于底座不动；不传 relation_edges（旧调用形态）不触发底座保护
+        await pool.execute("UPDATE agents SET needs = needs || '{\"social\": 66}'::jsonb WHERE id='A24'")
+        changes2 = await engine.settle_passive_recovery(
+            agg, agent_id="A24", from_sim=t1, to_sim=t2, cause="776", relation_edges=4)
+        assert "social" not in {c["need"] for c in changes2}, "高于底座不补"
+        changes3 = await engine.settle_passive_recovery(
+            agg, agent_id="A23", from_sim=t1, to_sim=t2, cause="775")
+        assert "social" not in {c["need"] for c in changes3}, "relation_edges 缺省 = 无底座（向后兼容）"
+        await agg.flush(tick=77, sim_now=t2, trigger="system", rng_seed=77)
+    finally:
+        await pool.execute("UPDATE agents SET needs = needs || '{\"social\": 70}'::jsonb "
+                           "WHERE id = ANY($1)", NEEDS_AGENT_IDS)

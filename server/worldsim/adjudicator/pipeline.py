@@ -150,6 +150,7 @@ class Pipeline:
         settler: SettleFn | None = None,
         decide_concurrency: int = 2,   # R1 #2：star 决策在飞并发闸（对齐免费档实测 concurrency=2）
         decide_stagger_s: float = 0.0,  # R1 #2：逐 agent 起跑错峰（main.py 经 WSIM_DECISION_STAGGER_S 注入）
+        needs_engine: Any = None,  # R3 #4③：作息判定注入（工作日工作时段开放通勤候选）
     ) -> None:
         self._pool = pool
         self._gw = gateway
@@ -162,6 +163,16 @@ class Pipeline:
         self._settler = settler  # T-ADJ-03：19 动作结算总线（None = M1 骨架 think/move 内置路径）
         self._decide_concurrency = max(1, int(decide_concurrency))
         self._decide_stagger_s = max(0.0, float(decide_stagger_s))
+        self._needs_engine = needs_engine
+
+    def _office_node(self, department: str | None) -> str | None:
+        """R3 #4③：部门名 → 公司工位区节点（world.yaml office 表 name 前缀匹配）。"""
+        if not department:
+            return None
+        for node in self._world.get("locations", {}).get("office", []):
+            if node.get("kind") == "dept_area" and str(node.get("name", "")).startswith(str(department)):
+                return str(node["id"])
+        return None
 
     # ---- tick 驱动（04 §2.2：LLM 并发、落库串行） -------------------------
 
@@ -330,7 +341,7 @@ class Pipeline:
 
     async def _build_obs(self, agent_id: str, sim_now: dt.datetime) -> Observation:
         row = await self._pool.fetchrow(
-            "SELECT id, name, persona, needs, balance_cents, position, cognition_tier FROM agents WHERE id=$1",
+            "SELECT id, name, persona, needs, balance_cents, position, cognition_tier, department FROM agents WHERE id=$1",
             agent_id,
         )
         if row is None:
@@ -347,6 +358,14 @@ class Pipeline:
                 "SELECT goal FROM goals WHERE agent_id=$1 AND status='active' ORDER BY id", agent_id
             )
         ]
+        exits = self.exits_for(row["position"], sim_now)
+        # R3 #4③：工作日工作时段且人在公寓 → 开放部门工位区通勤候选（5 天 0 条 move-to-corp 修复：
+        # 旧可达图对 apt 位置只列公寓公共节点，公司半边地图对决策不可达）
+        if (self._needs_engine is not None and self._needs_engine.is_working(sim_now)
+                and str(row["position"]).startswith("apt.")):
+            office = self._office_node(row["department"])
+            if office is not None and office not in exits:
+                exits = [*exits, office]
         recent = await self._pool.fetch(
             "SELECT seq, type, visibility FROM events WHERE $1 = ANY(actors) ORDER BY seq DESC LIMIT 5",
             agent_id,
@@ -385,7 +404,7 @@ class Pipeline:
             name=row["name"],
             sim_time=sim_now,
             position=row["position"],
-            exits=self.exits_for(row["position"], sim_now),
+            exits=exits,
             co_located=co_located,
             needs=dict(needs or {}),
             balance_cents=row["balance_cents"],

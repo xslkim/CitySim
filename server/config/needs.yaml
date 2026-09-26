@@ -45,6 +45,10 @@ passive:                       # T-ITER2-01②（round2 #1）：决策停摆被�
                                # 数值口径：energy 复用 satisfy.energy.sleep_per_hour，
                                # hunger 按 satisfy.hunger.canteen 摊到 1h 窗口（工程默认，偏差表登记）
   meals: [["12:00", "13:00"], ["19:00", "20:00"]]   # 进食窗（两段各 1 模拟小时）
+  social_floor_base: 10         # R3 #4②：社交保底座（按关系边数上抬；工程默认，偏差表登记）——
+                               # 批量段不与"零社交"冲突：同侪在场基线，social 恒 0 的克隆态打破
+  social_floor_per_edge: 2      # 每条显著关系边（affinity/tension/labels 非空）+2
+  social_floor_max_edges: 5     # 计边封顶（5 条 → 底座上限 20）
 
 state_rule:                    # 04 §6.2 通用校验状态行 + 01 §3.1 强制行为（方向：低值 = 匮乏，评审二轮 P2-3 修正后口径）
   energy_forced_rest_below: 10         # 精力 <10 强制 rest
@@ -52,5 +56,11 @@ state_rule:                    # 04 §6.2 通用校验状态行 + 01 §3.1 强�
   hunger_downweight_below: 15          # 饥饿 <15 时非进食动作降权（04 §6.2 状态行）
   non_eat_downweight_factor: 0.5       # 降权倍率（设计未给值；工程默认 ×0.5，02 文档偏差表 D14 登记）
 
-big_five:                      # 修正系数表为 P1（W4 前校准）；M1 仅实现接口与中性档 1.0（02 文档 D9，系数表读取路径预留）
-  modifier: neutral_1_0
+big_five:                      # R3 #4①：±20% 修正系数表生效（01 §3.1 P1 档落地；02 文档 D9 预留路径接通）
+  modifier: table_v1           # 系数 = 1 + band*(维度分-50)/50，clamp [0.5, 1.5]；50 分为中性
+  band: 0.2                    # ±20% 带（01 §3.1 P1）
+  decay_map:                   # 需求衰减 ← Big Five 维度（hunger/wealth 中性不映射，工程默认）
+    energy: neuroticism        # N 高 → 精力消耗更快
+    social: extraversion       # E 高 → 社交渴求衰减更快（更需要人）
+    mood: neuroticism          # N 高 → 情绪基线更不稳
+    achievement: conscientiousness   # C 高 → 成就驱动更强

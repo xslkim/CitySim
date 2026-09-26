@@ -314,3 +314,33 @@ async def test_pipeline_injected_mock_deterministic() -> None:
     events_a = run_a[0]
     assert len(events_a) > 0
     assert all(e[6] is not None for e in events_a), "events.rng_seed 留痕（04 §5.2）"
+
+
+@pytest.mark.asyncio
+async def test_work_hours_open_office_commute(pool) -> None:
+    """R3 #4③：工作日工作时段，公寓住户的可达候选含本部门工位区（corp 半边地图对决策可达）。"""
+    from worldsim.relations.needs import NeedsEngine, load_needs_config
+    from worldsim.world_agent.config import load_world_config
+
+    await pool.execute(
+        """
+        INSERT INTO agents (id, name, gender, age, cognition_tier, persona, needs, balance_cents,
+                            position, department)
+        VALUES ('A20', '通勤测试', 'M', 25, 'star', '{}'::jsonb, '{}'::jsonb, 0, 'apt.L2.101', '技术部')
+        ON CONFLICT (id) DO NOTHING
+        """
+    )
+    try:
+        needs = NeedsEngine(load_needs_config(str(DDL_DIR.parent / "config" / "needs.yaml")))
+        pipe = Pipeline(pool, StubGateway(), load_world_config(), needs_engine=needs)
+        work_time = T0.replace(hour=10, minute=0)   # 周一 10:00 工作时段
+        obs = await pipe._build_obs("A20", work_time)
+        assert "corp.tech" in obs.exits, "工作时段须开放部门工位区通勤候选"
+        # 晚间 / 周末不开放（作息表口径，needs.yaml schedule.work）
+        obs_evening = await pipe._build_obs("A20", T0.replace(hour=20, minute=0))
+        assert "corp.tech" not in obs_evening.exits
+        sat = T0 + dt.timedelta(days=5)  # 周六
+        obs_weekend = await pipe._build_obs("A20", sat.replace(hour=10, minute=0))
+        assert "corp.tech" not in obs_weekend.exits
+    finally:
+        await pool.execute("DELETE FROM agents WHERE id='A20'")

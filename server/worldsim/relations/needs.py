@@ -119,8 +119,18 @@ class NeedsEngine:
         return total * self.bigfive_factor(need, big_five)
 
     def bigfive_factor(self, need: str, big_five: dict[str, Any] | None) -> float:
-        """Big Five 衰减修正系数（01 §3.1 P1 档）：M1 中性档 1.0（02 文档 D9；系数表读取路径预留）。"""
-        return 1.0
+        """Big Five 衰减/满足修正系数（01 §3.1 P1 档；R3 #4① 系数表落地）。
+
+        needs.yaml big_five.decay_map 给出需求 ← 维度映射；系数 = 1 + band*(维度分-50)/50，
+        clamp [0.5, 1.5]（50 分 = 中性 1.0）。未映射需求 / 无人设 → 1.0（M1 中性档口径不回退）。
+        """
+        table = self._cfg.get("big_five") or {}
+        dim = (table.get("decay_map") or {}).get(need)
+        if not dim or not big_five:
+            return 1.0
+        band = float(table.get("band", 0.2))
+        val = float(big_five.get(dim, 50) or 50)
+        return max(0.5, min(1.5, 1.0 + band * (val - 50.0) / 50.0))
 
     def satisfy_amount(self, need: str, method: str, *, big_five: dict[str, Any] | None = None) -> float:
         """满足量查询（01 §3.1 满足量列；±20% Big Five 修正 P1，M1 中性 1.0）。"""
@@ -171,13 +181,16 @@ class NeedsEngine:
 
     async def settle_passive_recovery(
         self, agg: StateAggregator, *, agent_id: str, from_sim: dt.datetime, to_sim: dt.datetime, cause: str,
-        big_five: dict[str, Any] | None = None,
+        big_five: dict[str, Any] | None = None, relation_edges: int | None = None,
     ) -> list[dict[str, Any]]:
         """作息表被动结算：睡眠窗恢复 energy（satisfy.energy.sleep_per_hour 积分）；
         进食窗恢复 hunger（satisfy.hunger.canteen 按 1h 窗口摊算，needs.yaml passive.meals）。
 
         与衰减解耦：决策链停摆（LLM 全挂/裁决异常）时 needs 仍沿作息表恢复，打破
         "能量归零 → 强制休息依赖决策 → 永不恢复"死锁（round2 #1 验收②）。
+
+        R3 #4②：社交保底座——觉醒时段同侪在场基线，social 低于底座（按显著关系边数上抬，
+        needs.yaml passive.social_floor_*）时补差额；批量段不与"零社交"冲突（克隆态打破）。
         """
         changes: list[dict[str, Any]] = []
         sleep_h = self._window_overlap_hours(from_sim, to_sim, *self._sleep)
@@ -196,6 +209,16 @@ class NeedsEngine:
                 agent_id=agent_id, need="hunger", delta=canteen * h, cause=cause)
             if change is not None:
                 changes.append(change)
+        if relation_edges is not None:
+            pf = self._cfg.get("passive", {})
+            floor = float(pf.get("social_floor_base", 10)) + float(pf.get("social_floor_per_edge", 2)) * min(
+                int(relation_edges), int(pf.get("social_floor_max_edges", 5)))
+            current = float((await agg.read_needs(agent_id)).get("social", 0.0))
+            if current < floor:
+                change = await agg.apply_needs_delta(
+                    agent_id=agent_id, need="social", delta=floor - current, cause=cause)
+                if change is not None:
+                    changes.append(change)
         return changes
 
     # ---- 驱动区 / 强制行为 / 意图降权（04 §6.2 状态行；T-ADJ-03 消费面） -----------
