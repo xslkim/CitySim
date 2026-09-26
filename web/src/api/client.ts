@@ -21,8 +21,17 @@ export interface ApiResult<T> {
   meta: { watermark_tick: number } & Record<string, unknown>;
 }
 
+const TOKEN_STORAGE_KEY = 'worldsim.token';
+
 export function getToken(): string {
-  return new URLSearchParams(window.location.search).get('token') ?? '';
+  // URL ?token= 优先；读入即持久化——SPA 内部跳转（react-router）会丢 location.search，
+  // 之后所有 API/WS 调用回落 localStorage（实测：点开角色页后裸请求全 401 的修复）
+  const fromUrl = new URLSearchParams(window.location.search).get('token');
+  if (fromUrl) {
+    try { window.localStorage.setItem(TOKEN_STORAGE_KEY, fromUrl); } catch { /* 隐私模式等 */ }
+    return fromUrl;
+  }
+  try { return window.localStorage.getItem(TOKEN_STORAGE_KEY) ?? ''; } catch { return ''; }
 }
 
 export function withToken(url: string): string {
