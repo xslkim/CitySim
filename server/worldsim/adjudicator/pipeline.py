@@ -33,10 +33,38 @@ log = logging.getLogger(__name__)
 
 STAR_EVERY_N_TICKS = 3  # 明星层每 3 tick 时钟兜底（04 §2.2；T-LOD-01 接管排程前的 M1 最小兜底）
 
+LOCAL_TZ = dt.timezone(dt.timedelta(hours=8))  # Asia/Shanghai（与 time_engine.clock 同口径）
+
 FORMAT_FIX_SUFFIX = (
     "格式错误：请只输出一个合法 JSON 对象，键含 intent/action{type,args}/emotion_delta，不要输出其他任何文字。"
 )
 DEGRADED_THINK_TEXT = "走神了"  # 04 §6.1 step3 降级 think 动作留痕文本
+
+# R3 #1② 动作候选菜单（01 §4 动作空间 19 项逐字；prompt 供给面——旧版只给 think/move，
+# 对话/社交意图在供给面即被扼杀，dialogue 五类事件 trigger 恒 0 的根因）。
+# {stocks} 由 _render_messages 以 world.yaml 标的清单填充。
+ACTION_MENU = (
+    "可选动作（action.type 取值，args 为参数对象，门槛不满足会被现实阻止）：\n"
+    "- move {to: 可达节点}\n"
+    "- work {}（工作日 09:00-18:00 且须在公司 corp 节点）\n"
+    "- rest {mode: nap|sleep}（须在自己房间）\n"
+    "- eat {venue: cook|bento|canteen|restaurant|coffee, with?: [同节点者]}\n"
+    "- shop {store: 便利店|商超|服饰店|家居店|书店|礼品店, budget: 分}\n"
+    "- trade_stock {side: buy|sell, symbol: {stocks}, amount: 分}（9:30-15:00）\n"
+    "- think {topic_hint: 在想什么}\n"
+    "- chat {target: 同节点者, mode: small|deep}（deep 需对方对你好感≥20；社交饥渴时优先）\n"
+    "- send_message {target: 任意者, content_hint: 捎话内容}\n"
+    "- invite {target, activity, time, location}\n"
+    "- give_gift {target: 同节点者, tier: 1|2|3}\n"
+    "- help {target: 同节点且对方有匮乏需求}\n"
+    "- borrow_money {target, amount: 分, result: accepted|refused}（对方对你好感≥10）\n"
+    "- repay_money {target, amount: 分}（你有对其未结清债务）\n"
+    "- argue {target: 同节点者, reason_hint: 起因}（紧张≥20 或情绪≤30 时成立）\n"
+    "- gossip {target_listener: 同节点者, about: 第三人, cites: [记忆id]}\n"
+    "- refuse {target, request_ref: 事件seq}\n"
+    "- confess {target, result: accepted|refused}（你→对方好感≥40 且在自己房间或天台）\n"
+    "- apologize {target, for_event_ref: 事件seq}（紧张≥20）"
+)
 
 # think 轻反思档重要性区间 1~3（04 §6.2 think 行）；移动耗时档 5~15min（04 §6.2 move 行，
 # 档位映射 T-ADJ-03 持有，M1 工程默认按 rng 在三档间确定性取数，登记偏差）
@@ -60,7 +88,10 @@ class Decision:
 
 @dataclass
 class Observation:
-    """step1 结构化感知（04 §6.1 step1：sim_time/地点/在场者/需求/余额/日程/未读事件/人设卡）。"""
+    """step1 结构化感知（04 §6.1 step1：sim_time/地点/在场者/需求/余额/日程/未读事件/人设卡）。
+
+    R3 #1：扩社交上下文面——关系边（好感/紧张/标签）与债务，prompt 渲染注入（对话意图供给）。
+    """
 
     agent_id: str
     name: str
@@ -74,6 +105,8 @@ class Observation:
     recent_events: list[dict[str, Any]]
     persona: dict[str, Any]
     cognition_tier: str
+    relation_edges: list[dict[str, Any]] = field(default_factory=list)  # [{id,name,affinity,tension,labels}]
+    debts: list[dict[str, Any]] = field(default_factory=list)  # [{peer,name,role,amount_cents,due_sim}]
 
     def prompt_line(self) -> str:
         """OBS_JSON 行（mock provider 的确定性决策契约；M2 模板渲染归 T-LLM-09）。"""
@@ -179,6 +212,10 @@ class Pipeline:
             decision = self._parse_decision(agent_id, last_text, attempts)
             if decision is not None:
                 return decision
+            # R3 #1③ 诊断面：解析失败落原始输出抽样（截断 300 字，kernel.log 站内留痕，
+            # 用于对照"含社交意图输出被 schema 系统性判失败"假设；不出站）
+            log.warning("agent %s 决策解析失败（第 %d 次）：原始输出=%r", agent_id, attempts,
+                        last_text[:300])
             messages = [*messages, {"role": "user", "content": FORMAT_FIX_SUFFIX}]
         log.warning("agent %s 决策解析两次失败，降级 think（%s）", agent_id, DEGRADED_THINK_TEXT)
         return Decision(
@@ -191,12 +228,36 @@ class Pipeline:
         )
 
     @staticmethod
-    def _parse_decision(agent_id: str, text: str, attempts: int) -> Decision | None:
+    def _extract_json_object(text: str) -> dict[str, Any] | None:
+        """R3 #1③：围栏/包裹容忍的 JSON 对象抽取（真 LLM 鲁棒性，T-LLM-12 同口径）。
+
+        免费档模型常把决策包在 ```json 围栏或解释文字里，旧版裸 json.loads 一律判失败
+        → 每 5 分钟一轮 7-8 连发"走神"降级（round3 诊断的系统性扼杀信号之一）。
+        """
+        s = str(text).strip()
+        if s.startswith("```"):
+            s = s.strip("`")
+            if s[:4].lower() == "json":
+                s = s[4:]
         try:
-            body = json.loads(text)
+            body = json.loads(s)
+            return body if isinstance(body, dict) else None
         except (ValueError, TypeError):
-            return None
-        if not isinstance(body, dict):
+            pass
+        # 从首个 '{' 起 raw_decode 截取第一个完整对象（容忍前后缀杂讯）
+        start = s.find("{")
+        while start != -1:
+            try:
+                body, _ = json.JSONDecoder().raw_decode(s[start:])
+                return body if isinstance(body, dict) else None
+            except (ValueError, TypeError):
+                start = s.find("{", start + 1)
+        return None
+
+    @classmethod
+    def _parse_decision(cls, agent_id: str, text: str, attempts: int) -> Decision | None:
+        body = cls._extract_json_object(text)
+        if body is None:
             return None
         action = body.get("action")
         if not isinstance(action, dict) or not isinstance(action.get("type"), str):
@@ -219,7 +280,11 @@ class Pipeline:
         )
 
     def _render_messages(self, obs: Observation, mems: list[Any]) -> list[dict[str, str]]:
-        """M1 轻量渲染（prompt 模板族归 03 T-LLM-09，M2 替换；人设卡每次必带，04 §6.1 step1）。"""
+        """M1 轻量渲染（prompt 模板族归 03 T-LLM-09，M2 替换；人设卡每次必带，04 §6.1 step1）。
+
+        R3 #1②：动作候选全量供给（19 项菜单）+ 社交上下文（关系边/债务/在场者）注入。
+        旧版"轻动作只可选 think 或 move"把对话意图在供给面扼杀——LLM 从不知道还能开口。
+        """
         persona_brief = {
             "name": obs.persona.get("name", obs.name),
             "age": obs.persona.get("age"),
@@ -227,19 +292,39 @@ class Pipeline:
             "speech_style": obs.persona.get("speech_style"),
         }
         system = (
-            "你是角色扮演引擎。只输出 JSON。"
+            "你是角色扮演引擎。只输出一个 JSON 对象（不要 markdown 代码块、不要任何解释文字）："
             + json.dumps({"persona": persona_brief}, ensure_ascii=False, sort_keys=True)
         )
         mem_lines = "\n".join(f"- {m}" for m in mems[:10]) or "- （无）"
+        rel_lines = "\n".join(
+            f"- {r['peer']}{r['name']}: 好感{int(r['affinity'])}/紧张{int(r['tension'])}"
+            + (f" [{','.join(r['labels'])}]" if r.get("labels") else "")
+            for r in obs.relation_edges
+        ) or "- （无显著关系）"
+        debt_lines = "\n".join(
+            f"- 你欠{r['name']} ¥{(int(r['amount_cents']) - int(r['repaid_cents'])) / 100:.0f}"
+            f"（{r['due_sim'].astimezone(LOCAL_TZ).date()} 到期）" if r["role"] == "owe"
+            else f"- {r['name']}欠你 ¥{(int(r['amount_cents']) - int(r['repaid_cents'])) / 100:.0f}"
+            for r in obs.debts
+        ) or "- （无未结清债务）"
+        stocks = "、".join(s["id"] for s in self._world.get("stocks", {}).get("symbols", [])) or "N/A"
+        names = {r["peer"]: r["name"] for r in obs.relation_edges}
+        here = "、".join(f"{aid}({names.get(aid, aid)})" for aid in obs.co_located) or "无人"
         user = (
             obs.prompt_line()
             + f"\n需求={json.dumps(obs.needs, ensure_ascii=False, sort_keys=True)}"
             + f"\n余额分={obs.balance_cents}"
             + f"\n目标={json.dumps(obs.goals, ensure_ascii=False)}"
+            + f"\n在场者={here}"
+            + f"\n关系网：\n{rel_lines}"
+            + f"\n债务：\n{debt_lines}"
             + f"\n近期事件={json.dumps(obs.recent_events, ensure_ascii=False)}"
             + f"\n相关记忆：\n{mem_lines}"
+            + f"\n{ACTION_MENU.replace('{stocks}', stocks)}"
             + "\n请输出本拍决策 JSON：{intent, action:{type, args}, say?, emotion_delta}。"
-            "轻动作只可选 think 或 move（move 的 args.to 必须取自 OBS_JSON.exits）。"
+            "从上面的菜单里选一个动作；有想 say 的话写进 say 字段。"
+            "身边有人且社交饥渴时不要只 think——优先 chat/gossip/invite 等互动动作；"
+            "有未结清债务时考虑 repay_money；与人有旧怨（紧张高）时 argue/apologize 更符合人设。"
         )
         return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
@@ -266,6 +351,29 @@ class Pipeline:
             "SELECT seq, type, visibility FROM events WHERE $1 = ANY(actors) ORDER BY seq DESC LIMIT 5",
             agent_id,
         )
+        # R3 #1②：社交上下文注入——关系边（非平淡才进 prompt，上限 8 条）+ 债务清单
+        rel_rows = await self._pool.fetch(
+            """
+            SELECT r.b_id AS peer, a.name, r.affinity, r.tension, r.labels
+            FROM relations r JOIN agents a ON a.id = r.b_id
+            WHERE r.a_id = $1 AND (r.affinity <> 0 OR r.tension <> 0 OR cardinality(r.labels) > 0)
+            ORDER BY (abs(r.affinity) + abs(r.tension)) DESC, r.b_id LIMIT 8
+            """,
+            agent_id,
+        )
+        debt_rows = await self._pool.fetch(
+            """
+            SELECT 'owe' AS role, a_id AS peer, ag.name, amount_cents, repaid_cents, due_sim
+            FROM debts JOIN agents ag ON ag.id = a_id
+            WHERE repaid_cents < amount_cents AND b_id = $1
+            UNION ALL
+            SELECT 'lent' AS role, b_id AS peer, ag.name, amount_cents, repaid_cents, due_sim
+            FROM debts JOIN agents ag ON ag.id = b_id
+            WHERE repaid_cents < amount_cents AND a_id = $1
+            ORDER BY 4 DESC
+            """,
+            agent_id,
+        )
         persona = row["persona"]
         if isinstance(persona, str):
             persona = json.loads(persona)
@@ -285,6 +393,8 @@ class Pipeline:
             recent_events=[dict(r) for r in recent],
             persona=dict(persona or {}),
             cognition_tier=row["cognition_tier"],
+            relation_edges=[dict(r) for r in rel_rows],
+            debts=[dict(r) for r in debt_rows],
         )
 
     # ---- step4~step6（串行，唯一写路径） -----------------------------------
@@ -298,6 +408,10 @@ class Pipeline:
         seqs: list[int] = []
         if not ok:
             decision.blocked_reason = reason
+            # R3 #1④ 诊断面：意图被门槛拒绝留计数日志（社交意图消失在门槛面的可见性）
+            log.info("step4 拦截：agent=%s action=%s args=%s reason=%s",
+                     decision.agent_id, decision.action_type,
+                     json.dumps(decision.action_args, ensure_ascii=False)[:120], reason)
             await self._write_blocked_memory(decision, reason, sim_now, rng_seed)
             if self._after_settle:
                 await self._after_settle(decision, seqs)

@@ -235,6 +235,45 @@ async def test_decide_concurrency_cap_r1(pool) -> None:
     assert gw.max_in_flight == 1, "并发闸=1 时决策须串行（错峰调度生效）"
 
 
+async def test_parse_tolerant_of_fences_and_noise(pool) -> None:
+    """R3 #1③：围栏/杂讯包裹的决策 JSON 不再被 schema 判失败（对话意图不被系统性误杀）。"""
+    fenced = ('```json\n{"intent":"想找人聊聊","action":{"type":"chat",'
+              '"args":{"target":"A12","mode":"small"}},"emotion_delta":{}}\n```')
+    d = Pipeline._parse_decision("A10", fenced, 1)
+    assert d is not None and d.action_type == "chat" and d.action_args["target"] == "A12"
+    noisy = '好的，这是本拍决策：{"intent":"聊聊八卦","action":{"type":"gossip","args":{}}} 就按这个来。'
+    d2 = Pipeline._parse_decision("A10", noisy, 1)
+    assert d2 is not None and d2.action_type == "gossip" and d2.intent == "聊聊八卦"
+    assert Pipeline._parse_decision("A10", "完全没有 JSON 对象", 1) is None
+
+
+async def test_prompt_supplies_action_menu_and_social_context(pool) -> None:
+    """R3 #1②：prompt 供给 19 动作菜单 + 关系网/债务/在场者（旧版只给 think/move 是哑火根因）。"""
+    await pool.execute(
+        "INSERT INTO relations (a_id,b_id,affinity,tension,labels) VALUES ('A10','A12',15,5,'{同事,暗恋}')"
+    )
+    await pool.execute(
+        "INSERT INTO debts (a_id,b_id,amount_cents,due_sim,created_tick) VALUES ('A12','A10',30000,$1,0)",
+        T0 + dt.timedelta(days=14),
+    )
+    try:
+        gw = StubGateway()
+        pipe = Pipeline(pool, gw)
+        obs = await pipe._build_obs("A10", T0)
+        assert any(r["peer"] == "A12" and int(r["affinity"]) == 15 for r in obs.relation_edges)
+        assert any(r["role"] == "owe" and r["peer"] == "A12" for r in obs.debts)
+        user = pipe._render_messages(obs, [])[1]["content"]
+        for action in ("chat {target", "gossip {", "argue {", "borrow_money {", "confess {", "invite {"):
+            assert action in user, f"动作菜单缺 {action}"
+        assert "好感15/紧张5" in user and "同事,暗恋" in user, "关系边注入"
+        assert "你欠" in user and "到期" in user, "债务注入"
+        assert "在场者=" in user and "A12" in user, "在场者注入"
+        assert "轻动作只可选" not in user, "旧版 think/move 限制必须移除"
+    finally:  # 共享 test_db：清理本用例行，避免污染夹具的 agents 删除
+        await pool.execute("DELETE FROM relations WHERE a_id='A10' AND b_id='A12'")
+        await pool.execute("DELETE FROM debts WHERE a_id='A12' AND b_id='A10'")
+
+
 async def test_pipeline_injected_mock_deterministic() -> None:
     """验收 2 指定用例：注入 03 T-LLM-02 mock，同 rng_seed 两次跑同批 tick，事件序列逐字节一致。"""
     from worldsim.llm_gateway import LLMGateway
