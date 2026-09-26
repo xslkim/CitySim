@@ -7,6 +7,7 @@ import {
   nodeRect,
   offsiteCount,
   siteOf,
+  spreadOffsets,
 } from '../lib/mapLayout';
 
 const layout = JSON.parse(readFileSync('public/map_layout.json', 'utf-8'));
@@ -41,5 +42,42 @@ describe('map_layout.json（03 §3.1 结构）', () => {
 
   it('offsiteCount 角标 = home.* 节点人数（N-P1-9）', () => {
     expect(offsiteCount({ A01: 'home.A01', A02: 'apt.L2.201', A03: 'home.A03' })).toBe(2);
+  });
+});
+
+describe('T-ITER2-06 首屏可视（公共区顶带 + 散开算法）', () => {
+  it('公共区带在顶部（y=0，首屏常驻），房间整体下移 48 不重叠', () => {
+    const apt = layout.sites[0];
+    const kitchen = nodeRect(apt, 'apt.kitchen')!;
+    expect(kitchen.y).toBe(0);
+    expect(kitchen.x).toBe(88);
+    const topFloor = nodeRect(apt, 'apt.L6.601')!;  // 最高层（floor=6）
+    expect(topFloor.y).toBe(48);                     // 48 + (6-6)*72
+    const ground = nodeRect(apt, 'apt.L1.101')!;
+    expect(ground.y).toBe(48 + 5 * 72);
+    // 公共区带与最高层房间不重叠
+    expect(kitchen.y + kitchen.h).toBeLessThanOrEqual(topFloor.y);
+  });
+
+  it('spreadOffsets：同房散开相邻间距 ≥ 头像直径 18px（n=2~6）', () => {
+    for (const n of [2, 3, 4, 5, 6]) {
+      const offs = spreadOffsets(n);
+      expect(offs).toHaveLength(n);
+      let min = Infinity;
+      for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+          const d = Math.hypot(offs[i].dx - offs[j].dx, (offs[i].dy - offs[j].dy) / 0.8);
+          min = Math.min(min, d);
+        }
+      }
+      expect(min).toBeGreaterThanOrEqual(18);
+    }
+    expect(spreadOffsets(1)).toEqual([{ dx: 0, dy: 0 }]);
+  });
+
+  it('天台（apt.roof）在 448 宽 viewBox 内不被右缘裁切', () => {
+    const apt = layout.sites[0];
+    const roof = nodeRect(apt, 'apt.roof')!;
+    expect(roof.x + roof.w).toBeLessThanOrEqual(440);  // LiteMap/SiteSvg viewBox 宽 448（-4 起）
   });
 });

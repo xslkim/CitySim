@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiGet } from '../api/client';
 import Avatar from '../components/common/Avatar';
-import { getLayout, tryLoadMapLayout, nodeRect, type Site } from '../lib/mapLayout';
+import { getLayout, tryLoadMapLayout, nodeRect, spreadOffsets, type Site } from '../lib/mapLayout';
 import { envelopeEventsSchema } from '../proto';
 import type { ObsEvent } from '../proto/event';
 import { rippleTodaySchema } from '../proto/ripple';
@@ -23,8 +23,33 @@ function LiteMap({ site, onPick }: { site: Site; onPick: (id: string) => void })
     site.id === 'apt' ? a.location_id?.startsWith('apt.') : a.location_id?.startsWith('corp.'));
   const dialogues = snapshot?.active_dialogues ?? [];
   const talkingPairs = new Set(dialogues.flatMap((d) => d.participants));
+  // T-ITER2-06：同房 pawn 分组 → 径向散开（叠名/叠头像修复）；名牌沿房间底边排开不再叠字
+  const placed = useMemo(() => {
+    const byRoom = new Map<string, typeof agents>();
+    for (const a of agents) {
+      const loc = a.location_id ?? '';
+      if (!byRoom.has(loc)) byRoom.set(loc, []);
+      byRoom.get(loc)!.push(a);
+    }
+    const out = new Map<string, { x: number; y: number; nameX: number; nameY: number }>();
+    for (const [loc, list] of byRoom) {
+      const rect = loc ? nodeRect(site, loc) : null;
+      if (!rect) continue;
+      const offs = spreadOffsets(list.length);
+      list.forEach((a, i) => {
+        const slot = Math.min(i, 3);  // 名牌底行最多 4 槽（fontSize 9 三人名不叠）
+        const nameX = rect.x + rect.w / 2 + (slot - (Math.min(list.length, 4) - 1) / 2) * 26;
+        out.set(a.id, {
+          x: rect.x + rect.w / 2 + offs[i].dx,
+          y: rect.y + rect.h / 2 + offs[i].dy,
+          nameX, nameY: rect.y + rect.h - 4,
+        });
+      });
+    }
+    return out;
+  }, [agents, site]);
   return (
-    <svg viewBox="0 0 400 520" className="h-full w-full">
+    <svg viewBox="-4 -16 448 500" className="h-full w-full">
       {(site.rooms ?? []).map((r) => {
         const rect = nodeRect(site, r.id)!;
         return (
@@ -46,11 +71,10 @@ function LiteMap({ site, onPick }: { site: Site; onPick: (id: string) => void })
           </g>
         );
       })}
-      {agents.map((a, i) => {
-        const rect = a.location_id ? nodeRect(site, a.location_id) : null;
-        if (!rect) return null;
-        const x = rect.x + rect.w / 2 + (i % 2) * 12 - 6;
-        const y = rect.y + rect.h / 2 + 6;
+      {agents.map((a) => {
+        const pos = placed.get(a.id);
+        if (!pos) return null;
+        const { x, y, nameX, nameY } = pos;
         return (
           <g key={a.id} transform={`translate(${x},${y})`} onClick={() => onPick(a.id)}
             style={{ cursor: 'pointer' }} data-testid={`lite-pawn-${a.id}`}>
@@ -62,7 +86,8 @@ function LiteMap({ site, onPick }: { site: Site; onPick: (id: string) => void })
             {talkingPairs.has(a.id) && (
               <text y={-12} textAnchor="middle" fontSize={10} fill="var(--accent)">💬</text>
             )}
-            <text y={20} textAnchor="middle" fontSize={9} fill="var(--text-0)">{a.name}</text>
+            <text x={nameX - x} y={nameY - y} textAnchor="middle" fontSize={9}
+              fill="var(--text-0)">{a.name}</text>
           </g>
         );
       })}

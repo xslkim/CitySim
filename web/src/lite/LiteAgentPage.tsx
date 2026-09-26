@@ -49,6 +49,8 @@ export default function LiteAgentPage() {
   const nameOf = (x: string) => names.get(x) ?? x;
   const profile = profiles.find((p) => p.id === id);
   const current = snapshot?.agents.find((a) => a.id === id);
+  // T-ITER2-06 搭车：代词按 gender 字段渲染（API 已有；原为固定"她"，4 位男性角色穿帮）
+  const pronoun = detail?.gender === 'M' ? '他' : detail?.gender === 'F' ? '她' : 'TA';
 
   if (!detail) return <LiteShell><div className="p-4 text-text-1">加载中…</div></LiteShell>;
   const pd = detail.persona_display;
@@ -73,7 +75,7 @@ export default function LiteAgentPage() {
             </div>
           </div>
           <div className="ml-auto max-w-xs rounded-card bg-bg-2 p-3 text-body">
-            她现在：{locationName(current?.location_id)}。
+            {pronoun}现在：{locationName(current?.location_id)}。
             <br />心情：<b className="text-positive">{moodSentence(state?.needs ?? null, state?.mood ?? null)}</b>
           </div>
         </div>

@@ -72,14 +72,19 @@ export function siteOf(locationId: string | null | undefined): string | null {
   return null;
 }
 
-/** 节点几何（逻辑坐标，03 §3.1；×4 换算为门禁③预留，本期纯 SVG） */
+/** 节点几何（逻辑坐标，03 §3.1；×4 换算为门禁③预留，本期纯 SVG）
+ *
+ * T-ITER2-06（round2 #6）：公寓公共区带从底部上移至顶部（首屏折叠线以下"全楼没人"修复）——
+ * 公共区 y=0..40、房间整体下移 48（y=48..472）； CommonsOrder 横向 5 格到 x=432，
+ * 旧 viewBox 宽 400 把天台（apt.roof）右缘裁半，一并由调用方加宽 viewBox 修复。
+ */
 export function nodeRect(site: Site, nodeId: string): { x: number; y: number; w: number; h: number } | null {
   if (site.id === 'apt') {
     const room = site.rooms?.find((r) => r.id === nodeId);
     if (room) {
       return {
         x: (room.col! - 1) * (room.w! + 8),
-        y: (site.floors! - Number(room.floor)) * (room.h! + 8),
+        y: 48 + (site.floors! - Number(room.floor)) * (room.h! + 8),
         w: room.w!,
         h: room.h!,
       };
@@ -87,7 +92,7 @@ export function nodeRect(site: Site, nodeId: string): { x: number; y: number; w:
     const commonsOrder = ['apt.lobby', 'apt.kitchen', 'apt.gym', 'apt.laundry', 'apt.roof'];
     const idx = commonsOrder.indexOf(nodeId);
     if (idx >= 0) {
-      return { x: idx * 88, y: 6 * (64 + 8), w: 80, h: 40 }; // 公共区底带
+      return { x: idx * 88, y: 0, w: 80, h: 40 }; // 公共区顶带（首屏常驻）
     }
     return null;
   }
@@ -96,6 +101,17 @@ export function nodeRect(site: Site, nodeId: string): { x: number; y: number; w:
   if (idx < 0) return null;
   const cols = 4;
   return { x: (idx % cols) * 96, y: Math.floor(idx / cols) * 72, w: 88, h: 64 };
+}
+
+/** T-ITER2-06：同房多 pawn 径向散开（确定性均分角度；相邻间距 ≥ 头像直径 18px，纵向压扁适配房间）。 */
+export function spreadOffsets(n: number): { dx: number; dy: number }[] {
+  if (n <= 1) return [{ dx: 0, dy: 0 }];
+  const step = (2 * Math.PI) / n;
+  const radius = Math.max(14, Math.ceil(10 / Math.sin(Math.PI / n)));
+  return Array.from({ length: n }, (_, i) => {
+    const a = -Math.PI / 2 + i * step;
+    return { dx: Math.round(Math.cos(a) * radius), dy: Math.round(Math.sin(a) * radius * 0.8) };
+  });
 }
 
 /** offsite 角标人数 = 位于 home.* 节点的 NPC 数（03 §3.1 N-P1-9；驻留时段由内核 residence 驱动） */

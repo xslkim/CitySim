@@ -57,8 +57,9 @@ export default function SiteSvg({
   }, [agents]);
 
   const nodes = [...(site.rooms ?? []), ...(site.commons ?? []), ...(site.zones ?? [])];
-  const width = site.id === 'apt' ? 4 * 88 + 16 : 4 * 96 + 16;
-  const height = site.id === 'apt' ? 6 * 72 + 60 : 3 * 72 + 16;
+  // T-ITER2-06：apt 公共区顶带 + 房间下移 48 → 440×480（右缘不再裁切天台）
+  const width = site.id === 'apt' ? 5 * 88 : 4 * 96 + 16;
+  const height = site.id === 'apt' ? 48 + 6 * 72 : 3 * 72 + 16;
 
   return (
     <svg
