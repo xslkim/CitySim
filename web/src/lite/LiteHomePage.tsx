@@ -83,7 +83,7 @@ export default function LiteHomePage() {
     tryLoadMapLayout().then(setLayout);
     apiGet('/api/ripple/today', rippleTodaySchema).then((r) => setToday(r.data)).catch(() => undefined);
     apiGet('/api/events?limit=30', envelopeEventsSchema)
-      .then((r) => setFeed(r.data.items.filter((e) => e.payload.text_display).reverse()))
+      .then((r) => setFeed(r.data.items.filter((e) => e.payload.text_display)))  // R1 #5 默认倒序：不再 reverse
       .catch(() => undefined);
   }, [setToday]);
 

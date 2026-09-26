@@ -74,11 +74,11 @@ async def client() -> Any:
 
 @pytest.mark.asyncio
 async def test_cursor_pagination_no_dup_no_gap(client: Any) -> None:
-    """cursor=seq 翻页：全程 seq 严格递增、无重复无空洞。"""
+    """cursor=seq 翻页：order=asc 全程 seq 严格递增、无重复无空洞（旧默认语义不回退）。"""
     seen: list[int] = []
     cursor: int | None = None
     for _ in range(10):
-        url = "/api/events?limit=10" + (f"&cursor={cursor}" if cursor else "")
+        url = "/api/events?limit=10&order=asc" + (f"&cursor={cursor}" if cursor else "")
         body = (await client.get(url)).json()["data"]
         items = body["items"]
         assert items
@@ -88,6 +88,25 @@ async def test_cursor_pagination_no_dup_no_gap(client: Any) -> None:
             break
     assert seen == sorted(seen) and len(seen) == len(set(seen))
     assert len(seen) == 33  # 30 chat + argue + day_summary + grade_revise
+
+
+@pytest.mark.asyncio
+async def test_default_order_desc_r1_5(client: Any) -> None:
+    """R1 #5 验收：默认（无 order 参数）返回最新 N 条、seq 严格递减；非法 order → 422。"""
+    body = (await client.get("/api/events?limit=10")).json()["data"]
+    seqs = [e["seq"] for e in body["items"]]
+    assert seqs == sorted(seqs, reverse=True), "默认倒序：最新在前"
+    assert max(seqs) == 33  # 最新一条 = 全库最大 seq
+    # desc 游标翻页：无重复无空洞
+    seen = list(seqs)
+    cursor = body["next_cursor"]
+    while cursor is not None:
+        body = (await client.get(f"/api/events?limit=10&cursor={cursor}")).json()["data"]
+        seen += [e["seq"] for e in body["items"]]
+        cursor = body["next_cursor"]
+    assert seen == sorted(seen, reverse=True) and len(seen) == len(set(seen)) and len(seen) == 33
+    r = await client.get("/api/events?order=sideways")
+    assert r.status_code == 422
 
 
 @pytest.mark.asyncio

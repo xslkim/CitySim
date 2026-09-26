@@ -27,7 +27,7 @@ export default function DebugSourcePopover({ agentId, field }: { agentId: string
   const [seqs, setSeqs] = useState<number[]>([]);
   useEffect(() => {
     if (!open) return;
-    apiGet(`/api/events?type=state.needs_delta,relation.changed&actor=${agentId}&limit=200`, envelopeEventsSchema)
+    apiGet(`/api/events?type=state.needs_delta,relation.changed&actor=${agentId}&limit=200&order=asc`, envelopeEventsSchema)
       .then((r) => setSeqs(extractCauseSeqs(r.data.items, agentId, field)))
       .catch(() => undefined);
   }, [open, agentId, field]);

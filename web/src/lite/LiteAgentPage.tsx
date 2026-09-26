@@ -38,7 +38,7 @@ export default function LiteAgentPage() {
     apiGet(`/api/agents/${id}/reflections?limit=2`, reflectionsSchema)
       .then((r) => setThoughts(r.data.items.map((x) => x.content_display))).catch(() => undefined);
     apiGet(`/api/events?actor=${id}&limit=30`, envelopeEventsSchema)
-      .then((r) => setEvents(r.data.items.filter((e) => e.payload.text_display).reverse().slice(0, 6)))
+      .then((r) => setEvents(r.data.items.filter((e) => e.payload.text_display).slice(0, 6)))  // R1 #5 默认倒序：不再 reverse
       .catch(() => undefined);
     apiGet(`/api/relations?agent=${id}`)
       .then((r) => setEdges((r.data as { items: Edge[] }).items.filter((e) => e.aff !== 0 || e.ten !== 0 || e.label.length).slice(0, 4)))

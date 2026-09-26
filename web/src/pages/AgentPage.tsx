@@ -43,7 +43,7 @@ export default function AgentPage() {
     apiGet(`/api/agents/${id}/reflections?limit=3`, reflectionsSchema)
       .then((r) => setReflections(r.data.items)).catch(() => undefined);
     apiGet(`/api/agents/${id}/schedule`, scheduleSchema).then((r) => setSchedule(r.data)).catch(() => undefined);
-    apiGet(`/api/events?actor=${id}&type=agent.promoted,agent.demoted`, envelopeEventsSchema)
+    apiGet(`/api/events?actor=${id}&type=agent.promoted,agent.demoted&order=asc`, envelopeEventsSchema)
       .then((r) => setLodHistory(r.data.items)).catch(() => undefined);
     apiGet(`/api/relations?agent=${id}`)
       .then((r) => setEdges((r.data as { items: never[] }).items)).catch(() => undefined);
@@ -168,7 +168,7 @@ export function LocationPageBody({ id }: { id: string }) {
   const profiles = useAgentsStore((s) => s.profiles);
   const [events, setEvents] = useState<ObsEvent[]>([]);
   useEffect(() => {
-    apiGet(`/api/events?location=${encodeURIComponent(id)}&limit=200`, envelopeEventsSchema)
+    apiGet(`/api/events?location=${encodeURIComponent(id)}&limit=200&order=asc`, envelopeEventsSchema)  // R1 #5 地点流保旧正序
       .then((r) => setEvents(r.data.items)).catch(() => undefined);
   }, [id]);
   const present = (snapshot?.agents ?? []).filter((a) => a.location_id === id);

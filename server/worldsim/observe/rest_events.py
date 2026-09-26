@@ -65,10 +65,15 @@ async def api_events(
     q: str | None = Query(default=None),
     cursor: int | None = Query(default=None),
     limit: int = Query(default=DEFAULT_LIMIT),
+    order: str = Query(default="desc"),
     pool: Any = Depends(get_pool),
 ) -> dict[str, Any]:
+    """R1 #5：默认倒序（最新 N 条在前）——"今日看点/最近经历"类入口不再返回开服旧闻；
+    `order=asc` 保留正序（游标分页语义不变：desc 用 seq < cursor，asc 用 seq > cursor）。"""
     if limit > MAX_LIMIT or limit < 1:
         raise ApiError("bad_param", f"limit 须 ∈ [1, {MAX_LIMIT}]（03 §5.1）", 422)
+    if order not in ("asc", "desc"):
+        raise ApiError("bad_param", f"order 仅支持 asc|desc（默认 desc，R1 #5）", 422)
     conds: list[str] = []
     args: list[Any] = []
 
@@ -117,12 +122,13 @@ async def api_events(
         args.append("%" + q.replace("%", "").replace("_", "") + "%")
 
     if cursor is not None:
-        conds.append(f"e.seq > ${len(args) + 1}")
+        conds.append(f"e.seq {'<' if order == 'desc' else '>'} ${len(args) + 1}")
         args.append(cursor)
 
     where = ("WHERE " + " AND ".join(conds)) if conds else ""
     rows = await pool.fetch(
-        f"SELECT e.* FROM obs.events e {join} {where} ORDER BY e.seq LIMIT ${len(args) + 1}",
+        f"SELECT e.* FROM obs.events e {join} {where} "
+        f"ORDER BY e.seq {'DESC' if order == 'desc' else 'ASC'} LIMIT ${len(args) + 1}",
         *args, limit + 1,
     )
     has_more = len(rows) > limit
