@@ -58,10 +58,10 @@ else
   log "obs_refresh already running"
 fi
 
-# 4) obs-api（03 §8.1）
+# 4) obs-api（03 §8.1）；WSIM_OBS_BIND 默认 0.0.0.0（局域网直连观看，token 鉴权守门）
 if ! pgrep -f "uvicorn worldsim.observe.app" >/dev/null; then
   log "启动 obs-api :$OBS_PORT…"
-  nohup uv run uvicorn worldsim.observe.app:app --port "$OBS_PORT" >>"$LOG_DIR/obs-api.log" 2>&1 &
+  nohup uv run uvicorn worldsim.observe.app:app --host "${WSIM_OBS_BIND:-0.0.0.0}" --port "$OBS_PORT" >>"$LOG_DIR/obs-api.log" 2>&1 &
 else
   log "obs-api already running"
 fi

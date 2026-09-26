@@ -34,6 +34,7 @@ function devAssets(): Plugin {
 export default defineConfig({
   plugins: [react(), devAssets()],
   server: {
+    host: true, // 0.0.0.0：局域网直连观看（移动端/他机浏览器；proxy 目标仍回环，不扩攻击面）
     port: 5173,
     strictPort: true,
     proxy: {
