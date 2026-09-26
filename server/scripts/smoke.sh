@@ -86,12 +86,12 @@ set -a; . "$REPO_ROOT/.env"; set +a
   "$PG_BIN/psql" -h /tmp -d postgres -c "DROP DATABASE IF EXISTS worldsim_replica WITH (FORCE)" >/dev/null
   bash "$SERVER_DIR/scripts/replica_init.sh" >/dev/null
   # 内核加速档（09 §8 "加速档"冒烟工程口径）：WSIM_RATIO 透传 --ratio
-  WSIM_RATIO="${WSIM_SMOKE_RATIO:-120}" bash "$REPO_ROOT/deploy/start_local.sh"
+  WSIM_RATIO="${WSIM_SMOKE_RATIO:-480}" bash "$REPO_ROOT/deploy/start_local.sh"
 } >>"$REPO_ROOT/var/logs/smoke_step1.log" 2>&1 \
   && record "step1_cold_start" "PASS" "PG+内核+obs_refresh+摄入 API+派生 worker+obs-api+web dev 全栈就绪" \
   || record "step1_cold_start" "FAIL" "见 var/logs/smoke_step1.log"
 
-log "step② 内核运行 ≥${KERNEL_MIN_WALL_S}s（加速档）：events 增长 / seq 无空洞 / 类型覆盖 ≥6"
+log "step② 内核运行 ≥${KERNEL_MIN_WALL_S}s（加速档：WSIM_SMOKE_RATIO=${WSIM_SMOKE_RATIO:-480}，窗口跨 ≥2 日界，08 D15）：events 增长 / seq 无空洞 / 类型覆盖 ≥6"
 e0=$(psql_main "SELECT coalesce(max(seq),0) FROM events")
 sleep "$KERNEL_MIN_WALL_S"
 e1=$(psql_main "SELECT coalesce(max(seq),0) FROM events")
@@ -109,8 +109,8 @@ DAY1=$(psql_main "SELECT count(DISTINCT (sim_time AT TIME ZONE 'Asia/Shanghai'):
                   FROM events WHERE seq <= $e1" || echo 0)
 [ "$DAY1" -ge 1 ] || DAY1=1
 llm_before=$(psql_main "SELECT count(*) FROM llm_calls")
-if (cd "$SERVER_DIR" && uv run python scripts/replay_check.py --sim-day "$DAY1" \
-      >>"$REPO_ROOT/var/logs/smoke_step3.log" 2>&1); then
+if (cd "$SERVER_DIR" && WSIM_REPLAY_MODE=replay uv run python scripts/replay_check.py \
+      --sim-day "$DAY1" >>"$REPO_ROOT/var/logs/smoke_step3.log" 2>&1); then
   llm_after=$(psql_main "SELECT count(*) FROM llm_calls")
   if [ "$llm_after" = "$llm_before" ]; then
     record "step3_replay" "PASS" "sim-day $DAY1 重放对账一致，llm_calls 零新增"
@@ -151,12 +151,12 @@ async def main() -> int:
         await ws.send(json.dumps({"op": "subscribe", "channels": [
             {"channel": "events", "filter": {}}]}))
         try:
-            f = json.loads(await asyncio.wait_for(ws.recv(), 30))
+            f = json.loads(await asyncio.wait_for(ws.recv(), 180))  # 08 D15：M6 链路延迟窗口
             assert f["op"] == "event", f
             print("WS 增量事件 seq=", f.get("data", {}).get("seq"))
             return 0
         except asyncio.TimeoutError:
-            print("WS 30s 未收增量事件（内核试跑已停则属预期窗口外）")
+            print("WS 180s 未收增量事件（08 D15 窗口；M6 链路 = 内核→sync→ingest→副本→obs-api）")
             return 1
 
 sys.exit(asyncio.run(main()))
