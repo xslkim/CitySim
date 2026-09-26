@@ -3,6 +3,7 @@
 - `POST /v1/events:batch`   body `{from_seq, events[]}`（单批 ≤500）→ `{acked_upto}`
 - `POST /v1/memories:batch` body `{from_id, memories[]}` → `{mem_acked_upto}`
 - `POST /v1/snapshot`       body `{sim_day, digest, state}` → `{snap_acked_upto}`
+- `POST /v1/state:latest`   body `{tick, sim_time, digest, state}` → `{latest_acked}`（R1 #1 当日滚动）
 - `GET  /v1/health`         副本库 max(seq) / 摄入延迟 / 最近 digest 校验结果（digest_log 归 T-SYN-09 D5）
 
 `/v1/digest` 归 T-SYN-09（ingest/digest.py），不在本模块。
@@ -18,7 +19,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from .auth import bearer_token, token_ok
-from .batch import BatchBuffer, BatchReject, ingest_memories, ingest_snapshot
+from .batch import BatchBuffer, BatchReject, ingest_memories, ingest_snapshot, ingest_state_latest
 
 log = logging.getLogger(__name__)
 
@@ -92,6 +93,22 @@ async def snapshot(request: Request, body: dict[str, Any],
         return JSONResponse(status_code=400, content={"error": str(e), "reason": "schema"})
     log.info("sync snapshot sim_day=%s 落库", day)
     return JSONResponse(content={"snap_acked_upto": day})
+
+
+@router.post("/state:latest")
+async def state_latest(request: Request, body: dict[str, Any],
+                       _auth: None = Depends(require_ingest_token)) -> JSONResponse:
+    """当日滚动 latest 帧（R1 #1；WS 主通道同语义）：digest 复核 + 单行 upsert。"""
+    try:
+        await ingest_state_latest(request.app.state.pool, body.get("tick"), body.get("sim_time"),
+                                  str(body.get("digest") or ""), body.get("state") or {})
+    except BatchReject as e:
+        log.error("state:latest 拒收（%s）tick=%s", e, body.get("tick"))
+        return JSONResponse(status_code=e.status, content={"error": str(e), "reason": e.reason})
+    except (TypeError, ValueError) as e:
+        return JSONResponse(status_code=400, content={"error": str(e), "reason": "schema"})
+    log.info("sync state_latest tick=%s 落库（https 回退）", body.get("tick"))
+    return JSONResponse(content={"latest_acked": True})
 
 
 @router.get("/health")

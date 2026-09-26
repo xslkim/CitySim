@@ -19,7 +19,7 @@ export default function LiteShell({ children }: { children: React.ReactNode }) {
             `rounded-card px-3 py-1 text-body ${isActive ? 'bg-bg-2 text-accent' : 'text-text-1'}`}>故事</NavLink>
         </nav>
         <span className="ml-auto text-aux text-text-1" data-testid="lite-clock">
-          {simClockText(snapshot?.sim_time ?? null, snapshot?.sim_day ?? null)}
+          世界状态截至 {simClockText(snapshot?.sim_time ?? null, snapshot?.sim_day ?? null)}
         </span>
       </header>
       {children}

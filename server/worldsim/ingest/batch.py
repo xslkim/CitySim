@@ -180,6 +180,28 @@ async def ingest_memories(conn: Any, from_id: int, memories: list[dict[str, Any]
     return int(await conn.fetchval("SELECT COALESCE(max(memory_id), 0) FROM memory_projection"))
 
 
+async def ingest_state_latest(conn: Any, tick: Any, sim_time: Any, digest: str,
+                              state: dict[str, Any]) -> None:
+    """当日滚动 latest 帧（R1 #1 独立通道）：随帧 digest canonical 复核 + 单行恒等 upsert。
+
+    与日界快照流（ingest_snapshot，sim_day 键 + d−1 定稿任务）完全分离——不排派生任务、
+    不推进 sync_state.snap_upto，digest_check（T-SYN-09）事件流口径不受影响。
+    """
+    expect = "sha256:" + sha256_hex(canonical(state))
+    if digest != expect:
+        raise BatchReject(f"latest digest 不符（随帧 {digest} ≠ 复核 {expect}）", reason="digest")
+    ts = _parse_ts(sim_time, "sim_time")
+    async with conn.acquire() as c, c.transaction():
+        await c.execute(
+            """
+            INSERT INTO world_state_latest (id, tick, sim_time, state, digest, updated_at)
+            VALUES (1, $1, $2, $3::jsonb, $4, now())
+            ON CONFLICT (id) DO UPDATE SET tick=$1, sim_time=$2, state=$3::jsonb, digest=$4,
+                                           updated_at=now()
+            """,
+            int(tick), ts, json.dumps(state, ensure_ascii=False), digest)
+
+
 async def ingest_snapshot(conn: Any, sim_day: str, digest: str, state: dict[str, Any]) -> str:
     """快照按 sim_day 幂等覆盖（05 §3.6）；落库前复核随帧 digest；排 d−1 定稿任务（05 §4.2）。"""
     day = dt.date.fromisoformat(str(sim_day))

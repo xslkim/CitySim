@@ -20,6 +20,8 @@ export const snapshotSchema = z
     sim_time: z.string(),
     sim_day: z.number().int(),
     compression_ratio: z.number(),
+    snapshot_time: z.string().nullable().optional(), // R1 #1：快照自身时点（"截至 HH:MM"标注）
+    snapshot_kind: z.enum(['rolling', 'day_end']).optional(), // R1 #1：rolling=日内滚动 latest
     agents: z.array(snapshotAgentSchema),
     economy: z.object({ stocks: z.array(z.object({ symbol: z.string(), price: z.number() })) }),
     active_dialogues: z.array(

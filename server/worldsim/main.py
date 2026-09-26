@@ -557,9 +557,13 @@ async def _run(args: argparse.Namespace) -> int:
             if os.environ.get("WSIM_CLOUD_INGEST_URL"):
                 from .sync.ws_client import SyncClient
 
-                sync_client = SyncClient(pool)
+                async def _latest_state() -> tuple[int, dt.datetime, float]:
+                    """当日滚动 latest 帧供数：当前 tick / sim 时点 / 压缩比（R1 #1）。"""
+                    return clock.current_tick, clock.now_sim(), float(clock.ratio)
+
+                sync_client = SyncClient(pool, state_fn=_latest_state)
                 tg.create_task(sync_client.run_forever(stop=stop))
-                log.info("出站同步协程已启动 → %s", sync_client.url)
+                log.info("出站同步协程已启动 → %s（含当日滚动 latest 通道）", sync_client.url)
             # T-OPS-03 致命故障探测（主库/全 provider 熔断/磁盘满 → clock.pause 路径，04 §3.2）
             from .audit.probe import FatalProbe
 

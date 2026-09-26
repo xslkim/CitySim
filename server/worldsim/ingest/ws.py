@@ -16,7 +16,7 @@ from typing import Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from .auth import bearer_token, token_ok
-from .batch import BatchReject, ingest_memories, ingest_snapshot
+from .batch import BatchReject, ingest_memories, ingest_snapshot, ingest_state_latest
 
 log = logging.getLogger(__name__)
 
@@ -86,6 +86,11 @@ async def _handle_data_frame(ws: WebSocket, msg: dict[str, Any]) -> None:
                                         msg.get("state") or {})
             log.info("sync snapshot ack snap_upto=%s（ws）", day)
             await _send(ws, {"frame": "ack", "upto": None, "mem_upto": None, "snap_upto": day})
+        elif frame == "state_latest":
+            await ingest_state_latest(pool, msg.get("tick"), msg.get("sim_time"),
+                                      str(msg.get("digest") or ""), msg.get("state") or {})
+            log.info("sync state_latest ack（ws，tick=%s）", msg.get("tick"))
+            await _send(ws, {"frame": "ack", "upto": None, "mem_upto": None, "snap_upto": None})
         else:
             await _send(ws, {"frame": "nack", "from": msg.get("from", 0),
                              "reason": f"unknown_frame:{frame}"})

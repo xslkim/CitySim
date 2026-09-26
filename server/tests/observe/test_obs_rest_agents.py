@@ -97,7 +97,8 @@ async def test_snapshot_shape(client: Any) -> None:
     assert body["ok"] is True
     data = body["data"]
     assert set(data) == {"tick", "sim_time", "sim_day", "compression_ratio",
-                         "agents", "economy", "active_dialogues"}
+                         "agents", "economy", "active_dialogues",
+                         "snapshot_time", "snapshot_kind"}  # R1 #1 时点标注字段
     assert len(data["agents"]) == 8
     a = data["agents"][0]
     assert set(a) == {"id", "name", "lod", "location_id", "activity", "mood", "needs"}

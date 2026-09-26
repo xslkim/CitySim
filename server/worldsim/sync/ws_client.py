@@ -32,7 +32,12 @@ from .outbox import (
     read_sync_state,
     update_sync_state,
 )
-from .snapshot import DEFAULT_SNAPSHOT_DIR, load_snapshot_frame_from_disk, pending_snapshot_days
+from .snapshot import (
+    DEFAULT_SNAPSHOT_DIR,
+    build_snapshot_frame,
+    load_snapshot_frame_from_disk,
+    pending_snapshot_days,
+)
 
 log = logging.getLogger(__name__)
 
@@ -46,6 +51,7 @@ CATCHUP_WINDOW = 8          #       窗口 8 批流水
 SEND_TIMEOUT_S = 5.0        # 发送超时标记 down
 BACKOFF_BASE_S = 1.0        # 退避 1s→60s 封顶 ±20% 抖动
 BACKOFF_MAX_S = 60.0
+LATEST_INTERVAL_S = 20.0    # R1 #1 当日滚动 latest 帧最小墙钟间隔（秒）
 
 DEFAULT_INGEST_URL = "ws://127.0.0.1:9100/v1/ingest/ws"  # 07 D2 开发期 loopback
 
@@ -75,6 +81,8 @@ class SyncClient:
         send_timeout_s: float = SEND_TIMEOUT_S,
         snapshot_dir: str | Path | None = None,
         connect: Callable[..., Any] = websockets.connect,
+        state_fn: Callable[[], Awaitable[tuple[int, dt.datetime, float]]] | None = None,
+        latest_interval_s: float = LATEST_INTERVAL_S,
     ) -> None:
         self.pool = pool
         self.url = url or os.environ.get("WSIM_CLOUD_INGEST_URL") or DEFAULT_INGEST_URL
@@ -91,12 +99,16 @@ class SyncClient:
         self.send_timeout_s = send_timeout_s
         self.snapshot_dir = snapshot_dir
         self._connect = connect
+        self.state_fn = state_fn  # R1 #1：当日滚动 latest 供数（tick, sim_now, ratio）；None = 不发
+        self.latest_interval_s = latest_interval_s
         self.down = False
         self.backoff_s = BACKOFF_BASE_S
         self._ws: Any = None
         self._cursor_seq = 0          # 发送游标（≥ 持久位点；nack/409 回退只动游标）
         self._pending_events: list[dict[str, Any]] = []   # 攒批缓冲（跨轮询周期保持，04 §1.3 2s 窗口）
         self._pending_since: float | None = None
+        self._latest_sent_at: float | None = None   # R1 #1 滚动节流（墙钟）
+        self._latest_sent_tick: int = -1            # 滚动节流（tick 未推进不重发）
 
     # ---- 帧 IO ----------------------------------------------------------------
 
@@ -223,7 +235,39 @@ class SyncClient:
             await self._handle_reply(ack)
             if ack.get("frame") == "ack":
                 sent_m = len(mems)
+        await self._maybe_send_state_latest()
         return {"events": sent_e, "memories": sent_m}
+
+    async def _maybe_send_state_latest(self) -> bool:
+        """R1 #1 当日滚动 latest 帧：节流（最小墙钟间隔 且 tick 须推进）后经 WS 主通道发送。
+
+        帧 state 复用日界快照同一 build_snapshot_frame（白名单子集 + canonical digest 唯一实现），
+        仅入口表不同（副本 world_state_latest 单行 upsert）——日界快照闭环与 digest_check 不动。
+        digest 不符时摄入侧 nack，下一周期自然重发（滚动语义，不纠正历史）。
+        """
+        if self.state_fn is None or self._ws is None:
+            return False
+        now_mono = self.monotonic()
+        if (self._latest_sent_at is not None
+                and now_mono - self._latest_sent_at < self.latest_interval_s):
+            return False
+        tick, sim_now, ratio = await self.state_fn()
+        if self._latest_sent_at is not None and int(tick) <= self._latest_sent_tick:
+            return False  # 世界未推进不发（避免重复刷同一时点）
+        frame = await build_snapshot_frame(self.pool, sim_day=sim_now.date(), sim_now=sim_now,
+                                           compression_ratio=ratio)
+        await self._send({"frame": "state_latest", "tick": int(tick),
+                          "sim_time": sim_now.isoformat(), "digest": frame["digest"],
+                          "state": frame["state"]})
+        reply = await self._recv()
+        await self._handle_reply(reply)
+        if reply.get("frame") == "ack":
+            self._latest_sent_at = now_mono
+            self._latest_sent_tick = int(tick)
+            log.info("sync state_latest ack tick=%s sim_time=%s", tick, sim_now.isoformat())
+            return True
+        log.warning("sync state_latest 未 ack（%s），下周期重试", reply)
+        return False
 
     async def _normal_events(self) -> int:
         """正常态：攒批 200 条立即发；不足 200 在 2s 窗口到点即发（窗口自首批入行起算）。"""

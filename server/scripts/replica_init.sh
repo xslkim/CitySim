@@ -75,6 +75,10 @@ if [ -f "$SCRIPT_DIR/../ddl/replica_obs_views.sql" ]; then
   psql -h /tmp -d "$DB_NAME" -v ON_ERROR_STOP=1 -f "$SCRIPT_DIR/../ddl/replica_obs_views.sql" >/dev/null
   log "replica_obs_views.sql applied（T-SYN-10 切换桥：obs schema 同名透传视图，07 D8）"
 fi
+if [ -f "$SCRIPT_DIR/../ddl/replica_world_state_latest.sql" ]; then
+  psql -h /tmp -d "$DB_NAME" -v ON_ERROR_STOP=1 -f "$SCRIPT_DIR/../ddl/replica_world_state_latest.sql" >/dev/null
+  log "replica_world_state_latest.sql applied（R1 #1 当日滚动通道，独立 latest 单行表）"
+fi
 
 psql -h /tmp -d "$DB_NAME" -c '\dt'
 log "done"

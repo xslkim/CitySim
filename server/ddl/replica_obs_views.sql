@@ -47,6 +47,12 @@ CREATE OR REPLACE VIEW obs.event_grade_view AS
 SELECT seq, grade, revised_by_seq, reason, updated_at
 FROM public.event_grade_view;
 
+-- R1 #1 当日滚动通道：单行最新世界态（独立 latest，日界 world_state_snapshot 闭环不动）
+CREATE OR REPLACE VIEW obs.world_state_latest AS
+SELECT id, tick, sim_time, state, digest, updated_at
+FROM public.world_state_latest;
+
 GRANT USAGE ON SCHEMA obs TO obs_ro;
 GRANT SELECT ON obs.events, obs.memory_projection, obs.relation_change_log, obs.relation_daily,
-  obs.health_daily, obs.world_state_snapshot, obs.ripple_edge, obs.event_grade_view TO obs_ro;
+  obs.health_daily, obs.world_state_snapshot, obs.ripple_edge, obs.event_grade_view,
+  obs.world_state_latest TO obs_ro;

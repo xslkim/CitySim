@@ -14,3 +14,6 @@ CREATE TABLE IF NOT EXISTS health_daily (
   cost_micro_cny BIGINT,                  -- 日结成本（微元；¥/模拟日 04 §8.3）
   computed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- 内核角色写入口径与 schema_v1.sql 同级（write_health_daily = INSERT..ON CONFLICT UPDATE，
+-- 08 T-AUD-08 metrics.py）；缺本行内核日界钩子 InsufficientPrivilegeError 直接崩 TaskGroup
+GRANT SELECT, INSERT, UPDATE ON health_daily TO worldsim;

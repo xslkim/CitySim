@@ -1,6 +1,7 @@
 /**
- * 数据延迟指示条（03 §0.1/§9.2）：watermark_tick − 最新事件 tick 换算滞后时长；
- * >60s 黄（warn）/ >10min 红（negative）。M4 主库直连恒近零属预期（05 文档 D4）。
+ * 快照时点指示条（03 §0.1/§9.2 + R1 #1）：展示快照自身时点"世界状态截至 HH:MM"；
+ * 颜色仍按事件滞后（watermark_tick − 最新事件 tick 换算）分级——>60s 黄 / >10min 红。
+ * R1 #1：快照滚动刷新间隔 > 数秒，不再自称"live / 延迟<1s"（验收 ④）。
  * tick = 模拟 5 分钟（00 §4 红线 10）：滞后 tick 数 × 5min / 压缩比 折算真实秒。
  */
 import { useTimelineStore } from '../../stores/timelineStore';
@@ -28,15 +29,28 @@ const COLOR: Record<LatencyLevel, string> = {
   negative: 'text-negative',
 };
 
+/** 快照 ISO 时点 → HH:MM（本地时区，与日界口径一致） */
+export function snapshotHHMM(simTime: string | null | undefined): string {
+  if (!simTime) return '—';
+  const d = new Date(simTime);
+  if (Number.isNaN(d.getTime())) return String(simTime).slice(11, 16);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
 export default function LatencyBar() {
   const watermarkTick = useWorldStore((s) => s.watermarkTick);
   const latestTick = useTimelineStore((s) => s.latestTick);
   const ratio = useWorldStore((s) => s.snapshot?.compression_ratio ?? 1);
+  const snapshot = useWorldStore((s) => s.snapshot);
   const lag = latestTick > 0 ? lagSeconds(watermarkTick, latestTick, ratio || 1) : 0;
   const level = latencyLevel(lag);
+  const snapTime = snapshot?.snapshot_time ?? snapshot?.sim_time ?? null;
   return (
     <span data-testid="latency-bar" className={COLOR[level]}>
-      延迟{lag < 1 ? '<1s' : lag < 60 ? `${Math.round(lag)}s` : `${Math.round(lag / 60)}min`}
+      世界状态截至 {snapshotHHMM(snapTime)}
+      {snapshot?.snapshot_kind === 'rolling' ? '（滚动刷新）' : ''}
     </span>
   );
 }
