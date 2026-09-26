@@ -16,20 +16,23 @@ import datetime as dt
 import json
 from typing import Any
 
-from ..sanitize import FALLBACK_GENERIC, FALLBACK_LINE, sanitize_display_text
+from ..sanitize import FALLBACK_GENERIC, FALLBACK_LINE, sanitize_or_extract
 
 
 def _sanitize_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """展示文本键出站清洗（text_display / lines[].text_display），其余键原样。"""
+    """展示文本键出站清洗（text_display / lines[].text_display），其余键原样。
+
+    T-ITER2-04②：两级判定（结构化解包优先，残块兜底）——JSON 形态但内容完好不再误杀。
+    """
     out = dict(payload)
     if "text_display" in out:
-        out["text_display"] = sanitize_display_text(out.get("text_display")) or FALLBACK_GENERIC
+        out["text_display"] = sanitize_or_extract(out.get("text_display")) or FALLBACK_GENERIC
     lines = out.get("lines")
     if isinstance(lines, list):
         cleaned = []
         for line in lines:
             if isinstance(line, dict) and isinstance(line.get("text_display"), str):
-                line = {**line, "text_display": sanitize_display_text(line["text_display"]) or FALLBACK_LINE}
+                line = {**line, "text_display": sanitize_or_extract(line["text_display"]) or FALLBACK_LINE}
             cleaned.append(line)
         out["lines"] = cleaned
     return out

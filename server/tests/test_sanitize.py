@@ -94,3 +94,39 @@ def test_serde_sanitize_event_payload() -> None:
     lines = ev2["payload"]["lines"]
     assert lines[0]["text_display"] == "（这句没听清）"
     assert lines[1]["text_display"] == "正常台词"
+
+
+def test_structured_extract_rescues_good_json() -> None:
+    """T-ITER2-04②：JSON 形态但内容完好 → 提取展示字段，不出兜底句（三种历史漂移形态 + 新形态）。"""
+    from worldsim.sanitize import display_or_fallback, extract_structured_display, sanitize_or_extract
+
+    good_summary = json.dumps({"summary": "今天和林晚聊了连载的事，心里踏实了一些。"}, ensure_ascii=False)
+    good_answer_obj = json.dumps({"answer": {"summary": "程一诺还在为天台的事别扭。"}}, ensure_ascii=False)
+    good_answer_str = json.dumps({"answer": "发工资的日子，却先还了赵启的钱。"}, ensure_ascii=False)
+    good_insights = json.dumps({"insights": ["我太在意别人的看法了。", "明天想主动找苏蔓聊聊。"]}, ensure_ascii=False)
+    for text, want in (
+        (good_summary, "今天和林晚聊了连载的事，心里踏实了一些。"),
+        (good_answer_obj, "程一诺还在为天台的事别扭。"),
+        (good_answer_str, "发工资的日子，却先还了赵启的钱。"),
+        (good_insights, "我太在意别人的看法了。；明天想主动找苏蔓聊聊。"),
+    ):
+        assert extract_structured_display(text) == want, text
+        assert display_or_fallback(text) == want, text
+        assert sanitize_or_extract(text) == want, text
+
+
+def test_structured_extract_still_blocks_garbage() -> None:
+    """T-ITER2-04②：真残块（截断/无展示键/提取后仍带黑话）依旧拦截 → 兜底句。"""
+    from worldsim.sanitize import extract_structured_display, is_fallback_text
+
+    for bad in (
+        '```json\n{"diary": "截断',
+        '{"answer": {"big_five": {"openness": 0.9}}}',      # 结构化但无展示字段
+        json.dumps({"summary": "这一 tick 的 LLM 降级"}, ensure_ascii=False),  # 提取后仍带黑话
+        '{"diary": "未闭合',
+    ):
+        assert extract_structured_display(bad) is None, bad
+    assert is_fallback_text(FALLBACK_GENERIC)
+    assert is_fallback_text(" " + FALLBACK_REFLECTION + " ")
+    assert not is_fallback_text("真实内容")
+    assert not is_fallback_text(None)

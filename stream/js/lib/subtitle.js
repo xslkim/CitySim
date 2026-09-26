@@ -16,7 +16,19 @@ export const BACKLOG_RATE = 1.5;       // 积压提速（06 §7 B4）
 export const SINGLE_LINE_DURATION_S = 4; // 非对话单条字幕显示时长（06 §7 B4；对话末句驻留同口径）
 export const LINE_MAX_LEN = 40;        // 单句 ≤40 字（01 §7 / 02 §6.2 共用约束；前端不截断，超出仅告警）
 
-/** 事件 → 字幕段；无展示文本 → null（零渲染）。 */
+// T-ITER2-04③：人话兜底句集（与 server/worldsim/sanitize.py FALLBACK_* 对齐）——
+// 兜底事件不进直播字幕队列（字幕连播同一句 = 观众可见"世界坏了"信号）
+export const FALLBACK_SENTENCES = [
+  '刚才走神了，没留下什么记录。',
+  '这段内容没能完整记录下来。',
+  '（这句没听清）',
+];
+
+export function isFallbackText(t) {
+  return typeof t === 'string' && FALLBACK_SENTENCES.includes(t.trim());
+}
+
+/** 事件 → 字幕段；无展示文本或为兜底句 → null（零渲染）。 */
 export function eventToSegment(ev) {
   const p = ev?.payload || {};
   if (DIALOGUE_TYPES.has(ev.type)) {
@@ -33,7 +45,7 @@ export function eventToSegment(ev) {
       lines,
     };
   }
-  if (typeof p.text_display === 'string' && p.text_display) {
+  if (typeof p.text_display === 'string' && p.text_display && !isFallbackText(p.text_display)) {
     return { kind: 'single', seq: ev.seq, type: ev.type, text: p.text_display };
   }
   return null;

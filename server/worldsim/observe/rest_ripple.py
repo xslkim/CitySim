@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, Path
 
 from .app import ApiError, get_pool, ok_envelope, require_token
 from .serde import serialize_event
+from ..sanitize import is_fallback_text
 
 router = APIRouter(prefix="/api/ripple", dependencies=[Depends(require_token)])
 
@@ -140,7 +141,10 @@ async def api_ripple_today(pool: Any = Depends(get_pool)) -> dict[str, Any]:
         stats = sections["stats"]
         score = stats["covered_agents"] * stats["hops"] * len(sections["relation_changes"])
         row = await pool.fetchrow("SELECT * FROM obs.events WHERE seq = $1", seq)
-        items.append({"score": score, "stats": stats, "event": serialize_event(row)})
+        ev = serialize_event(row)
+        if is_fallback_text((ev.get("payload") or {}).get("text_display")):
+            continue  # T-ITER2-04③：兜底句事件不进"今日看点"（观众面只见真实内容）
+        items.append({"score": score, "stats": stats, "event": ev})
     items.sort(key=lambda x: (-x["score"], -x["event"]["seq"]))
     return await ok_envelope(pool, {
         "sim_day": cur_day.isoformat(),

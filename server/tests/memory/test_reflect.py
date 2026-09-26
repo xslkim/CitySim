@@ -207,3 +207,26 @@ async def test_write_generated_reflection_tiers(pool, gw) -> None:
     await refl.write_generated_reflection("A13", "我放弃了，这件事现在做不到", importance=8, sim_now=T0, rng_seed=2)
     ev = await pool.fetchrow("SELECT payload FROM events WHERE seq > $1 AND type='agent.reflection'", baseline)
     assert ev is not None and set(json.loads(ev["payload"]).keys()) == {"text_display"}
+
+
+def test_parse_diary_tolerates_drift_shapes() -> None:
+    """T-ITER2-04①：日终反思解析契约固定 {"diary":…}，容忍三种历史漂移形态不出兜底句。"""
+    from worldsim.memory.reflect import Reflector
+
+    assert Reflector._parse_diary('{"diary": "今天过得还算平静。"}') == "今天过得还算平静。"
+    assert Reflector._parse_diary('{"summary": "和林晚把话说开了。"}') == "和林晚把话说开了。"
+    assert Reflector._parse_diary('{"answer": {"summary": "程一诺还在别扭。"}}') == "程一诺还在别扭。"
+    assert Reflector._parse_diary('{"answer": "先发工资还是先还账，真难。"}') == "先发工资还是先还账，真难。"
+    # 非 JSON 纯文本 / 真残块仍走兜底
+    assert Reflector._parse_diary("今天什么都没发生。") == "今天什么都没发生。"
+    assert "没能" in Reflector._parse_diary('```json {"diary": "截断') or "走神" in Reflector._parse_diary('```json {"diary": "截断')
+
+
+def test_parse_insights_tolerates_drift_shapes() -> None:
+    """T-ITER2-04①：深度反思解析 {"insights":[…]} 契约 + 漂移形态单条化。"""
+    from worldsim.memory.reflect import Reflector
+
+    assert Reflector._parse_insights('{"insights": ["a", "b"]}') == ["a", "b"]
+    assert Reflector._parse_insights('{"summary": "整体来说这周还不错。"}') == ["整体来说这周还不错。"]
+    assert Reflector._parse_insights('{"answer": {"summary": "欠的钱早晚要面对。"}}') == ["欠的钱早晚要面对。"]
+    assert len(Reflector._parse_insights('{"answer": {"big_five": {"openness": 0.9}}}')) == 1

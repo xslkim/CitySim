@@ -130,3 +130,18 @@ test('单句 >40 字告警但不截断（01 §7 由内核保证）', () => {
   assert.equal(warnings.length, 1);
   assert.equal(lines[0].text, long);
 });
+
+test('T-ITER2-04③：兜底句事件不进字幕队列（观众面过滤）', async () => {
+  const { eventToSegment: toSegment, isFallbackText } = await import('../js/lib/subtitle.js');
+  assert.equal(isFallbackText('这段内容没能完整记录下来。'), true);
+  assert.equal(isFallbackText(' 刚才走神了，没留下什么记录。 '), true);
+  assert.equal(isFallbackText('（这句没听清）'), true);
+  assert.equal(isFallbackText('真实内容'), false);
+  // agent.reflection 兜底句 → 零字幕项；真实反思 → 正常入队
+  assert.equal(toSegment({ seq: 21, type: 'agent.reflection', payload: { text_display: '这段内容没能完整记录下来。' } }), null);
+  assert.equal(toSegment({ seq: 22, type: 'agent.reflection', payload: { text_display: '今天和林晚把话说开了。' } }).kind, 'single');
+  // push 层同样拒绝（队列零积压）
+  const q = new SubtitleQueue({});
+  assert.equal(q.push({ seq: 23, type: 'agent.reflection', payload: { text_display: '刚才走神了，没留下什么记录。' } }), false);
+  assert.equal(q.push({ seq: 24, type: 'agent.reflection', payload: { text_display: '真实反思内容。' } }), true);
+});

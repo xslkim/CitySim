@@ -122,7 +122,8 @@ class Reflector:
         result = await self._gw.chat(
             "reflection",
             [
-                {"role": "system", "content": "你是角色扮演引擎。基于人设卡与近期经历生成 2~3 条第一人称洞察。只输出 JSON：{\"insights\": [...]}。"},
+                {"role": "system", "content": "你是角色扮演引擎。基于人设卡与近期经历生成 2~3 条第一人称洞察。"
+                 "只输出 JSON：{\"insights\": [\"洞察1\", \"洞察2\"]}，不要输出其他任何文字。"},
                 {"role": "user", "content": f"人设卡={json.dumps(persona, ensure_ascii=False, sort_keys=True)}\n近期经历：\n{mem_lines}"},
             ],
             self._gw.gen_params("reflection") if hasattr(self._gw, "gen_params") else None,
@@ -179,7 +180,8 @@ class Reflector:
         result = await self._gw.chat(
             "bgsummary",
             [
-                {"role": "system", "content": "总结该角色今天的模拟日，写一段第一人称摘要式反思。输出 JSON。"},
+                {"role": "system", "content": "总结该角色今天的模拟日，写一段第一人称摘要式反思。"
+                 "只输出一个 JSON 对象：{\"diary\": \"≤120 字的中文反思\"}，不要输出其他任何文字。"},
                 {"role": "user", "content": f"人设卡={json.dumps(persona, ensure_ascii=False, sort_keys=True)}\n今日经历：\n{mem_lines}"},
             ],
             self._gw.gen_params("bgsummary") if hasattr(self._gw, "gen_params") else None,
@@ -248,28 +250,53 @@ class Reflector:
 
     @staticmethod
     def _parse_insights(text: str) -> list[str]:
-        """R1 #3：解析失败/残块 → 人话兜底句（原文只留本机调试通道，不进展示/记忆）。"""
-        from ..sanitize import FALLBACK_REFLECTION, sanitize_display_text
+        """R1 #3 + T-ITER2-04①：解析失败/残块 → 人话兜底句（原文只留本机调试通道，不进展示/记忆）。
+
+        契约固定 {"insights": [...]}；容忍历史漂移形态（{"summary":…}/{"answer":…}）——
+        结构化解包成功则不报废（round2 剧情报告：8/8 误杀根因一半是生成格式漂移）。
+        """
+        from ..sanitize import FALLBACK_REFLECTION, extract_structured_display, sanitize_display_text
 
         try:
             body = json.loads(text)
         except (ValueError, TypeError):
             return [sanitize_display_text(text) or FALLBACK_REFLECTION]
-        insights = body.get("insights")
-        if isinstance(insights, list) and insights:
-            return [sanitize_display_text(x) or FALLBACK_REFLECTION for x in insights[:3]]
-        return [sanitize_display_text(text) or FALLBACK_REFLECTION]
+        if isinstance(body, dict):
+            insights = body.get("insights")
+            if isinstance(insights, list) and insights:
+                parsed = [sanitize_display_text(x) for x in insights[:3] if isinstance(x, (str, int, float))]
+                parsed = [x for x in parsed if x]
+                if parsed:
+                    return parsed
+        single = sanitize_display_text(text) or extract_structured_display(text)
+        return [single or FALLBACK_REFLECTION]
 
     @staticmethod
     def _parse_diary(text: str) -> str:
-        """R1 #3：同上——截断 ```json 残块不再直出展示字段。"""
-        from ..sanitize import FALLBACK_REFLECTION, sanitize_display_text
+        """R1 #3 + T-ITER2-04①：契约固定 {"diary": "…"}；容忍 {"summary":…}/{"answer":…} 漂移形态。"""
+        from ..sanitize import FALLBACK_REFLECTION, extract_structured_display, sanitize_display_text
 
         try:
             body = json.loads(text)
         except (ValueError, TypeError):
             return sanitize_display_text(text) or FALLBACK_REFLECTION
-        return sanitize_display_text(str(body.get("diary") or body.get("intent") or "")) or FALLBACK_REFLECTION
+        if isinstance(body, dict):
+            for k in ("diary", "summary"):
+                v = body.get(k)
+                if isinstance(v, str) and v.strip():
+                    shown = sanitize_display_text(v)
+                    if shown:
+                        return shown
+            ans = body.get("answer")
+            if isinstance(ans, str) and ans.strip():
+                shown = sanitize_display_text(ans)
+                if shown:
+                    return shown
+            if isinstance(ans, dict):
+                extracted = extract_structured_display(json.dumps(ans, ensure_ascii=False))
+                if extracted:
+                    return extracted
+        return sanitize_display_text(text) or FALLBACK_REFLECTION
 
     async def _persona(self, agent_id: str) -> dict[str, Any]:
         row = await self._pool.fetchrow("SELECT persona FROM agents WHERE id=$1", agent_id)

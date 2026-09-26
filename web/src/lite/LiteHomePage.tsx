@@ -13,6 +13,7 @@ import { rippleTodaySchema } from '../proto/ripple';
 import { useAgentsStore } from '../stores/agentsStore';
 import { useRippleStore } from '../stores/rippleStore';
 import { useWorldStore } from '../stores/worldStore';
+import { FALLBACK_BATCH_MESSAGE, partitionFeed } from '../lib/fallbackText';
 import { narrateEvent } from './narrativeMap';
 import LiteShell from './LiteShell';
 
@@ -73,6 +74,7 @@ export default function LiteHomePage() {
   const [layout, setLayout] = useState(getLayout());
   const [tab, setTab] = useState('apt');
   const [feed, setFeed] = useState<ObsEvent[]>([]);
+  const [fallbackCount, setFallbackCount] = useState(0);  // T-ITER2-04③ 兜底事件计数（降采样一张卡）
   const profiles = useAgentsStore((s) => s.profiles);
   const today = useRippleStore((s) => s.today);
   const setToday = useRippleStore((s) => s.setToday);
@@ -83,7 +85,11 @@ export default function LiteHomePage() {
     tryLoadMapLayout().then(setLayout);
     apiGet('/api/ripple/today', rippleTodaySchema).then((r) => setToday(r.data)).catch(() => undefined);
     apiGet('/api/events?limit=30', envelopeEventsSchema)
-      .then((r) => setFeed(r.data.items.filter((e) => e.payload.text_display)))  // R1 #5 默认倒序：不再 reverse
+      .then((r) => {
+        const [real, nFallback] = partitionFeed(r.data.items.filter((e) => e.payload.text_display));
+        setFeed(real);  // R1 #5 默认倒序：不再 reverse；T-ITER2-04③ 兜底事件不进 feed
+        setFallbackCount(nFallback);
+      })
       .catch(() => undefined);
   }, [setToday]);
 
@@ -137,6 +143,11 @@ export default function LiteHomePage() {
               </div>
             );
           })}
+          {fallbackCount > 0 && (  // T-ITER2-04③：同一拍多条兜底降采样为 ≤1 张人话卡
+            <div className="card text-body text-text-1" data-testid="lite-feed-fallback">
+              {FALLBACK_BATCH_MESSAGE}
+            </div>
+          )}
         </div>
       </div>
     </LiteShell>
