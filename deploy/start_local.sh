@@ -35,15 +35,34 @@ else
   log "PG already running"
 fi
 
-# 2) 内核（mock provider 默认；真跑 GLM：WSIM_LLM=routed，00 §1 A9）
-if ! pgrep -f "worldsim.main" >/dev/null; then
-  log "启动内核（${WSIM_LLM:-mock}）…"
-  HF_HUB_OFFLINE=1 PYTHONUNBUFFERED=1 nohup uv run python -m worldsim.main \
-    ${SIM_HOURS:+--sim-hours $SIM_HOURS} ${WSIM_RATIO:+--ratio $WSIM_RATIO} \
-    ${WSIM_LLM:+--llm $WSIM_LLM} \
-    >>"$LOG_DIR/kernel.log" 2>&1 &
+# 1.5) 增量 DDL 授权启动自检/自愈（T-ITER2-02④：授权缺失在启动阶段补授，不带伤起内核）
+log "增量 DDL 授权自检…"
+uv run python scripts/check_grants.py --apply || { log "FAIL: 增量授权补授后仍不一致，拒绝启动内核"; exit 1; }
+
+# 2) 内核 + 进程看守（T-ITER2-02③：kill 内核 ≤30s 自动拉起，接 main.py 崩溃恢复编排）
+rm -f "$LOG_DIR/kernel.stopped"   # 启动即解除停跑标记（停跑：touch 该文件后 pkill 内核）
+if ! pgrep -f "worldsim_kernel_supervisor" >/dev/null; then
+  log "启动内核看守（${WSIM_LLM:-mock}）…"
+  nohup bash -c '
+    KERNEL_PID_FILE="'"$LOG_DIR"'/kernel.pid"
+    alive() {
+      local pid
+      pid=$(cat "$KERNEL_PID_FILE" 2>/dev/null) || return 1
+      [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && grep -q "worldsim.main" /proc/"$pid"/cmdline 2>/dev/null
+    }
+    while true; do
+      [ -f "'"$LOG_DIR"'/kernel.stopped" ] && { echo "[kernel-supervisor] stop 标记存在，看守退出" >> "'"$LOG_DIR"'/kernel.log"; exit 0; }
+      if ! alive; then
+        echo "[kernel-supervisor] $(date +%FT%T) 拉起内核（llm='"${WSIM_LLM:-mock}"'）" >> "'"$LOG_DIR"'/kernel.log"
+        (cd "'"$REPO_ROOT"'/server" && HF_HUB_OFFLINE=1 PYTHONUNBUFFERED=1 uv run python -m worldsim.main \
+          ${SIM_HOURS:+--sim-hours $SIM_HOURS} ${WSIM_RATIO:+--ratio $WSIM_RATIO} --llm "${WSIM_LLM:-mock}" \
+          >> "'"$LOG_DIR"'/kernel.log" 2>&1 & echo $! > "$KERNEL_PID_FILE")
+      fi
+      sleep 10
+    done' >>"$LOG_DIR/kernel_supervisor.log" 2>&1 &
+  echo $! > "$LOG_DIR/kernel_supervisor.pid"
 else
-  log "内核 already running"
+  log "内核看守 already running"
 fi
 
 # 3) obs_refresh 常驻（新模拟日快照到达即重算三实体表；轮询 var/snapshot 目录）
@@ -123,4 +142,4 @@ fi
 log "全栈就绪：admin http://127.0.0.1:$WEB_PORT/map · lite http://127.0.0.1:$WEB_PORT/lite/home · obs-api :$OBS_PORT"
 log "stream 直播页：http://127.0.0.1:$OBS_PORT/stream/?token=<dev token>（token 签发：cd server && uv run python -m worldsim.observe.tokens_cli issue --label <name>）"
 log "摄入 API：http://$INGEST_BIND/v1/health（Bearer 鉴权，04 §9.1）· 派生 worker 常驻"
-log "停止：pkill -f 'worldsim.main|obs_refresh_loop|uvicorn worldsim.observe|uvicorn worldsim.ingest|worldsim.ingest.derived.worker|vite'；另见 README"
+log "停止：touch var/logs/kernel.stopped && pkill -f 'worldsim.main'（看守 10s 内退出）；或直接 pkill -f 'worldsim_kernel_supervisor|worldsim.main|obs_refresh_loop|uvicorn worldsim.observe|uvicorn worldsim.ingest|worldsim.ingest.derived.worker|vite'"

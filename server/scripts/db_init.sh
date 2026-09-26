@@ -145,6 +145,11 @@ do_reset() { # reset = drop + create database worldsim（供测试反复跑 DDL�
   log "database $DB_NAME created（owner=$APP_ROLE）"
   prepare_db
   log "extensions ready（vector / pg_partman；partman 权限已授 $APP_ROLE）"
+  # T-ITER2-02：reset 即重放增量 DDL 授权（登记表唯一持有 = scripts/check_grants.py）——
+  # round1 health_daily / round2 memories 两次日界崩溃根因：reset 丢增量 GRANT，等到日界才崩内核
+  (cd "$SCRIPT_DIR/.." && uv run python scripts/check_grants.py --db "$DB_NAME" --apply) \
+    || die "增量授权补授后仍不一致（见上）；禁止带伤 seed"
+  log "增量 DDL 授权已重放并复核（diff=0）"
   # 世界运行产物随库同生命周期：旧世界快照不清会被 obs_refresh 重新灌入新库（陈旧 sim_day 串档实测缺陷）
   rm -f "$SCRIPT_DIR/../../var/snapshot/"snapshot_* 2>/dev/null || true
   log "var/snapshot 旧世界快照已清理"

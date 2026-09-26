@@ -89,11 +89,20 @@ server/scripts/db_init.sh reset
 psql "$WSIM_PG_DSN" -v ON_ERROR_STOP=1 -f server/ddl/schema_v1.sql    # 11 表 + append-only + 周分区
 psql "$WSIM_PG_DSN" -v ON_ERROR_STOP=1 -f server/ddl/obs_views_v1.sql # obs 白名单视图（M0 最小集）
 psql "$WSIM_PG_DSN" -v ON_ERROR_STOP=1 -f server/ddl/seed_8.sql       # 8 人小世界（seed_40.sql 供 M6）
+uv run python scripts/check_grants.py --apply                          # 增量 DDL 授权重放 + 复核（T-ITER2-02）
 
 uv run python scripts/seed.py --ids A01..A08 --out ddl/seed_8.sql   # 确定性再生成（同输入同输出）
 uv run python scripts/seed.py --ids A01..A40 --out ddl/seed_40.sql
 bash server/scripts/schema_freeze_check.sh                          # 06 §4.5 差集检查（契约变更必跑）
 ```
+
+- **增量 DDL 授权重放口径（T-ITER2-02）**：`schema_v1.sql` 之外的增量文件（`health_daily_v1.sql`
+  表级 SELECT/INSERT/UPDATE、`memories_update_grant.sql` 列级 UPDATE(archived)）各自带 GRANT，
+  reset/seed 重放**不会**自动带上它们——round1 health_daily / round2 memories 两次日界崩溃均因此。
+  授权唯一登记表 = `scripts/check_grants.py` 的 `GRANT_REGISTRY`（新增增量 DDL 授权必须先登记）。
+  三道闸：① `db_init.sh reset` 末尾自动 `--apply` 并复核（diff≠0 即拒绝带伤 seed）；②
+  `start_local.sh` 启动自检自愈；③ `check_grants.py --check` 纯校验口径可进 CI。live 库已于
+  2026-09-27 手工补授 memories(archived) UPDATE，重放本脚本幂等无害。
 
 - `ddl/schema_v1.sql`：04 §5.2 逐字口径（events append-only 触发器 + REVOKE 双保险；agents id
   TEXT `'A01'~'A40'`；memories `vector(1024)` hnsw；不设事件类型 CHECK）；pg_partman 周分区

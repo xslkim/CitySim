@@ -168,3 +168,52 @@ async def test_batch_hook_mount(pool, gw) -> None:
         assert await pool.fetchval("SELECT count(*) FROM memories WHERE agent_id='A18' AND archived") == 2
     finally:
         clear_batch_hooks()
+
+
+class _StubClock:
+    """hygiene_loop 隔离测试用桩时钟：now_sim 可控推进（sim 日界翻转模拟）。"""
+
+    def __init__(self, t: dt.datetime) -> None:
+        self._t = t
+
+    def now_sim(self) -> dt.datetime:
+        return self._t
+
+    def advance_day(self) -> None:
+        self._t = self._t + dt.timedelta(days=1)
+
+
+async def test_hygiene_loop_survives_archive_exception(
+    pool: asyncpg.Pool, gw: HygStubGateway, caplog: pytest.LogCaptureFixture,
+) -> None:
+    """T-ITER2-02②：归档异常（如授权缺失）→ 协程存活、ERROR 留痕、当日跳过、次日自动重试。"""
+    import asyncio
+    import logging
+
+    h = MemoryHygiene(pool, gw)
+    clock = _StubClock(T0)
+    calls = {"n": 0}
+    orig = h.archive_old
+
+    async def flaky(*, sim_now):  # 第一次调用抛授权类异常，之后恢复正常
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise asyncpg.InsufficientPrivilegeError("mock REVOKE 后 archive_old 授权缺失")
+        return await orig(sim_now=sim_now)
+
+    h.archive_old = flaky  # type: ignore[method-assign]
+    stop = asyncio.Event()
+    loop_task = asyncio.create_task(h.hygiene_loop(clock=clock, stop=stop, interval=0.05))
+    with caplog.at_level(logging.ERROR):
+        try:
+            await asyncio.sleep(0.2)          # 日界翻转 #1：archive 抛异常（授权缺失）
+            clock.advance_day()
+            await asyncio.sleep(0.2)          # 日界翻转 #2：当日失败已跳过，不重复调用
+            clock.advance_day()
+            await asyncio.sleep(0.25)         # 日界翻转 #3：次日自动重试成功
+        finally:
+            stop.set()
+            await asyncio.wait_for(loop_task, timeout=2)
+    assert calls["n"] >= 2, "归档异常被跳过后次日须自动重试"
+    assert any("日界归档失败" in r.getMessage() and r.levelno >= logging.ERROR for r in caplog.records), \
+        "归档异常须记 ERROR 留痕（告警通道）"

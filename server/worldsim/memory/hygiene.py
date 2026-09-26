@@ -166,8 +166,14 @@ class MemoryHygiene:
         register_batch_hook(MERGE_BATCH_HOOK, self.batch_hook())
 
     async def hygiene_loop(self, *, clock: Any, stop: asyncio.Event, interval: float = 30.0) -> None:
-        """治理协程（04 §2.2 主循环挂接）：日界翻转（sim 日）触发归档；停即止。"""
+        """治理协程（04 §2.2 主循环挂接）：日界翻转（sim 日）触发归档；停即止。
+
+        T-ITER2-02②：协程隔离——归档异常（如授权缺失 InsufficientPrivilege）记 ERROR 并跳过
+        当日作业，**不得拖垮主 TaskGroup**（round2 教训：一个治理钩子异常 → 全核退出无拉起）；
+        failed_day 标记保证次日自动重试、当日内不每 30s 重喷。
+        """
         last_day = clock.now_sim().date()
+        failed_day: dt.date | None = None
         while not stop.is_set():
             try:
                 await asyncio.wait_for(stop.wait(), timeout=interval)
@@ -176,8 +182,16 @@ class MemoryHygiene:
                 pass
             today = clock.now_sim().date()
             if today != last_day:
-                n = await self.archive_old(sim_now=clock.now_sim())
-                if n:
-                    log.info("日界归档：%d 条记忆置归档", n)
+                if today == failed_day:
+                    continue  # 当日已失败跳过，等次日重试
+                try:
+                    n = await self.archive_old(sim_now=clock.now_sim())
+                except Exception:  # noqa: BLE001 - 治理协程隔离（T-ITER2-02②）：授权/DB 异常不杀内核
+                    log.exception("日界归档失败（授权缺失？）→ 当日卫生作业跳过，次日自动重试（T-ITER2-02②）")
+                    failed_day = today
+                else:
+                    if n:
+                        log.info("日界归档：%d 条记忆置归档", n)
+                    failed_day = None
                 last_day = today
         log.info("hygiene_loop 退出（stop）")
