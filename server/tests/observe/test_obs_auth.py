@@ -15,7 +15,7 @@ import pytest
 import pytest_asyncio
 
 from tests.conftest import DDL_DIR, _build_db, _drop_db
-from worldsim.observe.access_log import record_access, usage_by_day
+from worldsim.observe.access_log import mask_token, record_access, usage_by_day
 from worldsim.observe.app import create_app
 from worldsim.observe.auth import TOKEN_CAPACITY, TokenStore
 
@@ -106,10 +106,24 @@ async def test_access_log_usage_aggregation(client: Any) -> None:
     auth = {"Authorization": f"Bearer {token}"}
     await c.get("/api/usage", headers=auth)
     await c.get("/api/usage", headers=auth)
-    rows = usage_by_day(None, None, db_path=token_db)
+    rows = usage_by_day(None, None, db_path=token_db, self_token=token)
     today = dt.datetime.now(dt.timezone.utc).date().isoformat()
-    (row,) = [r for r in rows if r["token"] == token and r["day"] == today]
-    assert row["opens"] == 2
+    (row,) = [r for r in rows if r["is_self"] and r["day"] == today]
+    assert row["token"] == mask_token(token) and row["opens"] == 2
     assert row["first_seen_at"] <= row["last_seen_at"]
     r = await c.get(f"/api/usage?from={today}&to={today}", headers=auth)
-    assert any(x["token"] == token and x["opens"] >= 2 for x in r.json()["data"])
+    assert any(x["token"] == mask_token(token) and x["opens"] >= 2 for x in r.json()["data"])
+
+
+@pytest.mark.asyncio
+async def test_usage_never_leaks_full_token_r1_4(client: Any) -> None:
+    """R1 #4（安全事故 P0）：/api/usage 响应不出现任何完整 token 串（脱敏 + is_self 标识）。"""
+    c, token, token_db = client
+    auth = {"Authorization": f"Bearer {token}"}
+    await c.get("/api/usage", headers=auth)  # 产生访问日志行
+    r = await c.get("/api/usage", headers=auth)
+    assert r.status_code == 200
+    assert token not in r.text, "完整 token 泄露"
+    items = r.json()["data"]
+    assert items and all(item["token"].endswith("…") for item in items)
+    assert any(item["is_self"] for item in items)

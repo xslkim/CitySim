@@ -85,11 +85,15 @@ def create_app(pool: Any = None, token_db_path: str | None = None) -> FastAPI:
     async def api_usage(
         from_: str | None = Query(default=None, alias="from"),
         to: str | None = Query(default=None),
-        _token_row: dict = Depends(require_token),
+        token_row: dict = Depends(require_token),
         _pool: Any = Depends(get_pool),
     ) -> dict[str, Any]:
-        """门禁④度量（03 §5.1）：访问日志 token×自然日聚合（管理鉴权 = 有效 token，M4 开发期口径）。"""
-        return await ok_envelope(_pool, usage_by_day(from_, to, db_path=app.state.token_db_path), kind="usage")
+        """门禁④度量（03 §5.1）：访问日志 token×自然日聚合（R1 #4：全量脱敏 + is_self）。"""
+        return await ok_envelope(
+            _pool,
+            usage_by_day(from_, to, db_path=app.state.token_db_path, self_token=token_row["token"]),
+            kind="usage",
+        )
 
     # 随任务挂载的 REST/WS 路由（T-WEB-03~07；模块未交付时静默缺省）；
     # static（T-ART-03）另持 mount() 挂载静态目录（/assets、/stream）
