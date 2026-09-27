@@ -176,17 +176,18 @@ async def test_decision_silent_probe_flags_stall(test_db_dsn: str, alerts_file) 
     pool = await asyncpg.create_pool(test_db_dsn, min_size=1, max_size=2)
     try:
         t0 = dt.datetime(2026, 10, 12, 10, 0, tzinfo=LOCAL_TZ)  # 周一 10:00（清醒工作时段）
-        await _ins_agent_event(pool, 100, t0)
+        base = 100_000  # 高位基线：共享 test_db 可能残留其他用例的 agent 事件，低 tick 会被污染
+        await _ins_agent_event(pool, base, t0)
         stall_reasons: list[str] = []
 
         async def on_stall(reason: str) -> None:
             stall_reasons.append(reason)
 
-        clock = _DuckClock(100, t0)
+        clock = _DuckClock(base, t0)
         probe = DecisionSilentProbe(pool, clock=clock, is_quiet_fn=lambda _s: False,
                                     silent_minutes=30, on_stall=on_stall)
         assert (await probe.check_once())["stalled"] is False, "同 tick 有行为事件不告警"
-        clock._tick = 110  # +10 tick = 50 模拟分钟 > 30 阈值
+        clock._tick = base + 10  # +10 tick = 50 模拟分钟 > 30 阈值
         res = await probe.check_once()
         assert res["stalled"] is True and "decision_silent" in (res["reason"] or "")
         assert probe.stalled_reason and "decision_silent" in probe.stalled_reason
@@ -194,17 +195,17 @@ async def test_decision_silent_probe_flags_stall(test_db_dsn: str, alerts_file) 
         marker = _json.loads(await pool.fetchval(
             "SELECT value FROM world_state WHERE key='world.stalled'"))
         assert marker["stalled"] is True and marker["reason"] == "decision_silent"
-        assert marker["since_tick"] == 100
+        assert marker["since_tick"] == base
         alerts.flush_warnings()
         assert "world.decision_silent" in alerts_file.read_text(encoding="utf-8")
         # 行为恢复 → 清标
-        await _ins_agent_event(pool, 110, t0)
+        await _ins_agent_event(pool, base + 10, t0)
         assert (await probe.check_once())["stalled"] is False
         marker2 = _json.loads(await pool.fetchval(
             "SELECT value FROM world_state WHERE key='world.stalled'"))
         assert marker2["stalled"] is False
         # 睡眠窗静默 = 正常口径：即使 gap 超阈也不告警并清除标记
-        clock2 = _DuckClock(200, t0.replace(hour=2, minute=0))
+        clock2 = _DuckClock(base + 200, t0.replace(hour=2, minute=0))
         probe2 = DecisionSilentProbe(pool, clock=clock2,
                                      is_quiet_fn=lambda s: s.hour < 6, silent_minutes=30)
         res2 = await probe2.check_once()
