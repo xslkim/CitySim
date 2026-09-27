@@ -344,3 +344,13 @@ async def test_work_hours_open_office_commute(pool) -> None:
         assert "corp.tech" not in obs_weekend.exits
     finally:
         await pool.execute("DELETE FROM agents WHERE id='A20'")
+
+
+def test_parse_accepts_scalar_emotion_delta() -> None:
+    """R3 #1③ 附修：标量 emotion_delta（免费档模型常见形态）按情绪值收编，不判解析失败。"""
+    text = '{"intent":"聊聊","action":{"type":"chat","args":{"target":"A03"}},"emotion_delta":1}'
+    d = Pipeline._parse_decision("A10", text, 1)
+    assert d is not None and d.action_type == "chat" and d.emotion_delta == {"mood": 1.0}
+    bad = '{"intent":"x","action":{"type":"think","args":{}},"emotion_delta":"开心"}'
+    d2 = Pipeline._parse_decision("A10", bad, 1)
+    assert d2 is not None and d2.emotion_delta == {}

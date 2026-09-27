@@ -279,7 +279,12 @@ class Pipeline:
             return None
         emotion_delta = body.get("emotion_delta")
         if emotion_delta is not None and not isinstance(emotion_delta, dict):
-            return None
+            # R3 #1③ 附修：免费档模型常给标量 emotion_delta（如 1 / -2）——按情绪值宽容收编
+            # （下游无消费方，仅留痕），整行不再因此判解析失败而空转重试。
+            if isinstance(emotion_delta, (int, float)):
+                emotion_delta = {"mood": float(emotion_delta)}
+            else:
+                emotion_delta = None
         return Decision(
             agent_id=agent_id,
             intent=str(body.get("intent", "")),
