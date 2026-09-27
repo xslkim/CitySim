@@ -117,9 +117,9 @@ export default function AppShell() {
       </header>
       <div className="flex min-h-0 flex-1">
         <aside className="w-60 overflow-y-auto border-r border-border bg-bg-1 p-2" data-testid="left-pane">
-          <LocationTree />
+          <AgentList />
           <div className="mt-3 border-t border-border pt-2">
-            <AgentList />
+            <LocationTree />
           </div>
         </aside>
         <main className="min-w-0 flex-1 overflow-y-auto p-2">

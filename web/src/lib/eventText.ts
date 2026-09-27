@@ -11,6 +11,7 @@
  */
 import type { ObsEvent } from '../proto/event';
 import { EVENT_TYPES } from '../proto/event_types';
+import { locationName } from './mapLayout';
 
 export type RenderKind = 'bubble' | 'banner' | 'card' | 'divider' | 'system' | 'move' | 'gray' | 'hidden';
 
@@ -25,7 +26,9 @@ export interface RenderedEvent {
   grade?: string | null;
 }
 
-/** 03 §5.3 显式映射表（23 个显式 type；系统事件行走 SYSTEM_TYPES 前缀族） */
+/** 03 §5.3 显式映射表（23 个显式 type；系统事件行走 SYSTEM_TYPES 前缀族）
+ *  2026-09-27 扩充：日常动作/约定/账单/世界扰动等 26 类补模板文案——此前它们无 text_display 时
+ *  一律落"▮内容审核中▮"占位，观察端被占位刷屏（占位本意只是 LLM 文本待审的兜底，03 §7.3）。 */
 export const EXPLICIT_TYPES = [
   'dialogue.chat', 'dialogue.gossip', 'dialogue.argue', 'dialogue.confess', 'dialogue.apologize',
   'social.send_message', 'social.invite', 'social.refuse', 'social.give_gift', 'social.help',
@@ -33,6 +36,18 @@ export const EXPLICIT_TYPES = [
   'agent.move', 'agent.reflection', 'agent.promoted', 'agent.demoted',
   'world.announce', 'economy.payroll', 'economy.stock.tick', 'world.overtime', 'world.layoff_rumor',
   'director.intervene', 'time.day_summary',
+  // —— 扩充：日常动作（模板文案，无 LLM 原文泄漏面）——
+  'agent.work', 'agent.rest', 'agent.eat', 'agent.shop', 'agent.trade_stock', 'agent.think',
+  // —— 扩充：邀约/约定状态机 ——
+  'social.invite.counter', 'social.appointment.created', 'social.appointment.remind',
+  'social.appointment.stood_up',
+  // —— 扩充：账单与结算 ——
+  'economy.bill.rent', 'economy.bill.utility', 'economy.bill.rent.overdue',
+  'economy.bill.utility.overdue', 'economy.bill.rent.notice', 'economy.settle',
+  // —— 扩充：世界事件与扰动 ——
+  'world.holiday', 'world.team_building', 'world.promotion_window', 'world.perf_review',
+  'world.company_crisis', 'world.disturb.illness', 'world.disturb.weather',
+  'world.disturb.complaint', 'world.disturb.lucky', 'director.grade_revise',
 ] as const;
 
 /** 灰条系统族（03 §5.3 系统行：时间轴默认折叠，调试态展开） */
@@ -67,6 +82,12 @@ export function formatCents(cents: number): string {
 type NameOf = (id: string) => string;
 const idName: NameOf = (id) => id;
 
+/** 事件发起者人名：agent.* 事件的 actor 在 `source`（'agent:<id>'）而非 payload（03 §5.1 形态） */
+function actorName(ev: ObsEvent, nameOf: NameOf): string {
+  const m = /^agent:(A\d+)$/.exec(ev.source);
+  return m ? nameOf(m[1]) : '有人';
+}
+
 export function renderEvent(ev: ObsEvent, nameOf: NameOf = idName): RenderedEvent {
   const p = ev.payload as Record<string, any>;
   const text = typeof p.text_display === 'string' ? p.text_display : '';
@@ -99,7 +120,9 @@ export function renderEvent(ev: ObsEvent, nameOf: NameOf = idName): RenderedEven
     case 'social.repay_money':
       return { ...base, kind: 'card', icon: '💳', text: `${nameOf(p.from)} 还 ${nameOf(p.to)} 钱${typeof p.amount_cents === 'number' ? ` ${formatCents(p.amount_cents)}` : ''}` };
     case 'agent.move':
-      return { ...base, kind: 'move', icon: '👣', text: '' }; // 无气泡（pawn 动画）
+      // pawn 动画为主（03 §5.3）；事件流里给一行文字，否则列表出现空行（2026-09-27 观察页复盘）
+      return { ...base, kind: 'move', icon: '👣',
+        text: `${actorName(ev, nameOf)} ${locationName(typeof p.from === 'string' ? p.from : null)} → ${locationName(typeof p.to === 'string' ? p.to : null)}` };
     case 'agent.reflection':
       return { ...base, kind: 'system', icon: '💭', text }; // 灰虚线气泡（调试态）
     case 'agent.promoted':
@@ -124,6 +147,73 @@ export function renderEvent(ev: ObsEvent, nameOf: NameOf = idName): RenderedEven
       return { ...base, kind: 'banner', icon: '🎬', text: `编剧：${text || p.reason || ''}（${p.level ?? ''}）`, directorBorder: true };
     case 'time.day_summary':
       return { ...base, kind: 'divider', icon: '🌙', text: `第 ${p.day ?? '?'} 天结束` };
+    // ---- 日常动作（2026-09-27 扩充：模板文案，取代"内容审核中"占位刷屏） --------------
+    case 'agent.work':
+      return { ...base, kind: 'card', icon: '💼', text: text || `${actorName(ev, nameOf)} 投入工作` };
+    case 'agent.rest':
+      return { ...base, kind: 'card', icon: '😴',
+        text: text || (p.mode === 'nap' ? `${actorName(ev, nameOf)} 打了个盹` : `${actorName(ev, nameOf)} 睡下了`) };
+    case 'agent.eat': {
+      const venue = ({ cook: '自己做了顿饭', bento: '吃了份便当', canteen: '去食堂吃饭',
+        restaurant: '下馆子', coffee: '喝了杯咖啡' } as Record<string, string>)[String(p.venue)] ?? '吃了点东西';
+      return { ...base, kind: 'card', icon: '🍚', text: text || `${actorName(ev, nameOf)} ${venue}` };
+    }
+    case 'agent.shop':
+      return { ...base, kind: 'card', icon: '🛍', text: text || `${actorName(ev, nameOf)} 逛了逛商店` };
+    case 'agent.trade_stock':
+      return { ...base, kind: 'card', icon: '📊', text: text || `${actorName(ev, nameOf)} 操作了股票` };
+    case 'agent.think':
+      // 低价值内心活动：kind=system → 非调试态折叠（EventStream/TimelineList 过滤规则），
+      // 不进观众信息流；历史 public think 数据一并安静化
+      return { ...base, kind: 'system', icon: '💭', text: text || `${actorName(ev, nameOf)} 出了会儿神` };
+    // ---- 邀约/约定状态机 -------------------------------------------------------------
+    case 'social.invite.counter':
+      return { ...base, kind: 'card', icon: '🔁',
+        text: text || `${nameOf(p.to)} 对 ${nameOf(p.from)} 的邀约提了新方案${p.activity ? `：${p.activity}` : ''}` };
+    case 'social.appointment.created':
+      return { ...base, kind: 'card', icon: '🗓',
+        text: text || `约定成行${p.activity ? `：${p.activity}` : ''}${p.location_id ? `（${p.location_id}）` : ''}` };
+    case 'social.appointment.remind':
+      return { ...base, kind: 'card', icon: '⏰', text: text || `约定将近${p.activity ? `：${p.activity}` : ''}` };
+    case 'social.appointment.stood_up':
+      return { ...base, kind: 'card', icon: '💢', text: text || '有人被放了鸽子' };
+    // ---- 账单与结算 -------------------------------------------------------------------
+    case 'economy.bill.rent':
+      return { ...base, kind: 'card', icon: '🧾',
+        text: text || `${actorName(ev, nameOf)} 缴了房租${typeof p.amount_cents === 'number' ? ` ${formatCents(-Math.abs(p.amount_cents))}` : ''}` };
+    case 'economy.bill.utility':
+      return { ...base, kind: 'card', icon: '🧾',
+        text: text || `${actorName(ev, nameOf)} 缴了水电费${typeof p.amount_cents === 'number' ? ` ${formatCents(-Math.abs(p.amount_cents))}` : ''}` };
+    case 'economy.bill.rent.overdue':
+      return { ...base, kind: 'banner', icon: '⚠', text: text || `${actorName(ev, nameOf)} 的房租逾期了` };
+    case 'economy.bill.utility.overdue':
+      return { ...base, kind: 'banner', icon: '⚠', text: text || `${actorName(ev, nameOf)} 的水电费逾期了` };
+    case 'economy.bill.rent.notice':
+      return { ...base, kind: 'card', icon: '📨', text: text || '房租催缴通知贴了出来' };
+    case 'economy.settle':
+      return { ...base, kind: 'system', icon: '🧮', text: text || '系统结算' }; // 调试态可见
+    // ---- 世界事件与扰动 ----------------------------------------------------------------
+    case 'world.holiday':
+      return { ...base, kind: 'banner', icon: '🎉', text: text || '节日到了' };
+    case 'world.team_building':
+      return { ...base, kind: 'banner', icon: '🥂', text: text || '公司团建' };
+    case 'world.promotion_window':
+      return { ...base, kind: 'banner', icon: '🌟', text: text || '晋升窗口开启' };
+    case 'world.perf_review':
+      return { ...base, kind: 'banner', icon: '📝', text: text || '绩效评估季' };
+    case 'world.company_crisis':
+      return { ...base, kind: 'banner', icon: '🚨', text: text || '公司出事了' };
+    case 'world.disturb.illness':
+      return { ...base, kind: 'card', icon: '🤒', text: text || `${actorName(ev, nameOf)} 病倒了` };
+    case 'world.disturb.weather':
+      return { ...base, kind: 'card', icon: '🌦', text: text || '天气突变' };
+    case 'world.disturb.complaint':
+      return { ...base, kind: 'card', icon: '📮', text: text || '邻里投诉' };
+    case 'world.disturb.lucky':
+      return { ...base, kind: 'card', icon: '🍀', text: text || `${actorName(ev, nameOf)} 走了点小运` };
+    case 'director.grade_revise':
+      return { ...base, kind: 'banner', icon: '🎬', directorBorder: true,
+        text: text || `编剧改判 e${p.target_seq ?? '?'} → ${p.new_grade ?? '?'}` };
     default:
       break;
   }

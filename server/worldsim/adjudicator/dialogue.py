@@ -24,6 +24,7 @@ import datetime as dt
 import json
 import logging
 import random
+import re
 from typing import Any
 
 from ..memory import store
@@ -71,6 +72,7 @@ class DialogueEngine:
         throttle: ThrottleState | None = None,
         default_daily_cap: int = 42,
         grader: Any = None,
+        world: dict[str, Any] | None = None,
     ) -> None:
         self._pool = pool
         self._gw = gateway
@@ -82,6 +84,23 @@ class DialogueEngine:
         self._throttle = throttle or NullThrottleState()
         self._daily_cap = int(default_daily_cap)
         self._grader = grader  # T-ADJ-07 挂接（None = 不打分）
+        self._world = world or {}
+
+    def _location_display(self, node_id: Any) -> str:
+        """地点节点 id → 展示名（text_display 人话口径：此前原样拼 obs.position，
+        观众看到 "在apt.lobby聊起" 的技术串）。world.yaml 无名节点回退原 id。"""
+        node = str(node_id or "")
+        locs = self._world.get("locations", {})
+        for c in locs.get("apartment", {}).get("commons", []):
+            if c.get("id") == node:
+                return str(c.get("name") or node)
+        for n in locs.get("office", []):
+            if n.get("id") == node:
+                return str(n.get("name") or node)
+        m = re.match(r"^apt\.L\d+\.(\d+)$", node)
+        if m:
+            return f"{m.group(1)}室"
+        return node
 
     # ---- T-ADJ-03 结算挂接（dialogue_settle 签名） ------------------------------
 
@@ -142,7 +161,7 @@ class DialogueEngine:
         band = RelationEngine.chat_band(a_enjoy, b_enjoy)  # 愉快/平淡/敷衍（01 §7）
         # 情绪满足量先算（grade R3 信号预申报与实际施加同一数据源，D30）
         mood_gain = random.Random(f"dlg-mood:{rng_seed}:{a_id}:{b_id}:{tick}").uniform(*MOOD_ENJOYABLE_RANGE)
-        text_display = f"{names[a_id]}和{names[b_id]}在{obs.position}聊起「{topic_titles}」"
+        text_display = f"{names[a_id]}和{names[b_id]}在{self._location_display(obs.position)}聊起「{topic_titles}」"
         ui = None
         payload: dict[str, Any] = {
             "participants": [a_id, b_id], "mode": mode, "topic_ids": topic_ids,

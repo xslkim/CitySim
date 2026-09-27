@@ -147,7 +147,10 @@ class ActionValidator:
         # 通用规则① 状态（04 §6.2 状态行，P2-3 修正后口径：低值=匮乏）
         forced = self._needs.forced_action(obs.needs)
         if forced == "rest" and action_type != "rest":
-            return False, "精力 <10：强制 rest（04 §6.2 状态行）"
+            # 精力死锁修复（round3 实测）：强制 rest 期间放行"回自己房间"的 move——
+            # rest 前置要求位于自己房间，一刀切拦截 move 会让房外低精力 agent 永远回不了家。
+            if action_type != "move" or args.get("to") != await self._own_room(obs.agent_id):
+                return False, "精力 <10：强制 rest（04 §6.2 状态行）"
         if forced == "eat" and action_type != "eat":
             return False, "饥饿 <10：强制 eat（04 §6.2 状态行）"
         # 通用规则② 冷却（intent_cooldown until_sim > now → 拦截，01 §3.4）

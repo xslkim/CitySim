@@ -29,12 +29,29 @@ describe('03 §5.3 映射表', () => {
     }
   });
 
-  it('显式类型清单与 03 §5.3 表行数一致（23 显式 type）', () => {
-    expect(EXPLICIT_TYPES).toHaveLength(23);
+  it('显式类型清单与 03 §5.3 表 + 2026-09-27 扩充行数一致（49 显式 type）', () => {
+    expect(EXPLICIT_TYPES).toHaveLength(49);
     // 显式清单 ⊆ 06 注册表
     for (const t of EXPLICIT_TYPES) {
       expect(EVENT_TYPES).toContain(t);
     }
+  });
+
+  it('06 §1.2 注册类型全覆盖：无 text_display 也不落"内容审核中"占位（2026-09-27 扩充验收）', () => {
+    // 占位分支（03 §7.3）保留为"未来新注册类型未配模板"的兜底；当前注册表全类型均有渲染路径
+    for (const t of EVENT_TYPES) {
+      const r = renderEvent(ev(t, { day: 3, participants: ['A01', 'A02'] }));
+      expect(r.text).not.toBe('▮内容审核中▮');
+    }
+  });
+
+  it('日常动作模板文案：rest/eat/think 有人话、无 LLM 原文泄漏面', () => {
+    expect(renderEvent(ev('agent.rest', { mode: 'sleep' })).text).toBe('A01 睡下了');
+    expect(renderEvent(ev('agent.rest', { mode: 'nap' })).text).toBe('A01 打了个盹');
+    expect(renderEvent(ev('agent.eat', { venue: 'cook' })).text).toBe('A01 自己做了顿饭');
+    const think = renderEvent(ev('agent.think', { topic_hint: '未过审原文' }));
+    expect(think.kind).toBe('system'); // 非调试态折叠
+    expect(think.text).not.toContain('未过审原文');
   });
 
   it('test_unknown_type_gray_bar_logged：无 text_display 未知 type → 灰条 + 错误日志计数', () => {
@@ -45,10 +62,10 @@ describe('03 §5.3 映射表', () => {
     expect(unknownTypeLogCount()).toBe(before + 1);
   });
 
-  it('未过审占位（03 §7.3）：已注册无 text_display → ▮内容审核中▮，事件可见', () => {
+  it('economy.settle → 系统结算灰条（调试态），不落审核占位、无金额原文泄漏', () => {
     const r = renderEvent(ev('economy.settle', { agent_id: 'A01', amount_cents: -100, reason: 'x' }));
-    expect(r.kind).toBe('gray');
-    expect(r.text).toBe('▮内容审核中▮');
+    expect(r.kind).toBe('system');
+    expect(r.text).toBe('系统结算');
     expect(r.text).not.toContain('amount_cents'); // 无原文泄漏面
   });
 

@@ -1,18 +1,19 @@
 /**
  * /map 空间地图页（05 T-WEB-13；03 §3.1/§2.2(a)/§4.2 scrub 历史重建）。
  * 布局：四 site tab + pawn/名牌/气泡 + 跟拍（右栏锁定摘要卡）+ 底部 ScrubBar +
- * 右栏（选中角色摘要卡 / 本地点·全局 EventStream）+ 顶部"今日热涟漪"卡片条（T-WEB-16 组件）。
+ * 右栏（选中角色摘要卡 / NowPanel"此刻"总览：对话+角色动态+事件流）+ 顶部"今日热涟漪"卡片条（T-WEB-16 组件）。
  */
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiGet } from '../api/client';
-import EventStream from '../components/common/EventStream';
 import Avatar from '../components/common/Avatar';
 import ScrubBar from '../components/map/ScrubBar';
 import SiteSvg from '../components/map/SiteSvg';
+import NowPanel from '../components/map/NowPanel';
 import TodayRipples from '../components/ripple/TodayRipples';
 import { getLayout, tryLoadMapLayout, locationName, siteOf, type Site } from '../lib/mapLayout';
+import { envelopeEventsSchema } from '../proto';
 import { snapshotSchema, type SnapshotData } from '../proto/snapshot';
 import { useAgentsStore } from '../stores/agentsStore';
 import { useTimelineStore } from '../stores/timelineStore';
@@ -36,6 +37,14 @@ export default function MapPage() {
 
   useEffect(() => {
     tryLoadMapLayout().then(setLayout);
+  }, []);
+
+  // 动态流首屏回填（2026-09-27：此前右栏事件流纯靠 WS 实时帧，打开页面/世界安静时整段空白）
+  useEffect(() => {
+    if (useTimelineStore.getState().events.length > 0) return;
+    apiGet('/api/events?limit=100', envelopeEventsSchema)
+      .then((r) => useTimelineStore.getState().append(r.data.items))
+      .catch(() => undefined);
   }, []);
 
   const view = historical ?? snapshot;
@@ -148,7 +157,13 @@ export default function MapPage() {
               </Link>
             </div>
           ) : (
-            <EventStream events={events.slice(-100)} names={names} height={440} />
+            <NowPanel
+              snapshot={snapshot}
+              events={events}
+              names={names}
+              signatureColors={signatureColors}
+              onSelectAgent={selectAgent}
+            />
           ),
           rightPane,
         )}

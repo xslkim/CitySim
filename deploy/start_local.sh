@@ -44,6 +44,7 @@ rm -f "$LOG_DIR/kernel.stopped"   # 启动即解除停跑标记（停跑：touch
 if ! pgrep -f "worldsim_kernel_supervisor" >/dev/null; then
   log "启动内核看守（${WSIM_LLM:-mock}）…"
   nohup bash -c '
+    # worldsim_kernel_supervisor（守护标记：pgrep -f 去重锚点，勿删——缺失会导致重复拉起看守）
     KERNEL_PID_FILE="'"$LOG_DIR"'/kernel.pid"
     alive() {
       local pid
@@ -68,7 +69,8 @@ fi
 # 3) obs_refresh 常驻（新模拟日快照到达即重算三实体表；轮询 var/snapshot 目录）
 if ! pgrep -f "obs_refresh_loop" >/dev/null; then
   log "启动 obs_refresh 常驻…"
-  nohup bash -c 'while true; do
+  nohup bash -c '# obs_refresh_loop（守护标记：pgrep -f 去重锚点，勿删——缺失会导致重复拉起常驻循环）
+  while true; do
     cd "'"$REPO_ROOT"'/server" && uv run python scripts/obs_refresh.py --all >>"'"$LOG_DIR"'/obs_refresh.log" 2>&1
     sleep 30
   done' >/dev/null 2>&1 &

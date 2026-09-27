@@ -47,7 +47,7 @@ ACTION_MENU = (
     "可选动作（action.type 取值，args 为参数对象，门槛不满足会被现实阻止）：\n"
     "- move {to: 可达节点}\n"
     "- work {}（工作日 09:00-18:00 且须在公司 corp 节点）\n"
-    "- rest {mode: nap|sleep}（须在自己房间）\n"
+    "- rest {mode: nap|sleep}（须在自己房间；不在房间时先 move 回自己房间再 rest）\n"
     "- eat {venue: cook|bento|canteen|restaurant|coffee, with?: [同节点者]}\n"
     "- shop {store: 便利店|商超|服饰店|家居店|书店|礼品店, budget: 分}\n"
     "- trade_stock {side: buy|sell, symbol: {stocks}, amount: 分}（9:30-15:00）\n"
@@ -107,6 +107,7 @@ class Observation:
     cognition_tier: str
     relation_edges: list[dict[str, Any]] = field(default_factory=list)  # [{id,name,affinity,tension,labels}]
     debts: list[dict[str, Any]] = field(default_factory=list)  # [{peer,name,role,amount_cents,due_sim}]
+    room_no: str | None = None  # 强制 rest 改派（回房路径）用；None = 校外 NPC 无公寓房间
 
     def prompt_line(self) -> str:
         """OBS_JSON 行（mock provider 的确定性决策契约；M2 模板渲染归 T-LLM-09）。"""
@@ -346,7 +347,7 @@ class Pipeline:
 
     async def _build_obs(self, agent_id: str, sim_now: dt.datetime) -> Observation:
         row = await self._pool.fetchrow(
-            "SELECT id, name, persona, needs, balance_cents, position, cognition_tier, department FROM agents WHERE id=$1",
+            "SELECT id, name, persona, needs, balance_cents, position, cognition_tier, department, room_no FROM agents WHERE id=$1",
             agent_id,
         )
         if row is None:
@@ -371,6 +372,13 @@ class Pipeline:
             office = self._office_node(row["department"])
             if office is not None and office not in exits:
                 exits = [*exits, office]
+        # 精力死锁修复（round3 实测）：人在公寓时自家房间恒可达——房间不在 commons 可达图里，
+        # 旧版 agent 永远无法 move 回房，而 rest 前置要求"位于自己房间"→ 精力 <10 后一切动作
+        # 被强制 rest 拦截、又无法回家休息，全员瘫在大堂直到睡眠窗被动结算。
+        if row["room_no"] and str(row["position"]).startswith("apt."):
+            own = f"apt.L{int(str(row['room_no'])[:-2])}.{row['room_no']}"
+            if own != row["position"] and own not in exits:
+                exits = [*exits, own]
         recent = await self._pool.fetch(
             "SELECT seq, type, visibility FROM events WHERE $1 = ANY(actors) ORDER BY seq DESC LIMIT 5",
             agent_id,
@@ -419,6 +427,7 @@ class Pipeline:
             cognition_tier=row["cognition_tier"],
             relation_edges=[dict(r) for r in rel_rows],
             debts=[dict(r) for r in debt_rows],
+            room_no=str(row["room_no"]) if row["room_no"] else None,
         )
 
     # ---- step4~step6（串行，唯一写路径） -----------------------------------
@@ -431,6 +440,9 @@ class Pipeline:
         ok, reason = verdict
         seqs: list[int] = []
         if not ok:
+            redirected = await self._forced_rest_redirect(obs, decision, reason, tick, sim_now, rng_seed)
+            if redirected is not None:
+                return redirected
             decision.blocked_reason = reason
             # R3 #1④ 诊断面：意图被门槛拒绝留计数日志（社交意图消失在门槛面的可见性）
             log.info("step4 拦截：agent=%s action=%s args=%s reason=%s",
@@ -450,6 +462,41 @@ class Pipeline:
             await self._after_settle(decision, seqs)
         if self._reflect:
             await self._reflect(decision.agent_id, decision)  # step6 挂接点（T-MEM-02）
+        return seqs
+
+    async def _forced_rest_redirect(
+        self, obs: Observation, decision: Decision, reason: str | None,
+        tick: int, sim_now: dt.datetime, rng_seed: int,
+    ) -> list[int] | None:
+        """精力 <10 强制 rest 从"只否决"改为"真强制"（round3 实测复盘）：
+
+        纯否决不产生任何恢复——弱模型学不会"先 move 回房再 rest"（连续两轮决策仍选 chat/原地
+        rest），全员能量归零瘫在大堂、世界静默数模拟小时。改派规则：不在自己房间 → move 回房
+        （下一裁决点再 rest）；已在房间 → rest sleep。仅公寓内生效（公司时段精力约束归工作/
+        通勤规则）；无可改派路径 → None 走原拦截留痕。04 §6.2"强制 rest"的本来语义即强制。
+        """
+        if not (reason and reason.startswith("精力 <10")):
+            return None
+        if not obs.room_no or not str(obs.position).startswith("apt."):
+            return None
+        own = f"apt.L{int(str(obs.room_no)[:-2])}.{obs.room_no}"
+        if obs.position != own:
+            d = Decision(agent_id=obs.agent_id, intent="精疲力尽，回房休息",
+                         action_type="move", action_args={"to": own}, attempts=decision.attempts)
+            if self._settler is not None:
+                seqs = await self._settler(obs, d, tick, sim_now, rng_seed)
+            else:
+                seqs = [await self._settle_move(obs, d, tick, sim_now, rng_seed)]
+        else:
+            if self._settler is None:
+                return None  # M1 骨架无 rest 结算路径，走原拦截
+            d = Decision(agent_id=obs.agent_id, intent="精疲力尽，倒头睡下",
+                         action_type="rest", action_args={"mode": "sleep"}, attempts=decision.attempts)
+            seqs = await self._settler(obs, d, tick, sim_now, rng_seed)
+        log.info("强制 rest 改派：agent=%s → %s（原决策 %s 被精力门槛否决，系统接管）",
+                 obs.agent_id, d.action_type, decision.action_type)
+        if self._after_settle:
+            await self._after_settle(d, seqs)
         return seqs
 
     def _default_validate(self, obs: Observation, action_type: str, args: dict[str, Any]) -> tuple[bool, str | None]:

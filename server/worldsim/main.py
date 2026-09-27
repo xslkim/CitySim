@@ -265,6 +265,7 @@ async def _run(args: argparse.Namespace) -> int:
             default_daily_cap=int(models_cfg.get("thresholds", {}).get("dialogue", {}).get("daily_cap", 42)),
             grader=grader,
             throttle=throttle_view,  # T-OPS-02 降速读取点③接线
+            world=world_cfg,  # 地点展示名（text_display 人话口径）
         )
         action_validator = ActionValidator(
             pool, world=world_cfg, needs_engine=needs_engine, cooldown=cooldown_engine,
